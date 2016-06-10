@@ -1,9 +1,9 @@
 package org.bitcoins.core.protocol.transaction
 
+import org.bitcoins.core.crypto.DoubleSha256Digest
 import org.bitcoins.core.protocol.NetworkElement
+import org.bitcoins.core.util.{BitcoinSUtil, Factory}
 import org.bitcoins.core.serializers.transaction.RawTransactionOutPointParser
-import org.bitcoins.core.util.Factory
-
 /**
  * Created by chris on 12/26/15.
  *
@@ -14,7 +14,7 @@ sealed trait TransactionOutPoint extends NetworkElement {
  *
     * @return
     */
-  def txId : String
+  def txId : DoubleSha256Digest
 
   /**
     * The output index in the parent transaction for the output we are spending
@@ -30,13 +30,14 @@ sealed trait TransactionOutPoint extends NetworkElement {
 }
 
 case object EmptyTransactionOutPoint extends TransactionOutPoint {
-  def txId : String = "0000000000000000000000000000000000000000000000000000000000000000"
+  def txId = DoubleSha256Digest(
+    BitcoinSUtil.decodeHex("0000000000000000000000000000000000000000000000000000000000000000"))
   def vout = -1
 }
 
 object TransactionOutPoint extends Factory[TransactionOutPoint] {
 
-  private sealed case class TransactionOutPointImpl(txId : String, vout : Int) extends TransactionOutPoint
+  private sealed case class TransactionOutPointImpl(txId : DoubleSha256Digest, vout : Int) extends TransactionOutPoint
   /**
     * Creates a transaction outpoint from a TransactionOutput & it's parent transaction
  *
@@ -49,7 +50,7 @@ object TransactionOutPoint extends Factory[TransactionOutPoint] {
     else factory(parentTransaction.txId,indexOfOutput)
   }
 
-  private def factory(txId : String, index : Int) = {
+  private def factory(txId : DoubleSha256Digest, index : Int) = {
     if (txId == EmptyTransactionOutPoint.txId && index == EmptyTransactionOutPoint.vout) {
       EmptyTransactionOutPoint
     } else TransactionOutPointImpl(txId, index)
@@ -57,9 +58,8 @@ object TransactionOutPoint extends Factory[TransactionOutPoint] {
 
   def fromBytes(bytes : Seq[Byte]) : TransactionOutPoint = RawTransactionOutPointParser.read(bytes)
 
-  def apply(bytes : Seq[Byte]) : TransactionOutPoint = fromBytes(bytes)
-  def apply(hex : String) : TransactionOutPoint = fromHex(hex)
   def apply(output : TransactionOutput,parentTransaction : Transaction) : TransactionOutPoint = factory(output,parentTransaction)
-  def apply(txId : String, index: Int) : TransactionOutPoint = factory(txId,index)
+
+  def apply(txId : DoubleSha256Digest, index: Int) : TransactionOutPoint = factory(txId,index)
 }
 

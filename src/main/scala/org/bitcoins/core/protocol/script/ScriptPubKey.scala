@@ -1,6 +1,6 @@
 package org.bitcoins.core.protocol.script
 
-import org.bitcoins.core.crypto.{ECFactory, ECPublicKey}
+import org.bitcoins.core.crypto.{ECPublicKey}
 import org.bitcoins.core.serializers.script.{RawScriptPubKeyParser, ScriptParser}
 import org.bitcoins.core.protocol._
 import org.bitcoins.core.script.bitwise.{OP_EQUAL, OP_EQUALVERIFY}
@@ -18,11 +18,9 @@ sealed trait ScriptPubKey extends NetworkElement with BitcoinSLogger {
    * Representation of a scriptSignature in a parsed assembly format
    * this data structure can be run through the script interpreter to
    * see if a script evaluates to true
- *
    * @return
    */
-  def asm : Seq[ScriptToken]
-
+  lazy val asm : Seq[ScriptToken] = ScriptParser.fromBytes(bytes)
 
 }
 
@@ -40,12 +38,10 @@ trait P2PKHScriptPubKey extends ScriptPubKey
  */
 trait MultiSignatureScriptPubKey extends ScriptPubKey {
 
-
   /**
-   * Returns the amount of required signatures for this multisignature script pubkey output
- *
-   * @return
-   */
+    * Returns the amount of required signatures for this multisignature script pubkey output
+    * @return
+    */
   def requiredSigs : Long = {
     val asmWithoutPushOps = asm.filterNot(_.isInstanceOf[BytesToPushOntoStack])
     val opCheckMultiSigIndex = if (asm.indexOf(OP_CHECKMULTISIG) != -1) asmWithoutPushOps.indexOf(OP_CHECKMULTISIG) else asmWithoutPushOps.indexOf(OP_CHECKMULTISIGVERIFY)
@@ -64,7 +60,6 @@ trait MultiSignatureScriptPubKey extends ScriptPubKey {
 
   /**
    * The maximum amount of signatures for this multisignature script pubkey output
- *
    * @return
    */
   def maxSigs : Long = {
@@ -82,7 +77,6 @@ trait MultiSignatureScriptPubKey extends ScriptPubKey {
 
   /**
    * Gives the OP_CHECKMULTISIG or OP_CHECKMULTISIGVERIFY index inside of asm
- *
    * @return the index of OP_CHECKMULTISIG or OP_CHECKMULTISIGVERIFY
    */
   private def checkMultiSigIndex : Int = {
@@ -91,11 +85,10 @@ trait MultiSignatureScriptPubKey extends ScriptPubKey {
 
   /**
    * Returns the public keys encoded into the scriptPubKey
- *
    * @return
    */
   def publicKeys : Seq[ECPublicKey] = {
-    asm.filter(_.isInstanceOf[ScriptConstant]).slice(1, maxSigs.toInt + 1).map(key => ECFactory.publicKey(key.hex))
+    asm.filter(_.isInstanceOf[ScriptConstant]).slice(1, maxSigs.toInt + 1).map(key => ECPublicKey(key.hex))
   }
 }
 
@@ -112,43 +105,15 @@ trait P2SHScriptPubKey extends ScriptPubKey
  * Format: <pubkey> OP_CHECKSIG
  */
 trait P2PKScriptPubKey extends ScriptPubKey {
-  def publicKey = ECFactory.publicKey(BitcoinScriptUtil.filterPushOps(asm).head.bytes)
+  def publicKey = ECPublicKey(BitcoinScriptUtil.filterPushOps(asm).head.bytes)
 }
 
 trait NonStandardScriptPubKey extends ScriptPubKey
-
-
-object NonStandardScriptPubKeyImpl {
-  def apply(hex : String) : NonStandardScriptPubKeyImpl = NonStandardScriptPubKeyImpl(hex, RawScriptPubKeyParser.read(hex).asm)
-}
-case class NonStandardScriptPubKeyImpl(hex : String, asm : Seq[ScriptToken]) extends NonStandardScriptPubKey
-
-object P2PKHScriptPubKeyImpl {
-  def apply(hex : String) : P2PKHScriptPubKeyImpl = P2PKHScriptPubKeyImpl(hex, RawScriptPubKeyParser.read(hex).asm)
-}
-case class P2PKHScriptPubKeyImpl(hex : String, asm : Seq[ScriptToken]) extends P2PKHScriptPubKey
-
-
-object MultiSignatureScriptPubKeyImpl {
-  def apply(hex : String) : MultiSignatureScriptPubKeyImpl = MultiSignatureScriptPubKeyImpl(hex, RawScriptPubKeyParser.read(hex).asm)
-}
-case class MultiSignatureScriptPubKeyImpl(hex : String,asm : Seq[ScriptToken]) extends MultiSignatureScriptPubKey
-
-object P2SHScriptPubKeyImpl {
-  def apply(hex : String) : P2SHScriptPubKeyImpl = P2SHScriptPubKeyImpl(hex, RawScriptPubKeyParser.read(hex).asm)
-}
-case class P2SHScriptPubKeyImpl(hex : String,asm : Seq[ScriptToken]) extends P2SHScriptPubKey
-
-object P2PKScriptPubKeyImpl {
-  def apply(hex : String) : P2PKScriptPubKeyImpl = P2PKScriptPubKeyImpl(hex, RawScriptPubKeyParser.read(hex).asm)
-}
-case class P2PKScriptPubKeyImpl(hex : String,asm : Seq[ScriptToken]) extends P2PKScriptPubKey
 
 /**
  * Represents the empty script pub key
  */
 case object EmptyScriptPubKey extends ScriptPubKey {
-  def asm = List()
   def hex = ""
 }
 
@@ -158,11 +123,18 @@ case object EmptyScriptPubKey extends ScriptPubKey {
 object ScriptPubKey extends Factory[ScriptPubKey] {
   def empty : ScriptPubKey = fromAsm(List())
 
-  def fromBytes(bytes : Seq[Byte]) : ScriptPubKey = RawScriptPubKeyParser.read(bytes)
+  private case class P2PKScriptPubKeyImpl(hex : String) extends P2PKScriptPubKey
+
+  private case class NonStandardScriptPubKeyImpl(hex : String) extends NonStandardScriptPubKey
+
+  private case class P2PKHScriptPubKeyImpl(hex : String) extends P2PKHScriptPubKey
+
+  private case class MultiSignatureScriptPubKeyImpl(hex : String) extends MultiSignatureScriptPubKey
+
+  private case class P2SHScriptPubKeyImpl(hex : String) extends P2SHScriptPubKey
 
   /**
     * Creates a scriptPubKey from its asm representation
- *
     * @param asm
     * @return
     */
@@ -171,20 +143,18 @@ object ScriptPubKey extends Factory[ScriptPubKey] {
     asm match {
       case Seq() => EmptyScriptPubKey
       case List(OP_DUP, OP_HASH160, x : BytesToPushOntoStack, y : ScriptConstant, OP_EQUALVERIFY, OP_CHECKSIG) =>
-        P2PKHScriptPubKeyImpl(scriptPubKeyHex,asm)
+        P2PKHScriptPubKeyImpl(scriptPubKeyHex)
       case List(OP_HASH160, x : BytesToPushOntoStack, y : ScriptConstant, OP_EQUAL) =>
-        P2SHScriptPubKeyImpl(scriptPubKeyHex,asm)
-      case List(b : BytesToPushOntoStack, x : ScriptConstant, OP_CHECKSIG) => P2PKScriptPubKeyImpl(scriptPubKeyHex,asm)
+        P2SHScriptPubKeyImpl(scriptPubKeyHex)
+      case List(b : BytesToPushOntoStack, x : ScriptConstant, OP_CHECKSIG) => P2PKScriptPubKeyImpl(scriptPubKeyHex)
       case _ if (isMultiSignatureScriptPubKey(asm)) =>
-        MultiSignatureScriptPubKeyImpl(scriptPubKeyHex,asm)
-      case _ => NonStandardScriptPubKeyImpl(scriptPubKeyHex,asm)
+        MultiSignatureScriptPubKeyImpl(scriptPubKeyHex)
+      case _ => NonStandardScriptPubKeyImpl(scriptPubKeyHex)
     }
   }
 
-
   /**
     * Determines if the given script tokens are a multisignature scriptPubKey
- *
     * @param asm the tokens to check
     * @return a boolean indicating if the given tokens are a multisignature scriptPubKey
     */
@@ -197,8 +167,6 @@ object ScriptPubKey extends Factory[ScriptPubKey] {
 
   }
 
-  def apply(bytes: Seq[Byte]) : ScriptPubKey = fromBytes(bytes)
-
-  def apply(hex : String) : ScriptPubKey = fromHex(hex)
+  def fromBytes(bytes : Seq[Byte]) : ScriptPubKey = RawScriptPubKeyParser.read(bytes)
 
 }

@@ -2,7 +2,7 @@ package org.bitcoins.core.crypto
 
 import java.math.BigInteger
 
-import org.bitcoins.core.util.{BitcoinSLogger, BitcoinSUtil}
+import org.bitcoins.core.util.{BitcoinSLogger, BitcoinSUtil, Factory}
 import org.spongycastle.crypto.params.ECPublicKeyParameters
 import org.spongycastle.crypto.signers.ECDSASigner
 
@@ -12,12 +12,8 @@ import scala.util.{Failure, Success, Try}
  * Created by chris on 2/16/16.
  */
 trait ECPublicKey extends BaseECKey with BitcoinSLogger {
-  import org.bitcoinj.core.ECKey
-
-
   /**
    * The elliptic curve used by bitcoin
- *
    * @return
    */
   private def curve = CryptoParams.curve
@@ -27,9 +23,17 @@ trait ECPublicKey extends BaseECKey with BitcoinSLogger {
    */
   private def publicKeyParams = new ECPublicKeyParameters(curve.getCurve.decodePoint(bytes.toArray), curve)
 
+
+  /**
+    * Verifies that the given hash is signed by the private key corresponding to the public key
+    * @param hash the hash that needs to be verified
+    * @param signature the signature created by the private key corresponding to this publick ey
+    * @return a boolean indicating if the signature is valid or not
+    */
+  def verify(hash : HashDigest, signature : ECDigitalSignature) : Boolean = verify(hash.bytes,signature)
+
   /**
    * Verifies if a given piece of data is signed by the private key corresponding public key
- *
    * @param data
    * @param signature
    * @return
@@ -71,6 +75,27 @@ trait ECPublicKey extends BaseECKey with BitcoinSLogger {
    * @return
    */
   def verify(hex : String, signature : ECDigitalSignature) : Boolean = verify(BitcoinSUtil.decodeHex(hex),signature)
+
+  override def toString = "ECPublicKey(" + hex + ")"
 }
 
-case class ECPublicKeyImpl(hex : String) extends ECPublicKey
+object ECPublicKey extends Factory[ECPublicKey] {
+
+  private case class ECPublicKeyImpl(bytes : Seq[Byte]) extends ECPublicKey
+
+  override def fromBytes(bytes : Seq[Byte]) : ECPublicKey = ECPublicKeyImpl(bytes)
+
+  /**
+    * Generates a fresh public key that has not been used before
+    * @return
+    */
+  def apply() = freshPublicKey
+
+  /**
+    * Generates a fresh public key that has not been used before
+    * @return
+    */
+  def freshPublicKey = ECPrivateKey.freshPrivateKey.publicKey
+}
+
+

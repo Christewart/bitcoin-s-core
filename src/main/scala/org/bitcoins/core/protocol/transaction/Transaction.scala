@@ -1,8 +1,9 @@
 package org.bitcoins.core.protocol.transaction
 
+import org.bitcoins.core.crypto.DoubleSha256Digest
 import org.bitcoins.core.protocol.NetworkElement
 import org.bitcoins.core.serializers.transaction.RawTransactionParser
-import org.bitcoins.core.util.{BitcoinSUtil, CryptoUtil, Factory}
+import org.bitcoins.core.util.{Factory, BitcoinSUtil, CryptoUtil}
 
 /**
  * Created by chris on 7/14/15.
@@ -12,10 +13,11 @@ import org.bitcoins.core.util.{BitcoinSUtil, CryptoUtil, Factory}
 sealed trait Transaction extends NetworkElement {
   /**
     * The sha256(sha256(tx)) of this transaction
- *
+    * Note that this is the little endian encoding of the hash NOT the big endian encoding
+    * which bitcoin core uses
     * @return
     */
-  def txId : String = BitcoinSUtil.encodeHex(CryptoUtil.doubleSHA256(hex).reverse)
+  def txId : DoubleSha256Digest = DoubleSha256Digest(CryptoUtil.doubleSHA256(bytes).bytes.reverse)
 
   /**
     * The version number for this transaction
@@ -62,7 +64,7 @@ sealed trait Transaction extends NetworkElement {
 }
 
 case object EmptyTransaction extends Transaction {
-  override def txId = "0000000000000000000000000000000000000000000000000000000000000000"
+  override def txId = DoubleSha256Digest(BitcoinSUtil.decodeHex("0000000000000000000000000000000000000000000000000000000000000000"))
   override def version = TransactionConstants.version
   override def inputs = Seq()
   override def outputs = Seq()
@@ -124,8 +126,6 @@ object Transaction extends Factory[Transaction] {
 
   def fromBytes(bytes : Seq[Byte]) : Transaction = RawTransactionParser.read(bytes)
 
-  def apply(bytes : Seq[Byte]) : Transaction = fromBytes(bytes)
-  def apply(hex: String) : Transaction = fromHex(hex)
   def apply(bytes : Array[Byte]) : Transaction = factory(bytes)
   def apply(oldTx : Transaction, lockTime : Long)  : Transaction = factory(oldTx,lockTime)
   def apply(oldTx : Transaction, updatedInputs : UpdateTransactionInputs) : Transaction = factory(oldTx, updatedInputs)
