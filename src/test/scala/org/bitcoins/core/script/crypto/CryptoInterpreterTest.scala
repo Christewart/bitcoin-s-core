@@ -24,7 +24,7 @@ import org.scalatest.{FlatSpec, MustMatchers}
 class CryptoInterpreterTest extends FlatSpec with MustMatchers with CryptoInterpreter with BitcoinSLogger {
   val stack = List(ScriptConstant("02218AD6CDC632E7AE7D04472374311CEBBBBF0AB540D2D08C3400BB844C654231".toLowerCase))
 
-  "CryptoInterpreter" must "evaluate OP_HASH160 correctly when it is on top of the script stack" in {
+/*  "CryptoInterpreter" must "evaluate OP_HASH160 correctly when it is on top of the script stack" in {
 
     val script = List(OP_HASH160)
     val program = ScriptProgram(TestUtil.testProgram, stack,script)
@@ -179,7 +179,7 @@ class CryptoInterpreterTest extends FlatSpec with MustMatchers with CryptoInterp
     val program = ScriptProgram(ScriptProgram(TestUtil.testProgramExecutionInProgress,stack,script),script,ScriptProgram.OriginalScript)
     val newProgram = ScriptProgramTestUtil.toExecutionInProgressScriptProgram(opCodeSeparator(program))
     newProgram.lastCodeSeparator must be (Some(0))
-  }
+  }*/
 
   it must "verify an attempt to withdraw coins from a blockchain" in {
     // 1. genesis block hash of the chain the withdraw is coming from
@@ -197,8 +197,9 @@ class CryptoInterpreterTest extends FlatSpec with MustMatchers with CryptoInterp
     val contract: Seq[Byte] = BitcoinSUtil.decodeHex("5032504800000000000000000000000000000000") ++ usersHash.bytes
     val amount = Satoshis(Int64(500))
     //note: this has the pushop on the front for the script which elements does not have
-    val fedPegScript = ScriptPubKey("255121025015a9e8e8831cf859e314b5a6a283d8fd6d201ba6aa8c7d20453dfd12fa2bea51ae")
-    val lockingScriptPubKey: ScriptPubKey = P2SHScriptPubKey(fedPegScript)
+    val fedPegScript = MultiSignatureScriptPubKey("255121025015a9e8e8831cf859e314b5a6a283d8fd6d201ba6aa8c7d20453dfd12fa2bea51ae")
+    val tweakedFedPegScript = MultiSignatureScriptPubKey(fedPegScript.requiredSigs,fedPegScript.publicKeys.map(_.tweakAdd(contract)))
+    val lockingScriptPubKey: ScriptPubKey = P2SHScriptPubKey(tweakedFedPegScript)
     val lockingOutput: TransactionOutput = TransactionOutput(amount,lockingScriptPubKey)
     val lockTx = buildLockingTx(lockingOutput)
     //TODO: This will fail to generate every now and then because generating a merkle block is expensive
@@ -245,8 +246,9 @@ class CryptoInterpreterTest extends FlatSpec with MustMatchers with CryptoInterp
     val contract: Seq[Byte] = BitcoinSUtil.decodeHex("5032504800000000000000000000000000000000d76885e2754fcd108c0204eab323e071e24e9a98")
     val amount = Satoshis(Int64(500))
     //note: this has the pushop on the front for the script which elements does not have
-    val fedPegScript = ScriptPubKey("255121025015a9e8e8831cf859e314b5a6a283d8fd6d201ba6aa8c7d20453dfd12fa2bea51ae")
-    val lockingScriptPubKey: ScriptPubKey = P2SHScriptPubKey(fedPegScript)
+    val fedPegScript = MultiSignatureScriptPubKey("255121025015a9e8e8831cf859e314b5a6a283d8fd6d201ba6aa8c7d20453dfd12fa2bea51ae")
+    val tweakedFedPegScript = MultiSignatureScriptPubKey(fedPegScript.requiredSigs,fedPegScript.publicKeys.map(_.tweakAdd(contract)))
+    val lockingScriptPubKey: ScriptPubKey = P2SHScriptPubKey(tweakedFedPegScript)
     val lockingOutput: TransactionOutput = TransactionOutput(amount,lockingScriptPubKey)
     val lockTx = buildLockingTx(lockingOutput)
     //TODO: This will fail to generate every now and then because generating a merkle block is expensive

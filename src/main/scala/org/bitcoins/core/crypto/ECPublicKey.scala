@@ -4,7 +4,7 @@ import java.math.BigInteger
 
 import org.bitcoin.NativeSecp256k1
 import org.bitcoins.core.script.crypto.HashType
-import org.bitcoins.core.util.{BitcoinSLogger, BitcoinSUtil, Factory}
+import org.bitcoins.core.util.{BitcoinSLogger, BitcoinSUtil, CryptoUtil, Factory}
 import org.spongycastle.crypto.params.ECPublicKeyParameters
 import org.spongycastle.crypto.signers.ECDSASigner
 
@@ -66,6 +66,17 @@ sealed trait ECPublicKey extends BaseECKey with BitcoinSLogger {
 
   /** Checks if the [[ECPublicKey]] is valid according to secp256k1 */
   def isFullyValid = ECPublicKey.isFullyValid(bytes)
+
+  def tweakAdd(nonce: Seq[Byte]): ECPublicKey = {
+    val tweak = CryptoUtil.sha256(bytes ++ nonce)
+    val keyBytesTry = Try(NativeSecp256k1.pubKeyTweakAdd(bytes.toArray,tweak.bytes.toArray,true))
+    require(isCompressed && isFullyValid, "All public keys must be fully valid compressed public keys, got: " + hex)
+    require(keyBytesTry.isSuccess, "Public key tweak failed")
+    val keyBytes = keyBytesTry.get
+    val tweakedKey = ECPublicKey(keyBytes)
+    require(tweakedKey.isCompressed && tweakedKey.isFullyValid, "All tweaked public keys must be fully valid compressed public keys, got: " + tweakedKey.hex)
+    tweakedKey
+  }
 }
 
 object ECPublicKey extends Factory[ECPublicKey] {

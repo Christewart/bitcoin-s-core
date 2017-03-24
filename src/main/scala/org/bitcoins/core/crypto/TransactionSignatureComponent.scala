@@ -58,7 +58,7 @@ sealed trait WitnessV0TransactionSignatureComponent extends TransactionSignature
 
 sealed trait FedPegTransactionSignatureComponent extends TransactionSignatureComponent {
   def witnessTxSigComponent: WitnessV0TransactionSignatureComponent
-  def fedPegScript: ScriptPubKey
+  def fedPegScript: MultiSignatureScriptPubKey
 
 
   override def flags = witnessTxSigComponent.flags
@@ -71,7 +71,6 @@ sealed trait FedPegTransactionSignatureComponent extends TransactionSignatureCom
   def getOutputOffSetFromCurrent(offset: Int): Option[TransactionOutput] = {
     require(witnessTxSigComponent.inputIndex >= UInt32.zero && witnessTxSigComponent.transaction.outputs.size > 0)
     val c = witnessTxSigComponent
-    val tx = witnessTxSigComponent.transaction
     val inputIndex = c.inputIndex.toInt
     val outputSize = c.transaction.outputs.size
     if (inputIndex + offset < 0 || outputSize <= (inputIndex + offset)) {
@@ -137,16 +136,16 @@ object WitnessV0TransactionSignatureComponent {
 
 object FedPegTransactionSignatureComponent {
   private case class FedPegTransactionSignatureComponentImpl(witnessTxSigComponent: WitnessV0TransactionSignatureComponent,
-                                                             fedPegScript: ScriptPubKey) extends FedPegTransactionSignatureComponent
+                                                             fedPegScript: MultiSignatureScriptPubKey) extends FedPegTransactionSignatureComponent
 
 
   def apply(witnessTxSigComponent : WitnessV0TransactionSignatureComponent,
-            fedPegScript: ScriptPubKey): FedPegTransactionSignatureComponent = {
+            fedPegScript: MultiSignatureScriptPubKey): FedPegTransactionSignatureComponent = {
     FedPegTransactionSignatureComponentImpl(witnessTxSigComponent,fedPegScript)
   }
 
   def apply(transaction : Transaction, inputIndex : UInt32, scriptPubKey : ScriptPubKey,
-            flags : Seq[ScriptFlag], amount: CurrencyUnit, sigVersion: SignatureVersion, fedPegScript: ScriptPubKey) : FedPegTransactionSignatureComponent = {
+            flags : Seq[ScriptFlag], amount: CurrencyUnit, sigVersion: SignatureVersion, fedPegScript: MultiSignatureScriptPubKey): FedPegTransactionSignatureComponent = {
     val w = WitnessV0TransactionSignatureComponent(transaction,inputIndex,scriptPubKey,flags,amount,sigVersion)
     FedPegTransactionSignatureComponentImpl(w,fedPegScript)
   }

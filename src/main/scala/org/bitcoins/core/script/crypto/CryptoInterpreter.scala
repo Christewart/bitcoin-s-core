@@ -1,5 +1,6 @@
 package org.bitcoins.core.script.crypto
 
+import org.bitcoin.NativeSecp256k1
 import org.bitcoins.core.crypto._
 import org.bitcoins.core.currency.CurrencyUnits
 import org.bitcoins.core.protocol.blockchain.MerkleBlock
@@ -346,8 +347,16 @@ trait CryptoInterpreter extends ControlOperationsInterpreter with BitcoinSLogger
       return ScriptProgram(program, ScriptErrorWithdrawVerifyFormat)
     }
 
-    val scriptDestination: ScriptPubKey = fPegTxSigComponent.fedPegScript
+    val scriptDestination: MultiSignatureScriptPubKey = fPegTxSigComponent.fedPegScript
 
+    val pubKeys = scriptDestination.publicKeys
+
+
+    val tweakedKeys: Seq[ECPublicKey] = pubKeys.map { key =>
+      key.tweakAdd(contract.get.bytes)
+    }
+
+    val tweakedScriptDestination = MultiSignatureScriptPubKey(scriptDestination.requiredSigs,tweakedKeys)
 
     /**
     * This tool allows you to take a redeemScript as a template and,
@@ -383,7 +392,7 @@ trait CryptoInterpreter extends ControlOperationsInterpreter with BitcoinSLogger
       }
     }*/
 
-    val expectedP2SH = P2SHScriptPubKey(scriptDestination)
+    val expectedP2SH = P2SHScriptPubKey(tweakedScriptDestination)
     val lockedOutput = lockTx.outputs(outputIndex)
     if (lockedOutput.scriptPubKey != expectedP2SH) {
       logger.error("Incorrect withdrawl output script destination")

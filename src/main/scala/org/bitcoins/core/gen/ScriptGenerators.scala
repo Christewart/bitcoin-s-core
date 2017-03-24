@@ -454,7 +454,7 @@ trait ScriptGenerators extends BitcoinSLogger {
 
   /** Returns a valid [[WithdrawScriptSignature]], the [[WithdrawScriptPubKey]] it spends and
     * the federated peg scriptPubkey */
-  def withdrawlScript: Gen[(WithdrawScriptSignature, WithdrawScriptPubKey, ScriptPubKey, CurrencyUnit)] = for {
+  def withdrawlScript: Gen[(WithdrawScriptSignature, WithdrawScriptPubKey, MultiSignatureScriptPubKey, CurrencyUnit)] = for {
     genesisBlockHash <- CryptoGenerators.doubleSha256Digest
     userSidechainAddr <- CryptoGenerators.sha256Hash160Digest
     reserveAmount <- CurrencyUnitGenerator.satoshis
@@ -463,7 +463,8 @@ trait ScriptGenerators extends BitcoinSLogger {
     sidechainCreditingOutput = sidechainCreditingTx.outputs(outputIndex.toInt)
     c <- contract(userSidechainAddr)
     (fedPegScript,_) <- ScriptGenerators.multiSigScriptPubKey
-    lockingScriptPubKey = P2SHScriptPubKey(fedPegScript)
+    tweakedFedPegScript = MultiSignatureScriptPubKey(fedPegScript.requiredSigs,fedPegScript.publicKeys.map(_.tweakAdd(c.bytes)))
+    lockingScriptPubKey = P2SHScriptPubKey(tweakedFedPegScript)
     (lockTx,lockTxOutputIndex) = TransactionGenerators.buildCreditingTransaction(lockingScriptPubKey,amount)
     (merkleBlock,_,_) <- MerkleGenerator.merkleBlockWithInsertedTxIds(Seq(lockTx))
     withdrawlScriptSig = WithdrawScriptSignature(c,merkleBlock,lockTx,outputIndex)
