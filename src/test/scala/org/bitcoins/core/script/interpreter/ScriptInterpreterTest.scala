@@ -60,7 +60,8 @@ class ScriptInterpreterTest extends FlatSpec with MustMatchers {
           case wit: WitnessScriptPubKey =>
             ScriptProgram(tx.asInstanceOf[WitnessTransaction], wit, inputIndex, flags, amount)
           case x @ (_: P2PKScriptPubKey | _: P2PKHScriptPubKey | _: MultiSignatureScriptPubKey | _: CLTVScriptPubKey | _: CSVScriptPubKey
-                    | _: CLTVScriptPubKey | _: EscrowTimeoutScriptPubKey | _: NonStandardScriptPubKey | _: WitnessCommitment | EmptyScriptPubKey) =>
+                    | _: CLTVScriptPubKey | _: EscrowTimeoutScriptPubKey | _: NonStandardScriptPubKey
+                    | _: LightningSPK | _: WitnessCommitment | EmptyScriptPubKey) =>
             val t = TxSigComponent(tx,inputIndex,x,flags)
             ScriptProgram(t)
         }

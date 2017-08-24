@@ -118,7 +118,8 @@ class TransactionTest extends FlatSpec with MustMatchers {
                 ScriptProgram(wtx,wit,UInt32(inputIndex),testCase.flags,amount)
             }
           case x @ (_: P2PKScriptPubKey | _: P2PKHScriptPubKey | _: MultiSignatureScriptPubKey | _: CLTVScriptPubKey | _: CSVScriptPubKey
-                    | _: CLTVScriptPubKey | _: EscrowTimeoutScriptPubKey | _: NonStandardScriptPubKey | _: WitnessCommitment | EmptyScriptPubKey) =>
+                    | _: CLTVScriptPubKey | _: EscrowTimeoutScriptPubKey | _: NonStandardScriptPubKey
+                    | _: LightningSPK | _: WitnessCommitment | EmptyScriptPubKey) =>
             val t = TxSigComponent(tx,UInt32(inputIndex),x,testCase.flags)
             ScriptProgram(t)
         }
@@ -180,7 +181,8 @@ class TransactionTest extends FlatSpec with MustMatchers {
                     ScriptProgram(wtx,wit,UInt32(inputIndex),testCase.flags,amount)
                 }
               case x @ (_: P2PKScriptPubKey | _: P2PKHScriptPubKey | _: MultiSignatureScriptPubKey | _: CLTVScriptPubKey | _: CSVScriptPubKey
-                        | _: CLTVScriptPubKey | _: EscrowTimeoutScriptPubKey | _: NonStandardScriptPubKey | _: WitnessCommitment | EmptyScriptPubKey) =>
+                        | _: CLTVScriptPubKey | _: EscrowTimeoutScriptPubKey | _: NonStandardScriptPubKey
+                        | _: LightningSPK | _: WitnessCommitment | EmptyScriptPubKey) =>
                 val t = TxSigComponent(tx,UInt32(inputIndex),x,testCase.flags)
                 ScriptProgram(t)
             }

@@ -539,6 +539,33 @@ trait ScriptGenerators extends BitcoinSLogger {
       case _: CSVScriptPubKey => CSVScriptSignature(nestedScriptSig)
     }
   }
+
+  def refundHTLC: Gen[(RefundHTLC, Seq[ECPrivateKey])] = for {
+    revocationKey <- CryptoGenerators.privateKey
+    delayedKey <- CryptoGenerators.privateKey
+    locktime <- NumberGenerator.scriptNumbers
+    refund = RefundHTLC(revocationKey.publicKey,locktime,delayedKey.publicKey)
+    privKeys = Seq(revocationKey,delayedKey)
+  } yield (refund,privKeys)
+
+  def offeredHTLC: Gen[(OfferedHTLC, Seq[ECPrivateKey])] = for {
+    revocationKey <- CryptoGenerators.privateKey
+    remoteKey <- CryptoGenerators.privateKey
+    localKey <- CryptoGenerators.privateKey
+    paymentHash <- CryptoGenerators.ripeMd160Digest
+    htlc = OfferedHTLC(revocationKey.publicKey,remoteKey.publicKey,localKey.publicKey,paymentHash)
+    keys = Seq(revocationKey,remoteKey,localKey)
+  } yield (htlc,keys)
+
+  def receivedHTLC: Gen[(ReceivedHTLC,Seq[ECPrivateKey])] = for {
+    revocationKey <- CryptoGenerators.privateKey
+    remoteKey <- CryptoGenerators.privateKey
+    localKey <- CryptoGenerators.privateKey
+    paymentHash <- CryptoGenerators.ripeMd160Digest
+    lockTime <- NumberGenerator.scriptNumbers
+    htlc = ReceivedHTLC(revocationKey.publicKey,remoteKey.publicKey,paymentHash,localKey.publicKey,lockTime)
+    keys = Seq(revocationKey,remoteKey,localKey)
+  } yield (htlc,keys)
 }
 
 object ScriptGenerators extends ScriptGenerators

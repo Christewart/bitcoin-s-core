@@ -225,7 +225,7 @@ object Address extends Factory[Address] {
     case p2sh: P2SHScriptPubKey => Success(P2SHAddress(p2sh,network))
     case x @ (_: P2PKScriptPubKey | _: MultiSignatureScriptPubKey | _: LockTimeScriptPubKey
               | _: EscrowTimeoutScriptPubKey | _: NonStandardScriptPubKey | _: WitnessScriptPubKeyV0
-              | _: WitnessCommitment |  _: UnassignedWitnessScriptPubKey | EmptyScriptPubKey) =>
+              | _: WitnessCommitment |  _: UnassignedWitnessScriptPubKey | _: LightningSPK | EmptyScriptPubKey) =>
       Failure(new IllegalArgumentException("Cannot create a address for the scriptPubKey: " + x))
   }
 

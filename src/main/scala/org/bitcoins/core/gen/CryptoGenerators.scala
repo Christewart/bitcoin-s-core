@@ -92,6 +92,11 @@ trait CryptoGenerators {
     hash = CryptoUtil.sha256Hash160(pubKey.bytes)
   } yield hash
 
+  def ripeMd160Digest: Gen[RipeMd160Digest] = for {
+    pubKey <- publicKey
+    hash = CryptoUtil.ripeMd160(pubKey.bytes)
+  } yield hash
+
   /** Generates a random [[HashType]] */
   def hashType: Gen[HashType] = Gen.oneOf(HashType.sigHashAll, HashType.sigHashNone, HashType.sigHashSingle,
     HashType.sigHashAnyoneCanPay, HashType.sigHashSingleAnyoneCanPay, HashType.sigHashNoneAnyoneCanPay,

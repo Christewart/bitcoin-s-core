@@ -1,17 +1,18 @@
 package org.bitcoins.core.protocol.script
 
-import org.bitcoins.core.crypto.{DoubleSha256Digest, ECPublicKey, HashDigest, Sha256Hash160Digest}
+import org.bitcoins.core.crypto._
 import org.bitcoins.core.protocol._
 import org.bitcoins.core.protocol.transaction.WitnessTransaction
 import org.bitcoins.core.protocol.blockchain.Block
 import org.bitcoins.core.script.ScriptSettings
 import org.bitcoins.core.script.bitwise.{OP_EQUAL, OP_EQUALVERIFY}
 import org.bitcoins.core.script.constant.{BytesToPushOntoStack, _}
-import org.bitcoins.core.script.control.{OP_ELSE, OP_ENDIF, OP_IF, OP_RETURN}
+import org.bitcoins.core.script.control._
 import org.bitcoins.core.script.crypto.{OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY, OP_CHECKSIG, OP_HASH160}
 import org.bitcoins.core.script.locktime.{OP_CHECKLOCKTIMEVERIFY, OP_CHECKSEQUENCEVERIFY}
 import org.bitcoins.core.script.reserved.UndefinedOP_NOP
-import org.bitcoins.core.script.stack.{OP_DROP, OP_DUP}
+import org.bitcoins.core.script.splice.OP_SIZE
+import org.bitcoins.core.script.stack.{OP_DROP, OP_DUP, OP_SWAP}
 import org.bitcoins.core.serializers.script.{RawScriptPubKeyParser, ScriptParser}
 import org.bitcoins.core.util._
 
@@ -474,6 +475,9 @@ object ScriptPubKey extends Factory[ScriptPubKey] {
     case _ if WitnessScriptPubKey.isWitnessScriptPubKey(asm) => WitnessScriptPubKey(asm).get
     case _ if WitnessCommitment.isWitnessCommitment(asm) => WitnessCommitment(asm)
     case _ if EscrowTimeoutScriptPubKey.isValidEscrowTimeout(asm) => EscrowTimeoutScriptPubKey.fromAsm(asm)
+    case _ if OfferedHTLC.isValid(asm) => OfferedHTLC.fromAsm(asm)
+    case _ if ReceivedHTLC.isValid(asm) => ReceivedHTLC.fromAsm(asm)
+    case _ if RefundHTLC.isValid(asm) => RefundHTLC.fromAsm(asm)
     case _ => NonStandardScriptPubKey(asm)
   }
 
@@ -660,4 +664,186 @@ object EscrowTimeoutScriptPubKey extends ScriptFactory[EscrowTimeoutScriptPubKey
   }
 }
 
+sealed abstract class LightningSPK extends ScriptPubKey
 
+/** This script sends funds back to the owner of this commitment transaction, thus must be timelocked using OP_CSV.
+  * It can be claimed, without delay, by the other party if they know the revocation key.
+  * The output is a version 0 P2WSH, with a witness script:
+  * [[https://github.com/lightningnetwork/lightning-rfc/blob/master/03-transactions.md#to_local-output]]
+  * Format:
+  * OP_IF # Penalty transaction <revocationkey>
+    OP_ELSE `to_self_delay` OP_CSV OP_DROP <local_delayedkey> OP_ENDIF
+    OP_CHECKSIG
+  */
+sealed abstract class RefundHTLC extends LightningSPK {
+  def revocationKey: ECPublicKey = ECPublicKey(asm(2).bytes)
+
+  def delayedKey: ECPublicKey = {
+    if (asm.size == 11) {
+      ECPublicKey(asm(8).bytes)
+    } else {
+      ECPublicKey(asm(10).bytes)
+    }
+  }
+
+  def locktime: ScriptNumber = {
+    if (asm(4).isInstanceOf[ScriptNumberOperation]) asm(4).asInstanceOf[ScriptNumberOperation]
+    else ScriptNumber(asm(5).bytes)
+  }
+}
+
+object RefundHTLC extends ScriptFactory[RefundHTLC] {
+  private case class RefundHTLCImpl(hex: String) extends RefundHTLC
+
+  override def fromAsm(asm: Seq[ScriptToken]): RefundHTLC = {
+    buildScript(asm,RefundHTLCImpl(_),isValid(_), "Given asm was not a valid RefundHTLC, got: " + asm)
+  }
+
+  def isValid(asm: Seq[ScriptToken]): Boolean = {
+    val isFirstHalfValid = asm(0) == OP_IF && asm(1) == BytesToPushOntoStack(33) &&
+      asm(2).bytes.size == 33 && asm(3) == OP_ELSE
+    val scriptOp = asm(4)
+    val isSecondHalfValid = if (scriptOp.isInstanceOf[ScriptNumberOperation]) {
+      asm(5) == OP_CHECKSEQUENCEVERIFY &&
+        asm(6) == OP_DROP && asm(7) == BytesToPushOntoStack(33) &&
+        asm(8).bytes.size == 33 && asm(9) == OP_ENDIF &&
+        asm(10) == OP_CHECKSIG
+    } else {
+      //pushop relative locktime
+      asm(6) == OP_CHECKSEQUENCEVERIFY &&
+        asm(7) == OP_DROP && asm(8) == BytesToPushOntoStack(33) &&
+        asm(9).bytes.size == 33 && asm(10) == OP_ENDIF &&
+        asm(11) == OP_CHECKSIG
+    }
+    isFirstHalfValid && isSecondHalfValid
+  }
+
+  def apply(revocationKey: ECPublicKey, scriptNum: ScriptNumber, delayedKey: ECPublicKey): RefundHTLC = {
+    val f = Seq(OP_IF, BytesToPushOntoStack(33), ScriptConstant(revocationKey.bytes), OP_ELSE)
+    val pushOp = BitcoinScriptUtil.calculatePushOp(scriptNum)
+    val f1 = pushOp ++ Seq(scriptNum,OP_CHECKSEQUENCEVERIFY, OP_DROP, BytesToPushOntoStack(33),
+      ScriptConstant(delayedKey.bytes), OP_ENDIF, OP_CHECKSIG)
+    val asm = f ++ f1
+    fromAsm(asm)
+  }
+}
+
+/**
+  * This output sends funds to a HTLC-timeout transaction after the HTLC timeout,
+  * or to the remote peer using the payment preimage or the revocation key.
+  * The output is a P2WSH, with a witness script:
+  * OP_DUP OP_HASH160 <RIPEMD160(SHA256(revocationkey))> OP_EQUAL
+  * OP_IF OP_CHECKSIG
+  * OP_ELSE <remotekey> OP_SWAP OP_SIZE 32 OP_EQUAL
+  *   OP_NOTIF # To me via HTLC-timeout transaction (timelocked). OP_DROP 2 OP_SWAP <localkey> 2 OP_CHECKMULTISIG
+  *   OP_ELSE # To you with preimage. OP_HASH160 <RIPEMD160(payment_hash)> OP_EQUALVERIFY OP_CHECKSIG OP_ENDIF
+  * OP_ENDIF
+  * [[https://github.com/lightningnetwork/lightning-rfc/blob/master/03-transactions.md#offered-htlc-outputs]]
+  */
+sealed abstract class OfferedHTLC extends LightningSPK {
+  def paymentHash: RipeMd160Digest = RipeMd160Digest(asm(26).bytes)
+}
+
+object OfferedHTLC extends ScriptFactory[OfferedHTLC] {
+  private case class OfferedHTLCImpl(hex: String) extends OfferedHTLC
+
+  def apply(revocationKey: ECPublicKey, remoteKey: ECPublicKey, localKey: ECPublicKey,
+            paymentHash: RipeMd160Digest): OfferedHTLC = {
+    val revHash = CryptoUtil.sha256Hash160(revocationKey.bytes)
+    val first = Seq(OP_DUP, OP_HASH160, BytesToPushOntoStack(20), ScriptConstant(revHash.bytes), OP_EQUAL)
+    val second = Seq(OP_IF, OP_CHECKSIG, OP_ELSE, BytesToPushOntoStack(33), ScriptConstant(remoteKey.bytes))
+    val third = Seq(OP_SWAP, OP_SIZE, BytesToPushOntoStack(1), ScriptNumber(32), OP_EQUAL)
+    val fourth = Seq(OP_NOTIF, OP_DROP, OP_2, OP_SWAP, BytesToPushOntoStack(33), ScriptConstant(remoteKey.bytes), OP_2, OP_CHECKMULTISIG)
+    val fifth = Seq(OP_ELSE, OP_HASH160, BytesToPushOntoStack(20), ScriptConstant(paymentHash.bytes))
+    val sixth = Seq(OP_EQUALVERIFY, OP_CHECKSIG, OP_ENDIF, OP_ENDIF)
+    val asm = first ++ second ++ third ++ fourth ++ fifth ++ sixth
+    fromAsm(asm)
+  }
+
+  override def fromAsm(asm: Seq[ScriptToken]): OfferedHTLC = {
+    buildScript(asm,OfferedHTLCImpl(_),isValid(_),"Given asm was not a valid OfferedHTLC, got: " + asm)
+  }
+
+  def isValid(asm: Seq[ScriptToken]): Boolean = {
+    asm.head == OP_DUP && asm(1) == OP_HASH160 && asm(2) == BytesToPushOntoStack(20) &&
+      asm(3).bytes.size == 20 && asm(4) == OP_EQUAL && asm(5) == OP_IF && asm(6) == OP_CHECKSIG &&
+      asm(7) == OP_ELSE && asm(8) == BytesToPushOntoStack(33) && asm(9).bytes.size == 33 &&
+      asm(10) == OP_SWAP && asm(11) == OP_SIZE && asm(12) == BytesToPushOntoStack(1) &&
+      asm(13).bytes == ScriptNumber(32).bytes && asm(14) == OP_EQUAL &&
+      asm(15) == OP_NOTIF && asm(16) == OP_DROP && asm(17) == OP_2 && asm(18) == OP_SWAP &&
+      asm(19) == BytesToPushOntoStack(33) && asm(20).bytes.size == 33 && asm(21) == OP_2 &&
+      asm(22) == OP_CHECKMULTISIG && asm(23) == OP_ELSE && asm(24) == OP_HASH160 &&
+      asm(25) == BytesToPushOntoStack(20) && asm(26).bytes.size == 20 && asm(27) == OP_EQUALVERIFY &&
+      asm(28) == OP_CHECKSIG && asm(29) == OP_ENDIF && asm(30) == OP_ENDIF
+  }
+}
+
+/**
+  * This output sends funds to the remote peer after the HTLC timeout or using the revocation key,
+  * or to an HTLC-success transaction with a successful payment preimage.
+  * The output is a P2WSH, with a witness script:
+  * OP_DUP OP_HASH160 <RIPEMD160(SHA256(revocationkey))> OP_EQUAL
+  * OP_IF OP_CHECKSIG OP_ELSE <remotekey> OP_SWAP OP_SIZE 32 OP_EQUAL
+  *   OP_IF # To me via HTLC-success transaction. OP_HASH160 <RIPEMD160(payment_hash)>
+  *     OP_EQUALVERIFY 2 OP_SWAP <localkey> 2 OP_CHECKMULTISIG
+  *   OP_ELSE # To you after timeout. OP_DROP <cltv_expiry>
+  *     OP_CHECKLOCKTIMEVERIFY OP_DROP OP_CHECKSIG
+  *   OP_ENDIF
+  * OP_ENDIF
+  */
+sealed abstract class ReceivedHTLC extends LightningSPK {
+  def paymentHash: RipeMd160Digest = RipeMd160Digest(asm(18).bytes)
+  def lockTime: ScriptNumber = {
+    if (asm(28).isInstanceOf[ScriptNumberOperation]) {
+      asm(28).asInstanceOf[ScriptNumberOperation]
+    } else {
+      ScriptNumber(asm(29).bytes)
+    }
+  }
+}
+
+object ReceivedHTLC extends ScriptFactory[ReceivedHTLC] {
+  private case class ReceivedHTLCImpl(hex: String) extends ReceivedHTLC
+
+  override def fromAsm(asm: Seq[ScriptToken]): ReceivedHTLC = {
+    buildScript(asm,ReceivedHTLCImpl(_),isValid(_),"Given asm was not a valid ReceivedHTLC, got: " + asm)
+  }
+  def isValid(asm: Seq[ScriptToken]): Boolean = {
+    val firstHalf = asm.head == OP_DUP && asm(1) == OP_HASH160 && asm(2) == BytesToPushOntoStack(20) &&
+      asm(3).bytes.size == 20 && asm(4) == OP_EQUAL && asm(5) == OP_IF && asm(6) == OP_CHECKSIG &&
+      asm(7) == OP_ELSE && asm(8) == BytesToPushOntoStack(33) && asm(9).bytes.size == 33 &&
+      asm(10) == OP_SWAP && asm(11) == OP_SIZE && asm(12) == BytesToPushOntoStack(1) &&
+      asm(13).bytes == ScriptNumber(32).bytes && asm(14) == OP_EQUAL &&
+      asm(15) == OP_IF && asm(16) == OP_HASH160 && asm(17) == BytesToPushOntoStack(20) && asm(18).bytes.size == 20
+      asm(19) == OP_EQUALVERIFY && asm(20) == OP_2 && asm(21) == OP_SWAP &&
+      asm(22) == BytesToPushOntoStack(33) && asm(23).bytes.size == 33 && asm(24) == OP_2 && asm(25) == OP_CHECKMULTISIG &&
+      asm(26) == OP_ELSE && asm(27) == OP_DROP
+    val secondHalf = if (asm(28).isInstanceOf[ScriptNumberOperation]) {
+      val b1 = asm(29) == OP_CHECKLOCKTIMEVERIFY && asm(30) == OP_DROP && asm(31) == OP_CHECKLOCKTIMEVERIFY &&
+      asm(32) == OP_DROP && asm(33) == OP_CHECKSIG && asm(34) == OP_ENDIF && asm(35) == OP_ENDIF
+      b1
+    } else {
+      //TODO: Bug here, account for OP_PUSHDATA, also asm(28).instanceOf[ScriptConstant] is probably a bug
+      val b2 = asm(28).isInstanceOf[BytesToPushOntoStack] && asm(29).isInstanceOf[ScriptConstant] &&
+      asm(30) == OP_CHECKLOCKTIMEVERIFY && asm(31) == OP_DROP && asm(32) == OP_CHECKSIG &&
+      asm(33) == OP_ENDIF && asm(34) == OP_ENDIF
+      b2
+    }
+    firstHalf && secondHalf
+  }
+
+  def apply(revocationKey: ECPublicKey, remoteKey: ECPublicKey, paymentHash: RipeMd160Digest,
+            localKey: ECPublicKey, lockTime: ScriptNumber): ReceivedHTLC = {
+    val revHash = CryptoUtil.sha256Hash160(revocationKey.bytes)
+    val first = Seq(OP_DUP, OP_HASH160, BytesToPushOntoStack(20), ScriptConstant(revHash.bytes), OP_EQUAL)
+    val second = Seq(OP_IF, OP_CHECKSIG, OP_ELSE, BytesToPushOntoStack(33), ScriptConstant(remoteKey.bytes))
+    val third = Seq(OP_SWAP, OP_SIZE, BytesToPushOntoStack(1), ScriptNumber(32), OP_EQUAL)
+
+    val fourth = Seq(OP_IF, OP_HASH160, BytesToPushOntoStack(20), ScriptConstant(paymentHash.bytes))
+    val fifth = Seq(OP_EQUALVERIFY, OP_2, OP_SWAP, BytesToPushOntoStack(33), ScriptConstant(localKey.bytes), OP_2, OP_CHECKMULTISIG)
+    val sixth = Seq(OP_ELSE,OP_DROP) ++ BitcoinScriptUtil.calculatePushOp(lockTime) ++ Seq(lockTime, OP_CHECKLOCKTIMEVERIFY)
+    val seventh = Seq(OP_DROP, OP_CHECKSIG, OP_ENDIF, OP_ENDIF)
+    val asm = first ++ second ++ third ++ fourth ++ fifth ++ sixth ++ seventh
+    fromAsm(asm)
+  }
+}

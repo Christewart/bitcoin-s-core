@@ -77,7 +77,7 @@ sealed abstract class ScriptInterpreter {
             else scriptPubKeyExecutedProgram
           case _: P2PKHScriptPubKey | _: P2PKScriptPubKey | _: MultiSignatureScriptPubKey | _: CSVScriptPubKey
                | _: CLTVScriptPubKey | _: NonStandardScriptPubKey | _: WitnessCommitment
-               | _: EscrowTimeoutScriptPubKey |  EmptyScriptPubKey =>
+               | _: EscrowTimeoutScriptPubKey | _: LightningSPK | EmptyScriptPubKey =>
             scriptPubKeyExecutedProgram
         }
       }
@@ -163,7 +163,7 @@ sealed abstract class ScriptInterpreter {
               }
             case s @ (_ : P2SHScriptPubKey | _ : P2PKHScriptPubKey | _ : P2PKScriptPubKey | _ : MultiSignatureScriptPubKey
                       | _ : CLTVScriptPubKey | _ : CSVScriptPubKey | _: NonStandardScriptPubKey | _ : WitnessCommitment
-                      | _: EscrowTimeoutScriptPubKey | EmptyScriptPubKey) =>
+                      | _: EscrowTimeoutScriptPubKey | _: LightningSPK | EmptyScriptPubKey) =>
               logger.debug("redeemScript: " + s.asm)
               run(scriptPubKeyExecutedProgram,stack,s)
           }

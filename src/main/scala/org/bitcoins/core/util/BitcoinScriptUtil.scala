@@ -308,7 +308,8 @@ trait BitcoinScriptUtil extends BitcoinSLogger {
       }
     case _: P2PKHScriptPubKey | _: P2PKScriptPubKey | _: MultiSignatureScriptPubKey
          | _: NonStandardScriptPubKey | _: CLTVScriptPubKey | _: CSVScriptPubKey
-         | _: WitnessCommitment | _: EscrowTimeoutScriptPubKey | EmptyScriptPubKey => script
+         | _: WitnessCommitment | _: EscrowTimeoutScriptPubKey
+         | _: LightningSPK | EmptyScriptPubKey => script
   }
 
   /** Removes the given [[ECDigitalSignature]] from the list of [[ScriptToken]] if it exists. */

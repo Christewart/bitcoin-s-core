@@ -79,7 +79,7 @@ sealed trait WitnessTxSigComponentP2SH extends WitnessTxSigComponent {
     case w: WitnessScriptPubKey => Success(w)
     case x @ (_: P2PKScriptPubKey | _: P2PKHScriptPubKey | _: MultiSignatureScriptPubKey | _: P2SHScriptPubKey
          | _: CSVScriptPubKey | _: CLTVScriptPubKey | _: EscrowTimeoutScriptPubKey | _: NonStandardScriptPubKey
-         | _: WitnessCommitment | EmptyScriptPubKey) =>
+         | _: WitnessCommitment | _: LightningSPK | EmptyScriptPubKey) =>
       Failure(new IllegalArgumentException("Must have a witness scriptPubKey as redeemScript for P2SHScriptPubKey in WitnessTxSigComponentP2SH, got: " + x))
 
   }

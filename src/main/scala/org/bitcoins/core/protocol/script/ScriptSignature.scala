@@ -205,7 +205,7 @@ object P2SHScriptSignature extends ScriptFactory[P2SHScriptSignature]  {
                | _: P2SHScriptPubKey | _: P2PKScriptPubKey
                | _: CLTVScriptPubKey | _: CSVScriptPubKey
                | _: WitnessScriptPubKeyV0 | _: UnassignedWitnessScriptPubKey
-               | _: EscrowTimeoutScriptPubKey => true
+               | _: EscrowTimeoutScriptPubKey | _: LightningSPK => true
           case _: NonStandardScriptPubKey | _: WitnessCommitment => false
           case EmptyScriptPubKey => false
         }
@@ -415,6 +415,7 @@ object ScriptSignature extends Factory[ScriptSignature] {
     case _: WitnessScriptPubKeyV0 | _: UnassignedWitnessScriptPubKey  => Success(EmptyScriptSignature)
     case EmptyScriptPubKey =>
       if (tokens.isEmpty) Success(EmptyScriptSignature) else Try(NonStandardScriptSignature.fromAsm(tokens))
+    case _: LightningSPK => Try(LightningScriptSig.fromAsm(tokens))
     case _ : WitnessCommitment => Failure(new IllegalArgumentException("Cannot spend witness commitment scriptPubKey"))
   }
 
@@ -513,4 +514,11 @@ object EscrowTimeoutScriptSignature extends Factory[EscrowTimeoutScriptSignature
     val asm = l.asm ++ Seq(OP_0)
     fromAsm(asm)
   }
+}
+
+sealed abstract class LightningScriptSig extends ScriptSignature
+
+object LightningScriptSig extends ScriptFactory[LightningScriptSig] {
+
+  def fromAsm(asm: Seq[ScriptToken]): LightningScriptSig = ???
 }
