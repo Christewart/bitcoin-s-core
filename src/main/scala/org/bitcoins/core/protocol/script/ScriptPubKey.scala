@@ -700,22 +700,25 @@ object RefundHTLC extends ScriptFactory[RefundHTLC] {
   }
 
   def isValid(asm: Seq[ScriptToken]): Boolean = {
-    val isFirstHalfValid = asm(0) == OP_IF && asm(1) == BytesToPushOntoStack(33) &&
-      asm(2).bytes.size == 33 && asm(3) == OP_ELSE
-    val scriptOp = asm(4)
-    val isSecondHalfValid = if (scriptOp.isInstanceOf[ScriptNumberOperation]) {
-      asm(5) == OP_CHECKSEQUENCEVERIFY &&
-        asm(6) == OP_DROP && asm(7) == BytesToPushOntoStack(33) &&
-        asm(8).bytes.size == 33 && asm(9) == OP_ENDIF &&
-        asm(10) == OP_CHECKSIG
-    } else {
-      //pushop relative locktime
-      asm(6) == OP_CHECKSEQUENCEVERIFY &&
-        asm(7) == OP_DROP && asm(8) == BytesToPushOntoStack(33) &&
-        asm(9).bytes.size == 33 && asm(10) == OP_ENDIF &&
-        asm(11) == OP_CHECKSIG
+    val result = Try {
+      val isFirstHalfValid = asm(0) == OP_IF && asm(1) == BytesToPushOntoStack(33) &&
+        asm(2).bytes.size == 33 && asm(3) == OP_ELSE
+      val scriptOp = asm(4)
+      val isSecondHalfValid = if (scriptOp.isInstanceOf[ScriptNumberOperation]) {
+        asm(5) == OP_CHECKSEQUENCEVERIFY &&
+          asm(6) == OP_DROP && asm(7) == BytesToPushOntoStack(33) &&
+          asm(8).bytes.size == 33 && asm(9) == OP_ENDIF &&
+          asm(10) == OP_CHECKSIG
+      } else {
+        //pushop relative locktime
+        asm(6) == OP_CHECKSEQUENCEVERIFY &&
+          asm(7) == OP_DROP && asm(8) == BytesToPushOntoStack(33) &&
+          asm(9).bytes.size == 33 && asm(10) == OP_ENDIF &&
+          asm(11) == OP_CHECKSIG
+      }
+      isFirstHalfValid && isSecondHalfValid
     }
-    isFirstHalfValid && isSecondHalfValid
+    result.isSuccess && result.get
   }
 
   def apply(revocationKey: ECPublicKey, scriptNum: ScriptNumber, delayedKey: ECPublicKey): RefundHTLC = {
@@ -765,16 +768,19 @@ object OfferedHTLC extends ScriptFactory[OfferedHTLC] {
   }
 
   def isValid(asm: Seq[ScriptToken]): Boolean = {
-    asm.head == OP_DUP && asm(1) == OP_HASH160 && asm(2) == BytesToPushOntoStack(20) &&
-      asm(3).bytes.size == 20 && asm(4) == OP_EQUAL && asm(5) == OP_IF && asm(6) == OP_CHECKSIG &&
-      asm(7) == OP_ELSE && asm(8) == BytesToPushOntoStack(33) && asm(9).bytes.size == 33 &&
-      asm(10) == OP_SWAP && asm(11) == OP_SIZE && asm(12) == BytesToPushOntoStack(1) &&
-      asm(13).bytes == ScriptNumber(32).bytes && asm(14) == OP_EQUAL &&
-      asm(15) == OP_NOTIF && asm(16) == OP_DROP && asm(17) == OP_2 && asm(18) == OP_SWAP &&
-      asm(19) == BytesToPushOntoStack(33) && asm(20).bytes.size == 33 && asm(21) == OP_2 &&
-      asm(22) == OP_CHECKMULTISIG && asm(23) == OP_ELSE && asm(24) == OP_HASH160 &&
-      asm(25) == BytesToPushOntoStack(20) && asm(26).bytes.size == 20 && asm(27) == OP_EQUALVERIFY &&
-      asm(28) == OP_CHECKSIG && asm(29) == OP_ENDIF && asm(30) == OP_ENDIF
+    val result = Try {
+      asm.head == OP_DUP && asm(1) == OP_HASH160 && asm(2) == BytesToPushOntoStack(20) &&
+        asm(3).bytes.size == 20 && asm(4) == OP_EQUAL && asm(5) == OP_IF && asm(6) == OP_CHECKSIG &&
+        asm(7) == OP_ELSE && asm(8) == BytesToPushOntoStack(33) && asm(9).bytes.size == 33 &&
+        asm(10) == OP_SWAP && asm(11) == OP_SIZE && asm(12) == BytesToPushOntoStack(1) &&
+        asm(13).bytes == ScriptNumber(32).bytes && asm(14) == OP_EQUAL &&
+        asm(15) == OP_NOTIF && asm(16) == OP_DROP && asm(17) == OP_2 && asm(18) == OP_SWAP &&
+        asm(19) == BytesToPushOntoStack(33) && asm(20).bytes.size == 33 && asm(21) == OP_2 &&
+        asm(22) == OP_CHECKMULTISIG && asm(23) == OP_ELSE && asm(24) == OP_HASH160 &&
+        asm(25) == BytesToPushOntoStack(20) && asm(26).bytes.size == 20 && asm(27) == OP_EQUALVERIFY &&
+        asm(28) == OP_CHECKSIG && asm(29) == OP_ENDIF && asm(30) == OP_ENDIF
+    }
+    result.isSuccess && result.get
   }
 }
 
@@ -809,27 +815,30 @@ object ReceivedHTLC extends ScriptFactory[ReceivedHTLC] {
     buildScript(asm,ReceivedHTLCImpl(_),isValid(_),"Given asm was not a valid ReceivedHTLC, got: " + asm)
   }
   def isValid(asm: Seq[ScriptToken]): Boolean = {
-    val firstHalf = asm.head == OP_DUP && asm(1) == OP_HASH160 && asm(2) == BytesToPushOntoStack(20) &&
-      asm(3).bytes.size == 20 && asm(4) == OP_EQUAL && asm(5) == OP_IF && asm(6) == OP_CHECKSIG &&
-      asm(7) == OP_ELSE && asm(8) == BytesToPushOntoStack(33) && asm(9).bytes.size == 33 &&
-      asm(10) == OP_SWAP && asm(11) == OP_SIZE && asm(12) == BytesToPushOntoStack(1) &&
-      asm(13).bytes == ScriptNumber(32).bytes && asm(14) == OP_EQUAL &&
-      asm(15) == OP_IF && asm(16) == OP_HASH160 && asm(17) == BytesToPushOntoStack(20) && asm(18).bytes.size == 20
+    val result = Try {
+      val firstHalf = asm.head == OP_DUP && asm(1) == OP_HASH160 && asm(2) == BytesToPushOntoStack(20) &&
+        asm(3).bytes.size == 20 && asm(4) == OP_EQUAL && asm(5) == OP_IF && asm(6) == OP_CHECKSIG &&
+        asm(7) == OP_ELSE && asm(8) == BytesToPushOntoStack(33) && asm(9).bytes.size == 33 &&
+        asm(10) == OP_SWAP && asm(11) == OP_SIZE && asm(12) == BytesToPushOntoStack(1) &&
+        asm(13).bytes == ScriptNumber(32).bytes && asm(14) == OP_EQUAL &&
+        asm(15) == OP_IF && asm(16) == OP_HASH160 && asm(17) == BytesToPushOntoStack(20) && asm(18).bytes.size == 20
       asm(19) == OP_EQUALVERIFY && asm(20) == OP_2 && asm(21) == OP_SWAP &&
-      asm(22) == BytesToPushOntoStack(33) && asm(23).bytes.size == 33 && asm(24) == OP_2 && asm(25) == OP_CHECKMULTISIG &&
-      asm(26) == OP_ELSE && asm(27) == OP_DROP
-    val secondHalf = if (asm(28).isInstanceOf[ScriptNumberOperation]) {
-      val b1 = asm(29) == OP_CHECKLOCKTIMEVERIFY && asm(30) == OP_DROP && asm(31) == OP_CHECKLOCKTIMEVERIFY &&
-      asm(32) == OP_DROP && asm(33) == OP_CHECKSIG && asm(34) == OP_ENDIF && asm(35) == OP_ENDIF
-      b1
-    } else {
-      //TODO: Bug here, account for OP_PUSHDATA, also asm(28).instanceOf[ScriptConstant] is probably a bug
-      val b2 = asm(28).isInstanceOf[BytesToPushOntoStack] && asm(29).isInstanceOf[ScriptConstant] &&
-      asm(30) == OP_CHECKLOCKTIMEVERIFY && asm(31) == OP_DROP && asm(32) == OP_CHECKSIG &&
-      asm(33) == OP_ENDIF && asm(34) == OP_ENDIF
-      b2
+        asm(22) == BytesToPushOntoStack(33) && asm(23).bytes.size == 33 && asm(24) == OP_2 && asm(25) == OP_CHECKMULTISIG &&
+        asm(26) == OP_ELSE && asm(27) == OP_DROP
+      val secondHalf = if (asm(28).isInstanceOf[ScriptNumberOperation]) {
+        val b1 = asm(29) == OP_CHECKLOCKTIMEVERIFY && asm(30) == OP_DROP && asm(31) == OP_CHECKLOCKTIMEVERIFY &&
+          asm(32) == OP_DROP && asm(33) == OP_CHECKSIG && asm(34) == OP_ENDIF && asm(35) == OP_ENDIF
+        b1
+      } else {
+        //TODO: Bug here, account for OP_PUSHDATA, also asm(28).instanceOf[ScriptConstant] is probably a bug
+        val b2 = asm(28).isInstanceOf[BytesToPushOntoStack] && asm(29).isInstanceOf[ScriptConstant] &&
+          asm(30) == OP_CHECKLOCKTIMEVERIFY && asm(31) == OP_DROP && asm(32) == OP_CHECKSIG &&
+          asm(33) == OP_ENDIF && asm(34) == OP_ENDIF
+        b2
+      }
+      firstHalf && secondHalf
     }
-    firstHalf && secondHalf
+    result.isSuccess && result.get
   }
 
   def apply(revocationKey: ECPublicKey, remoteKey: ECPublicKey, paymentHash: RipeMd160Digest,

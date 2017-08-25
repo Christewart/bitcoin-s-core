@@ -11,7 +11,7 @@ import org.bitcoins.core.script.constant.{OP_16, ScriptNumber}
 import org.bitcoins.core.script.crypto.{HashType, SIGHASH_ALL}
 import org.bitcoins.core.script.constant._
 import org.bitcoins.core.script.crypto.HashType
-import org.bitcoins.core.util.BitcoinSLogger
+import org.bitcoins.core.util.{BitcoinSLogger, BitcoinScriptUtil}
 import org.bitcoins.core.wallet.P2PKHHelper
 import org.scalacheck.Gen
 
@@ -566,6 +566,38 @@ trait ScriptGenerators extends BitcoinSLogger {
     htlc = ReceivedHTLC(revocationKey.publicKey,remoteKey.publicKey,paymentHash,localKey.publicKey,lockTime)
     keys = Seq(revocationKey,remoteKey,localKey)
   } yield (htlc,keys)
+
+  def refundHTLCScriptSig: Gen[RefundHTLCScriptSig] = for {
+    bool <- Gen.oneOf(OP_0,OP_1)
+    sig <- CryptoGenerators.digitalSignatures
+    sigConst = ScriptConstant(sig.bytes)
+    asm = BitcoinScriptUtil.calculatePushOp(sigConst) ++ Seq(sigConst, bool)
+  } yield RefundHTLCScriptSig.fromAsm(asm)
+
+  def offeredHTLCScriptSig: Gen[OfferedHTLCScriptSig] = Gen.oneOf(offeredHTLCScriptSigRevocation,
+    offeredHTLCScriptSigPayment)
+
+  def offeredHTLCScriptSigRevocation: Gen[OfferedHTLCScriptSig] = for {
+    key <- CryptoGenerators.publicKey
+    sig <- CryptoGenerators.digitalSignatures
+  } yield OfferedHTLCScriptSig(sig,key)
+
+  def offeredHTLCScriptSigPayment: Gen[OfferedHTLCScriptSig] = for {
+    hash <- CryptoGenerators.sha256Digest
+    sig <- CryptoGenerators.digitalSignatures
+  } yield OfferedHTLCScriptSig(hash,sig)
+
+  def receivedHTLCScriptSigTimeout: Gen[ReceivedHTLCScriptSig] = for {
+    sig <- CryptoGenerators.digitalSignatures
+  } yield ReceivedHTLCScriptSig(sig)
+
+  def receivedHTLCScriptSigRevocation: Gen[ReceivedHTLCScriptSig] = for {
+    key <- CryptoGenerators.publicKey
+    sig <- CryptoGenerators.digitalSignatures
+  } yield ReceivedHTLCScriptSig(sig,key)
+
+  def receivedHTLCScriptSig: Gen[ReceivedHTLCScriptSig] = Gen.oneOf(receivedHTLCScriptSigTimeout,
+    receivedHTLCScriptSigRevocation)
 }
 
 object ScriptGenerators extends ScriptGenerators

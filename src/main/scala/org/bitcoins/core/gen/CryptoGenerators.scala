@@ -69,6 +69,8 @@ trait CryptoGenerators {
     hash <- CryptoGenerators.doubleSha256Digest
   } yield privKey.sign(hash)
 
+  def sha256Digest: Gen[Sha256Digest] = doubleSha256Digest.map(s => Sha256Digest(s.bytes))
+
   /**
     * Generates a random [[DoubleSha256Digest]]
     * @return
