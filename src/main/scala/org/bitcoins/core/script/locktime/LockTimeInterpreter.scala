@@ -52,6 +52,7 @@ sealed abstract class LockTimeInterpreter {
         case s : ScriptNumber =>
           if (s.bytes.size > 5) {
             //if the number size is larger than 5 bytes the number is invalid
+            logger.error("Script number was larger than 5 bytes, which is invalid for OP_CLTV, got: " + s)
             ScriptProgram(program,ScriptErrorUnknownError)
           } else if (checkLockTime(program,s)) {
             ScriptProgram(program, program.script.tail, ScriptProgram.Script)
@@ -60,8 +61,11 @@ sealed abstract class LockTimeInterpreter {
             ScriptProgram(program, ScriptErrorUnsatisfiedLocktime)
           }
         case s : ScriptConstant =>
+          logger.info("s scriptConstant: " + s + " converted to number " + ScriptNumber(s.hex))
           opCheckLockTimeVerify(ScriptProgram(program, ScriptNumber(s.hex) :: program.stack.tail, ScriptProgram.Stack))
-        case _ : ScriptToken => ScriptProgram(program,ScriptErrorUnknownError)
+        case t : ScriptToken =>
+          logger.error("Unknown token in OP_CLTV: " + t)
+          ScriptProgram(program,ScriptErrorUnknownError)
       }
     }
   }

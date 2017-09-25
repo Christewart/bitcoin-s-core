@@ -7,11 +7,9 @@ import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.script.{P2SHScriptPubKey, _}
 import org.bitcoins.core.protocol.transaction.{TransactionConstants, TransactionOutPoint, TransactionOutput, TransactionWitness}
 import org.bitcoins.core.script.ScriptSettings
-import org.bitcoins.core.script.constant.{OP_16, ScriptNumber}
-import org.bitcoins.core.script.crypto.{HashType, SIGHASH_ALL}
-import org.bitcoins.core.script.constant._
+import org.bitcoins.core.script.constant.{OP_16, ScriptNumber, _}
 import org.bitcoins.core.script.crypto.HashType
-import org.bitcoins.core.util.{BitcoinSLogger, BitcoinScriptUtil}
+import org.bitcoins.core.util.BitcoinSLogger
 import org.bitcoins.core.wallet.P2PKHHelper
 import org.scalacheck.Gen
 
@@ -20,7 +18,7 @@ import org.scalacheck.Gen
   */
 //TODO: Need to provide generators for [[NonStandardScriptSignature]] and [[NonStandardScriptPubKey]]
 trait ScriptGenerators extends BitcoinSLogger {
-
+  private val tc = TransactionConstants
 
   def p2pkScriptSignature : Gen[P2PKScriptSignature] = for {
     digitalSignature <- CryptoGenerators.digitalSignatures
@@ -267,7 +265,7 @@ trait ScriptGenerators extends BitcoinSLogger {
     (creditingTx,outputIndex) = TransactionGenerators.buildCreditingTransaction(scriptPubKey)
     outpoint = TransactionOutPoint(creditingTx.txId,outputIndex)
     outputs = TransactionGenerators.dummyOutputs
-    txSigComponent = P2PKHHelper.sign(privateKey,scriptPubKey,outpoint, outputs, HashType.sigHashAll)
+    txSigComponent = P2PKHHelper.sign(privateKey,scriptPubKey,outpoint, outputs, hashType)
     signedScriptSig = txSigComponent.scriptSignature.asInstanceOf[P2PKHScriptSignature]
   } yield (signedScriptSig, scriptPubKey, privateKey)
 
@@ -418,8 +416,8 @@ trait ScriptGenerators extends BitcoinSLogger {
   private def lockTimeHelper(lockTime: Option[UInt32], sequence: UInt32, lock: LockTimeScriptPubKey, privateKeys: Seq[ECPrivateKey], requiredSigs: Option[Int],
                     hashType: HashType): LockTimeScriptSignature = {
     val pubKeys = privateKeys.map(_.publicKey)
-    val (creditingTx, outputIndex) = TransactionGenerators.buildCreditingTransaction(UInt32(2),lock)
-    val (unsignedSpendingTx, inputIndex) = TransactionGenerators.buildSpendingTransaction(UInt32(2), creditingTx,
+    val (creditingTx, outputIndex) = TransactionGenerators.buildCreditingTransaction(tc.validLockVersion,lock)
+    val (unsignedSpendingTx, inputIndex) = TransactionGenerators.buildSpendingTransaction(tc.validLockVersion, creditingTx,
       EmptyScriptSignature, outputIndex,lockTime.getOrElse(TransactionConstants.lockTime), sequence)
 
     val txSignatureComponent = TxSigComponent(unsignedSpendingTx, inputIndex,
@@ -444,13 +442,13 @@ trait ScriptGenerators extends BitcoinSLogger {
                              outputs: Seq[TransactionOutput] = Nil, amount: CurrencyUnit = CurrencyUnits.zero): EscrowTimeoutScriptSignature = {
     val pubKeys = privateKeys.map(_.publicKey)
     val (creditingTx, outputIndex) = TransactionGenerators.buildCreditingTransaction(
-      TransactionConstants.validLockVersion, csvEscrowTimeout,amount)
+      tc.validLockVersion, csvEscrowTimeout,amount)
     val (unsignedSpendingTx, inputIndex) = {
       if (outputs.isEmpty) {
-        TransactionGenerators.buildSpendingTransaction(TransactionConstants.validLockVersion,
+        TransactionGenerators.buildSpendingTransaction(tc.validLockVersion,
           creditingTx, EmptyScriptSignature, outputIndex, UInt32.zero, sequence)
       } else {
-        TransactionGenerators.buildSpendingTransaction(TransactionConstants.validLockVersion, creditingTx,
+        TransactionGenerators.buildSpendingTransaction(tc.validLockVersion, creditingTx,
           EmptyScriptSignature, outputIndex, UInt32.zero, sequence, outputs)
       }
     }
@@ -478,7 +476,7 @@ trait ScriptGenerators extends BitcoinSLogger {
   def signedP2SHP2WSHScriptSignature: Gen[(P2SHScriptSignature, P2SHScriptPubKey, Seq[ECPrivateKey], TransactionWitness, CurrencyUnit)] = for {
     (witness,wtxSigComponent,privKeys) <- WitnessGenerators.signedP2WSHTransactionWitness
     p2shScriptPubKey = P2SHScriptPubKey(wtxSigComponent.scriptPubKey)
-    p2shScriptSig = P2SHScriptSignature(wtxSigComponent.scriptPubKey.asInstanceOf[WitnessScriptPubKey])
+    p2shScriptSig = P2SHScriptSignature(wtxSigComponent.scriptPubKey)
   } yield (p2shScriptSig, p2shScriptPubKey, privKeys, witness, wtxSigComponent.amount)
 
   /**
@@ -540,64 +538,6 @@ trait ScriptGenerators extends BitcoinSLogger {
     }
   }
 
-  def refundHTLC: Gen[(RefundHTLC, Seq[ECPrivateKey])] = for {
-    revocationKey <- CryptoGenerators.privateKey
-    delayedKey <- CryptoGenerators.privateKey
-    locktime <- NumberGenerator.scriptNumbers
-    refund = RefundHTLC(revocationKey.publicKey,locktime,delayedKey.publicKey)
-    privKeys = Seq(revocationKey,delayedKey)
-  } yield (refund,privKeys)
-
-  def offeredHTLC: Gen[(OfferedHTLC, Seq[ECPrivateKey])] = for {
-    revocationKey <- CryptoGenerators.privateKey
-    remoteKey <- CryptoGenerators.privateKey
-    localKey <- CryptoGenerators.privateKey
-    paymentHash <- CryptoGenerators.ripeMd160Digest
-    htlc = OfferedHTLC(revocationKey.publicKey,remoteKey.publicKey,localKey.publicKey,paymentHash)
-    keys = Seq(revocationKey,remoteKey,localKey)
-  } yield (htlc,keys)
-
-  def receivedHTLC: Gen[(ReceivedHTLC,Seq[ECPrivateKey])] = for {
-    revocationKey <- CryptoGenerators.privateKey
-    remoteKey <- CryptoGenerators.privateKey
-    localKey <- CryptoGenerators.privateKey
-    paymentHash <- CryptoGenerators.ripeMd160Digest
-    lockTime <- NumberGenerator.scriptNumbers
-    htlc = ReceivedHTLC(revocationKey.publicKey,remoteKey.publicKey,paymentHash,localKey.publicKey,lockTime)
-    keys = Seq(revocationKey,remoteKey,localKey)
-  } yield (htlc,keys)
-
-  def refundHTLCScriptSig: Gen[RefundHTLCScriptSig] = for {
-    bool <- Gen.oneOf(OP_0,OP_1)
-    sig <- CryptoGenerators.digitalSignatures
-    sigConst = ScriptConstant(sig.bytes)
-    asm = BitcoinScriptUtil.calculatePushOp(sigConst) ++ Seq(sigConst, bool)
-  } yield RefundHTLCScriptSig.fromAsm(asm)
-
-  def offeredHTLCScriptSig: Gen[OfferedHTLCScriptSig] = Gen.oneOf(offeredHTLCScriptSigRevocation,
-    offeredHTLCScriptSigPayment)
-
-  def offeredHTLCScriptSigRevocation: Gen[OfferedHTLCScriptSig] = for {
-    key <- CryptoGenerators.publicKey
-    sig <- CryptoGenerators.digitalSignatures
-  } yield OfferedHTLCScriptSig(sig,key)
-
-  def offeredHTLCScriptSigPayment: Gen[OfferedHTLCScriptSig] = for {
-    hash <- CryptoGenerators.sha256Digest
-    sig <- CryptoGenerators.digitalSignatures
-  } yield OfferedHTLCScriptSig(hash,sig)
-
-  def receivedHTLCScriptSigTimeout: Gen[ReceivedHTLCScriptSig] = for {
-    sig <- CryptoGenerators.digitalSignatures
-  } yield ReceivedHTLCScriptSig(sig)
-
-  def receivedHTLCScriptSigRevocation: Gen[ReceivedHTLCScriptSig] = for {
-    key <- CryptoGenerators.publicKey
-    sig <- CryptoGenerators.digitalSignatures
-  } yield ReceivedHTLCScriptSig(sig,key)
-
-  def receivedHTLCScriptSig: Gen[ReceivedHTLCScriptSig] = Gen.oneOf(receivedHTLCScriptSigTimeout,
-    receivedHTLCScriptSigRevocation)
 }
 
 object ScriptGenerators extends ScriptGenerators

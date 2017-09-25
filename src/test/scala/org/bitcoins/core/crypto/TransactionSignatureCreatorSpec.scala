@@ -1,6 +1,6 @@
 package org.bitcoins.core.crypto
 
-import org.bitcoins.core.gen.TransactionGenerators
+import org.bitcoins.core.gen.{HTLCGenerators, TransactionGenerators}
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.core.script.result._
 import org.bitcoins.core.script.{PreExecutionScriptProgram, ScriptProgram}
@@ -96,6 +96,7 @@ class TransactionSignatureCreatorSpec extends Properties("TransactionSignatureCr
       val result = ScriptInterpreter.run(program)
       Seq(ScriptErrorPushSize, ScriptOk).contains(result)
     }
+
   property("generate a valid signature from a p2sh(p2wpkh) witness transaction") =
     Prop.forAllNoShrink(TransactionGenerators.signedP2SHP2WPKHTransaction) { case (wtxSigComponent, privKeys) =>
       val program = ScriptProgram(wtxSigComponent)
@@ -131,6 +132,32 @@ class TransactionSignatureCreatorSpec extends Properties("TransactionSignatureCr
     Prop.forAllNoShrink(TransactionGenerators.signedP2WSHEscrowTimeoutTransaction) { case (txSigComponent, _) =>
       val program = ScriptProgram(txSigComponent)
       val result = ScriptInterpreter.run(program)
+      result == ScriptOk
+    }
+  }
+
+  property("generate a valid signature for a received htlc transaction") = {
+    Prop.forAllNoShrink(HTLCGenerators.signedReceivedHTLCTx) { case (txSigComponent,_) =>
+      val program = ScriptProgram(txSigComponent)
+      val result = ScriptInterpreter.run(program)
+      if (result != ScriptOk) logger.error("Result:" + result)
+      result == ScriptOk
+    }
+  }
+
+  property("generate a valid signature for a offered htlc transaction") = {
+    Prop.forAllNoShrink(HTLCGenerators.signedOfferedHTLCTx) { case (txSigComponent,_) =>
+      val program = ScriptProgram(txSigComponent)
+      val result = ScriptInterpreter.run(program)
+      if (result != ScriptOk) logger.error("Result:" + result)
+      result == ScriptOk
+    }
+  }
+  property("generate a valid signature for a offered htlc transaction") = {
+    Prop.forAllNoShrink(HTLCGenerators.signedRefundHTLCTx) { case (txSigComponent,_) =>
+      val program = ScriptProgram(txSigComponent)
+      val result = ScriptInterpreter.run(program)
+      if (result != ScriptOk) logger.error("Result:" + result)
       result == ScriptOk
     }
   }

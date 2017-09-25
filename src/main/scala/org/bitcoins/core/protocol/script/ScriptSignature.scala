@@ -620,7 +620,7 @@ object OfferedHTLCScriptSig extends ScriptFactory[OfferedHTLCScriptSig] {
     val (preImageConst, sigConst) = (ScriptConstant(paymentPreImage.bytes), ScriptConstant(remoteSig.bytes))
     val preImagePushOp = BitcoinScriptUtil.calculatePushOp(preImageConst)
     val sigPushOp = BitcoinScriptUtil.calculatePushOp(sigConst)
-    val asm = preImagePushOp ++ Seq(preImageConst) ++ sigPushOp ++ Seq(sigConst)
+    val asm = sigPushOp ++ Seq(sigConst) ++ preImagePushOp ++ Seq(preImageConst)
     fromAsm(asm)
   }
 

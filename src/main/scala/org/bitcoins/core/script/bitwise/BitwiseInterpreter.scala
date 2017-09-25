@@ -31,7 +31,7 @@ sealed abstract class BitwiseInterpreter {
           OP_1.underlying == ScriptNumber.one.underlying
         case _ => h.bytes == h1.bytes
       }
-      val scriptBoolean  = if (result) OP_TRUE else OP_FALSE
+      val scriptBoolean  = if (result) ScriptNumber.one else ScriptNumber.zero
       ScriptProgram(program,scriptBoolean :: program.stack.tail.tail, program.script.tail)
     }
   }

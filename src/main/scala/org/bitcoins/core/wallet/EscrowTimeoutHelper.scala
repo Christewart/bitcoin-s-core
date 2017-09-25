@@ -44,10 +44,7 @@ sealed abstract class EscrowTimeoutHelper extends BitcoinSLogger {
   def buildEscrowTimeoutScriptWitness(signedScriptSig: EscrowTimeoutScriptSignature,
                                       lock: EscrowTimeoutScriptPubKey,
                                       unsigned: WitnessTxSigComponentRaw): TransactionWitness = {
-    //need to remove the OP_0 or OP_1 and replace it with ScriptNumber.zero / ScriptNumber.one since witnesses are *not* run through the interpreter
-    val s = BitcoinScriptUtil.minimalDummy(BitcoinScriptUtil.minimalIfOp(signedScriptSig.asm))
-    val signedScriptSigPushOpsRemoved = BitcoinScriptUtil.filterPushOps(s).reverse
-    val signedScriptWitness = ScriptWitness(lock.asmBytes +: (signedScriptSigPushOpsRemoved.map(_.bytes)))
+    val signedScriptWitness = ScriptWitness(signedScriptSig,lock)
     val updatedWitnesses = unsigned.transaction.witness.witnesses.updated(unsigned.inputIndex.toInt,signedScriptWitness)
     val txWitness: TransactionWitness = TransactionWitness(updatedWitnesses)
     txWitness

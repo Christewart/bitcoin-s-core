@@ -1,6 +1,6 @@
 package org.bitcoins.core.protocol.script
 
-import org.bitcoins.core.gen.ScriptGenerators
+import org.bitcoins.core.gen.{HTLCGenerators, ScriptGenerators}
 import org.bitcoins.core.util.BitcoinSLogger
 import org.scalacheck.{Prop, Properties}
 
@@ -8,7 +8,7 @@ class LightningScriptSigSpec extends Properties("LightningScriptSigSpec") {
   private def logger = BitcoinSLogger.logger
 
   property("RefundHTLCScriptSig serialization symmetry") = {
-    Prop.forAllNoShrink(ScriptGenerators.refundHTLCScriptSig) { case refund =>
+    Prop.forAllNoShrink(HTLCGenerators.refundHTLCScriptSig) { case refund =>
         val first = RefundHTLCScriptSig(refund.hex) == refund
         val second = if (refund.isRevocation) {
           RefundHTLCScriptSig.createRevocation(refund.signatures.head) == refund
@@ -20,7 +20,7 @@ class LightningScriptSigSpec extends Properties("LightningScriptSigSpec") {
   }
 
   property("OfferedHTLCScriptSig serialization symmetry") = {
-    Prop.forAllNoShrink(ScriptGenerators.offeredHTLCScriptSig) { case offered =>
+    Prop.forAllNoShrink(HTLCGenerators.offeredHTLCScriptSig) { case offered =>
         val first = OfferedHTLCScriptSig(offered.hex) == offered
         val reconstructed = offered.revocationOrPayment match {
           case Left((sig,key)) =>
@@ -34,7 +34,7 @@ class LightningScriptSigSpec extends Properties("LightningScriptSigSpec") {
   }
 
   property("ReceivedHTLCScriptSig serialization symmetry") = {
-    Prop.forAllNoShrink(ScriptGenerators.receivedHTLCScriptSig) { case received =>
+    Prop.forAllNoShrink(HTLCGenerators.receivedHTLCScriptSig) { case received =>
         val first = ReceivedHTLCScriptSig(received.hex) == received
         val reconstructed = received.timeoutOrRevocation match {
           case Left(sig) => ReceivedHTLCScriptSig(sig)

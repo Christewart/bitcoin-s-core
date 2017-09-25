@@ -499,14 +499,14 @@ trait TransactionGenerators extends BitcoinSLogger {
   } yield (csvScriptNum, sequence)).suchThat(x => !csvLockTimesOfSameType(x))
 
   /** generates a [[ScriptNumber]] and [[UInt32]] locktime for a transaction such that the tx will be spendable */
-  private def spendableCLTVValues: Gen[(ScriptNumber,UInt32)] = for {
+  def spendableCLTVValues: Gen[(ScriptNumber,UInt32)] = for {
     txLockTime <- NumberGenerator.uInt32s
     cltvLockTime <- NumberGenerator.uInt32s.suchThat(num => cltvLockTimesOfSameType(ScriptNumber(num.underlying),txLockTime) &&
       num < txLockTime).map(x => ScriptNumber(x.underlying))
   } yield (cltvLockTime,txLockTime)
 
   /** Generates a [[ScriptNumber]] and [[UInt32]] locktime for a transaction such that the tx will be unspendable */
-  private def unspendableCLTVValues: Gen[(ScriptNumber,UInt32)] = for {
+  def unspendableCLTVValues: Gen[(ScriptNumber,UInt32)] = for {
     txLockTime <- NumberGenerator.uInt32s
     cltvLockTime <- NumberGenerator.uInt32s.suchThat(num => num >= txLockTime || !cltvLockTimesOfSameType(ScriptNumber(num.underlying),txLockTime)).map(x => ScriptNumber(x.underlying))
   } yield (cltvLockTime,txLockTime)

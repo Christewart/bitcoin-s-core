@@ -4,7 +4,7 @@ import org.bitcoins.core.crypto._
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.CompactSizeUInt
 import org.bitcoins.core.protocol.script.{CLTVScriptPubKey, CSVScriptPubKey, EmptyScriptPubKey, _}
-import org.bitcoins.core.protocol.transaction.{BaseTransaction, Transaction, WitnessTransaction}
+import org.bitcoins.core.protocol.transaction.{BaseTransaction, Transaction, TransactionWitness, WitnessTransaction}
 import org.bitcoins.core.script.ScriptProgram.PreExecutionScriptProgramImpl
 import org.bitcoins.core.script.constant._
 import org.bitcoins.core.script.crypto.{OP_CHECKMULTISIG, OP_CHECKMULTISIGVERIFY, OP_CHECKSIG, OP_CHECKSIGVERIFY}
@@ -369,21 +369,28 @@ trait BitcoinScriptUtil extends BitcoinSLogger {
     }
   }
 
-
   /** Since witnesses are not run through the interpreter, replace OP_0/OP_1 with ScriptNumber.zero/ScriptNumber.one */
-  def minimalIfOp(asm: Seq[ScriptToken]): Seq[ScriptToken] = {
-    if (asm.last == OP_0) {
-      asm.dropRight(1) ++ Seq(ScriptNumber.zero)
-    } else if (asm.last == OP_1) {
-      asm.dropRight(1) ++ Seq(ScriptNumber.one)
-    } else throw new IllegalArgumentException("EscrowTimeoutScriptSig must end with OP_0 or OP_1")
-
+  def replaceScriptNumOpWithScriptNum(asm: Seq[ScriptToken]): Seq[ScriptToken] = asm.map { t =>
+    if (t.isInstanceOf[ScriptNumberOperation]) {
+      val scriptNumOp = t.asInstanceOf[ScriptNumberOperation]
+      ScriptNumber(scriptNumOp.underlying)
+    } else t
   }
 
-  /** Replaces the OP_0 dummy for OP_CHECKMULTISIG with ScriptNumber.zero */
-  def minimalDummy(asm: Seq[ScriptToken]): Seq[ScriptToken] = {
-    if (asm.head == OP_0) ScriptNumber.zero +: asm.tail
-    else asm
+  def convertToWitness(scriptSig: ScriptSignature): ScriptWitness = convertToWitness(scriptSig,EmptyScriptPubKey)
+
+  def convertToWitness(scriptSig: ScriptSignature,redeemScript: ScriptPubKey): ScriptWitness = {
+    if (scriptSig == EmptyScriptSignature) {
+      val minimalBools: Seq[ScriptToken] = replaceScriptNumOpWithScriptNum(Nil)
+      val filteredPushOps = minimalBools.filter(t => !t.isInstanceOf[BytesToPushOntoStack])
+      val reversed = filteredPushOps.reverse
+      ScriptWitness(redeemScript.asmBytes +: (reversed.map(_.bytes)))
+    } else {
+      val minimalBools: Seq[ScriptToken] = replaceScriptNumOpWithScriptNum(scriptSig.asm)
+      val filteredPushOps = minimalBools.filter(t => !t.isInstanceOf[BytesToPushOntoStack])
+      val reversed = filteredPushOps.reverse
+      ScriptWitness(redeemScript.asmBytes +: (reversed.map(_.bytes)))
+    }
   }
 
 }

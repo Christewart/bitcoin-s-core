@@ -744,14 +744,14 @@ object RefundHTLC extends ScriptFactory[RefundHTLC] {
   * [[https://github.com/lightningnetwork/lightning-rfc/blob/master/03-transactions.md#offered-htlc-outputs]]
   */
 sealed abstract class OfferedHTLC extends LightningSPK {
-  def paymentHash: RipeMd160Digest = RipeMd160Digest(asm(26).bytes)
+  def paymentHash: Sha256Hash160Digest = Sha256Hash160Digest(asm(26).bytes)
 }
 
 object OfferedHTLC extends ScriptFactory[OfferedHTLC] {
   private case class OfferedHTLCImpl(hex: String) extends OfferedHTLC
 
   def apply(revocationKey: ECPublicKey, remoteKey: ECPublicKey, localKey: ECPublicKey,
-            paymentHash: RipeMd160Digest): OfferedHTLC = {
+            paymentHash: Sha256Hash160Digest): OfferedHTLC = {
     val revHash = CryptoUtil.sha256Hash160(revocationKey.bytes)
     val first = Seq(OP_DUP, OP_HASH160, BytesToPushOntoStack(20), ScriptConstant(revHash.bytes), OP_EQUAL)
     val second = Seq(OP_IF, OP_CHECKSIG, OP_ELSE, BytesToPushOntoStack(33), ScriptConstant(remoteKey.bytes))

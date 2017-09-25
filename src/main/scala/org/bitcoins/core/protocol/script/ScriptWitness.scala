@@ -3,7 +3,7 @@ package org.bitcoins.core.protocol.script
 import org.bitcoins.core.crypto.{ECDigitalSignature, ECPublicKey}
 import org.bitcoins.core.protocol.NetworkElement
 import org.bitcoins.core.serializers.script.RawScriptWitnessParser
-import org.bitcoins.core.util.{BitcoinSUtil, Factory}
+import org.bitcoins.core.util.{BitcoinSUtil, BitcoinScriptUtil, Factory}
 
 /**
   * Created by chris on 11/10/16.
@@ -38,4 +38,10 @@ object ScriptWitness extends Factory[ScriptWitness] {
     val pubKeyConstant = publicKey.bytes
     ScriptWitness(Seq(sigConstant, pubKeyConstant))
   }
+
+  def apply(s: ScriptSignature): ScriptWitness = BitcoinScriptUtil.convertToWitness(s)
+
+  def apply(s: ScriptSignature, redeemScript: ScriptPubKey): ScriptWitness = BitcoinScriptUtil.convertToWitness(s,redeemScript)
+
+  def apply(spk: ScriptPubKey): ScriptWitness = ScriptWitness(EmptyScriptSignature,spk)
 }

@@ -12,6 +12,7 @@ import org.bitcoins.core.protocol.transaction._
   * Created by chris on 5/9/17.
   */
 sealed trait WTxSigComponentHelper {
+  private val tc = TransactionConstants
   /** Takes a signed [[ScriptWitness]] and an unsignedTx and adds the witness to the unsigned [[WitnessTransaction]] */
   def createSignedWTxComponent(witness: ScriptWitness, unsignedWTxComponent: WitnessTxSigComponent): (TransactionWitness,WitnessTxSigComponent) = {
     val signedTxWitness = TransactionWitness(Seq(witness))
@@ -33,7 +34,6 @@ sealed trait WTxSigComponentHelper {
   /** Creates a unsigned [[WitnessTxSigComponent]] from the given parameters */
   def createUnsignedRawWTxSigComponent(witScriptPubKey: WitnessScriptPubKey, amount: CurrencyUnit,
                                     unsignedScriptWitness: ScriptWitness, sequence: Option[UInt32]): WitnessTxSigComponentRaw = {
-    val tc = TransactionConstants
     val flags = Policy.standardScriptVerifyFlags
     val witness = TransactionWitness(Seq(unsignedScriptWitness))
     val (creditingTx,outputIndex) = TransactionGenerators.buildCreditingTransaction(witScriptPubKey,amount)
@@ -50,7 +50,6 @@ sealed trait WTxSigComponentHelper {
                                         inputs: Seq[TransactionInput]): WitnessTxSigComponentP2SH = {
     val witness = TransactionWitness(Seq(unsignedScriptWitness))
     val flags = Policy.standardScriptVerifyFlags
-    val tc = TransactionConstants
     val p2sh = P2SHScriptPubKey(witSPK)
     val (creditingTx,outputIndex) = TransactionGenerators.buildCreditingTransaction(witSPK,amount)
     val p2shScriptSig = P2SHScriptSignature(witSPK)
