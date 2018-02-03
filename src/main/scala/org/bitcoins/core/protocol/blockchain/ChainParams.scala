@@ -1,15 +1,18 @@
 package org.bitcoins.core.protocol.blockchain
 
+import java.nio.charset.StandardCharsets
+
 import org.bitcoins.core.consensus.Merkle
 import org.bitcoins.core.crypto.DoubleSha256Digest
-import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
-import org.bitcoins.core.number.{Int64, UInt32, UInt64}
+import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, Satoshis}
+import org.bitcoins.core.number.{Int64, UInt32, UInt64, UInt8}
 import org.bitcoins.core.protocol.CompactSizeUInt
+import org.bitcoins.core.protocol.blockchain.BCashChainParams.h2b
 import org.bitcoins.core.protocol.script.{ScriptPubKey, ScriptSignature}
 import org.bitcoins.core.protocol.transaction.{Transaction, TransactionConstants, TransactionInput, TransactionOutput}
 import org.bitcoins.core.script.constant.{BytesToPushOntoStack, ScriptConstant, ScriptNumber}
 import org.bitcoins.core.script.crypto.OP_CHECKSIG
-import org.bitcoins.core.util.BitcoinSUtil
+import org.bitcoins.core.util.{BitcoinSLogger, BitcoinSUtil, BitcoinScriptUtil}
 
 /**
   * Created by chris on 5/22/16.
@@ -21,7 +24,8 @@ import org.bitcoins.core.util.BitcoinSUtil
   * Mimics this C++ interface
   * https://github.com/bitcoin/bitcoin/blob/master/src/chainparams.h#L42
   */
-sealed trait ChainParams {
+sealed abstract class ChainParams {
+  val logger = BitcoinSLogger.logger
 
   /** Return the BIP70 network string ([[MainNetChainParams]], [[TestNetChainParams]] or [[RegTestNetChainParams]].) */
   def networkId : String
@@ -70,18 +74,21 @@ sealed trait ChainParams {
     */
   def createGenesisBlock(timestamp : String, scriptPubKey : ScriptPubKey, time : UInt32, nonce : UInt32, nBits : UInt32,
                          version : UInt32, amount : CurrencyUnit) : Block = {
-    val timestampHex = timestamp.toCharArray.map(_.toByte)
+    val timestampBytes: Seq[Byte] = timestamp.getBytes(StandardCharsets.UTF_8)
     //see https://bitcoin.stackexchange.com/questions/13122/scriptsig-coinbase-structure-of-the-genesis-block
     //for a full breakdown of the genesis block & its script signature
+    val timestampConst = ScriptConstant(timestampBytes)
+    val pushop = BitcoinScriptUtil.calculatePushOp(timestampConst)
     val scriptSignature = ScriptSignature.fromAsm(Seq(BytesToPushOntoStack(4), ScriptNumber(486604799),
-      BytesToPushOntoStack(1), ScriptNumber(4), BytesToPushOntoStack(69), ScriptConstant(timestampHex)))
+      BytesToPushOntoStack(1), ScriptNumber(4)) ++ pushop ++ Seq(timestampConst))
     val input = TransactionInput(scriptSignature)
     val output = TransactionOutput(amount,scriptPubKey)
-    val tx = Transaction(TransactionConstants.version,Seq(input), Seq(output), TransactionConstants.lockTime)
+    val tx = Transaction(UInt32.one,Seq(input), Seq(output), TransactionConstants.lockTime)
     val prevBlockHash = DoubleSha256Digest("0000000000000000000000000000000000000000000000000000000000000000")
     val merkleRootHash = Merkle.computeMerkleRoot(Seq(tx))
+    //require(merkleRootHash == tx.txId)
     val genesisBlockHeader = BlockHeader(version,prevBlockHash,merkleRootHash,time,nBits,nonce)
-    val genesisBlock = Block(genesisBlockHeader,CompactSizeUInt(UInt64.one,1),Seq(tx))
+    val genesisBlock = Block(genesisBlockHeader,Seq(tx))
     genesisBlock
   }
 }
@@ -91,14 +98,21 @@ object MainNetChainParams extends ChainParams {
 
   override def networkId = "main"
 
-  override def genesisBlock : Block = createGenesisBlock(UInt32(1231006505), UInt32(2083236893), UInt32(0x1d00ffff), UInt32.one, Satoshis(Int64(5000000000L)))
+  override def genesisBlock: Block = {
+    val b = createGenesisBlock(UInt32(1231006505), UInt32(2083236893), UInt32(0x1d00ffff), UInt32.one, Satoshis(Int64(5000000000L)))
+    val expectedRoot = BitcoinSUtil.flipEndianness("4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b")
+    val expected = BitcoinSUtil.flipEndianness("000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f")
+    require(b.blockHeader.merkleRootHash.hex == expectedRoot, "Got root: " + b.blockHeader.merkleRootHash.hex + "\nexpected: " + expected)
+    require(b.blockHeader.hash.hex == expected, "Got " + b.blockHeader.hash.hex + "\nexpected " + expected)
+    b
+  }
 
   override def requireStandardTransaction : Boolean = true
 
   override def base58Prefixes : Map[Base58Type,Seq[Byte]] = Map(
-    PubKeyAddress -> BitcoinSUtil.decodeHex("00"),
-    ScriptAddress -> BitcoinSUtil.decodeHex("05"),
-    SecretKey -> BitcoinSUtil.decodeHex("80"),
+    PubKeyAddress -> UInt8.zero.bytes,
+    ScriptAddress -> UInt8(5).bytes,
+    SecretKey -> UInt8(128).bytes,
     ExtPublicKey -> Seq(BitcoinSUtil.hexToByte("04"), BitcoinSUtil.hexToByte("88"),
       BitcoinSUtil.hexToByte("b2"), BitcoinSUtil.hexToByte("1e")),
     ExtSecretKey -> Seq(BitcoinSUtil.hexToByte("04"), BitcoinSUtil.hexToByte("88"),
@@ -131,9 +145,73 @@ object RegTestNetChainParams extends ChainParams {
   override def base58Prefixes : Map[Base58Type, Seq[Byte]] = TestNetChainParams.base58Prefixes
 }
 
+/**
+  * https://github.com/BitcoinUnlimited/BitcoinUnlimited/blob/release/src/chainparams.cpp#L91
+  */
+object BCashChainParams extends ChainParams {
+  override def networkId: String = MainNetChainParams.networkId
+  override def genesisBlock = MainNetChainParams.genesisBlock
+  private val h2b = BitcoinSUtil.hexToByte(_)
+  override def base58Prefixes = Map(
+    PubKeyAddress -> UInt8.zero.bytes,
+    ScriptAddress -> UInt8(5).bytes,
+    SecretKey -> UInt8(128).bytes,
+    //(0x04)(0x88)(0xB2)(0x1E)
+    ExtPublicKey -> Seq(h2b("04"), h2b("88"), h2b("b2"), h2b("1e")),
+    //(0x04)(0x88)(0xAD)(0xE4)
+    ExtSecretKey -> Seq(h2b("04"), h2b("88"), h2b("ad"), h2b("e4"))
+  )
 
+  override def requireStandardTransaction: Boolean = true
 
-sealed trait Base58Type
+}
+
+/**
+  * https://github.com/litecoin-project/litecoin/blob/master/src/chainparams.cpp#L73
+  */
+object LtcChainParams extends ChainParams {
+  private val h2b = BitcoinSUtil.hexToByte(_)
+  override def networkId: String = MainNetChainParams.networkId
+  override def genesisBlock: Block = {
+    //Litecoin does not share a genesis block with bitcoin, so we need to define the ltc genesis block here
+    //CreateGenesisBlock(1317972665, 2084524493, 0x1e0ffff0, 1, 50 * COIN);
+    //CreateGenesisBlock(1317972665, 2084524493, 0x1e0ffff0, 1, 50 * COIN)
+    val b = createGenesisBlock(UInt32(1317972665),UInt32(2084524493),UInt32(0x1e0ffff0),UInt32.one,Satoshis(Int64(5000000000L)))
+    val expectedLtcMerkleRoot = BitcoinSUtil.flipEndianness("97ddfbbae6be97fd6cdf3e7ca13232a3afff2353e29badfab7f73011edd4ced9")
+    val expectedLtcGenesis = BitcoinSUtil.flipEndianness("12a765e31ffd4059bada1e25190f6e98c99d9714d334efa41a195a7e7e04bfe2")
+    require(b.blockHeader.merkleRootHash.hex == expectedLtcMerkleRoot, "Got merkleRoot: " + b.blockHeader.merkleRootHash.hex + "\nexpected " + expectedLtcMerkleRoot)
+    require(b.blockHeader.hash.hex == expectedLtcGenesis, "Got " + b.blockHeader.hash.hex + "\nexpected " + expectedLtcGenesis)
+    b
+  }
+
+  override def createGenesisBlock(time: UInt32, nonce: UInt32, nBits: UInt32, version: UInt32, amount: CurrencyUnit): Block = {
+    //const char* pszTimestamp = "NY Times 05/Oct/2011 Steve Jobs, Apple’s Visionary, Dies at 56";
+    //const CScript genesisOutputScript = CScript() << ParseHex("040184710fa689ad5023690c80f3a49c8f13f8d45b8c857fbcbc8bc4a8e4d3eb4b10f4d4604fa08dce601aaf0f470216fe1b51850b4acf21b179c45070ac7b03a9") << OP_CHECKSIG;
+    val pszTimestamp = "NY Times 05/Oct/2011 Steve Jobs, Apple’s Visionary, Dies at 56"
+    val asm = Seq(BytesToPushOntoStack(65),
+      ScriptConstant("040184710fa689ad5023690c80f3a49c8f13f8d45b8c857fbcbc8bc4a8e4d3eb4b10f4d4604fa08dce601aaf0f470216fe1b51850b4acf21b179c45070ac7b03a9"),
+      OP_CHECKSIG)
+    val genesisOutputScript = ScriptPubKey.fromAsm(asm)
+    super.createGenesisBlock(pszTimestamp,genesisOutputScript,time,nonce,nBits,version,amount)
+  }
+
+  override def base58Prefixes: Map[Base58Type, Seq[Byte]] = Map(
+    PubKeyAddress -> UInt8(48).bytes,
+    //TODO: investigate why litcoin has two script address formats
+    //https://github.com/litecoin-project/litecoin/blob/master/src/chainparams.cpp#L134
+    ScriptAddress -> UInt8(50).bytes,
+    SecretKey -> Seq(1,176.toByte),
+    //(0x04)(0x88)(0xB2)(0x1E)
+    ExtPublicKey -> Seq(h2b("04"), h2b("88"), h2b("b2"), h2b("1e")),
+    //(0x04)(0x88)(0xAD)(0xE4)
+    ExtSecretKey -> Seq(h2b("04"), h2b("88"), h2b("ad"), h2b("e4"))
+  )
+
+  override def requireStandardTransaction: Boolean = true
+
+}
+
+sealed abstract class Base58Type
 case object PubKeyAddress extends Base58Type
 case object ScriptAddress extends Base58Type
 case object SecretKey extends Base58Type

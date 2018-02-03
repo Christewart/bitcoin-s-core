@@ -118,4 +118,10 @@ class ChainParamsTest extends FlatSpec with MustMatchers {
     BitcoinSUtil.encodeHex(RegTestNetChainParams.base58Prefixes(ExtPublicKey)) must be ("043587CF".toLowerCase)
     BitcoinSUtil.encodeHex(RegTestNetChainParams.base58Prefixes(ExtSecretKey)) must be ("04358394".toLowerCase)
   }
+
+  it must "have the right litecoin coinbase tx" in {
+    val expected = "04ffff001d0104404e592054696d65732030352f4f63742f32303131205374657665204a6f62732c204170706c65e280997320566973696f6e6172792c2044696573206174203536"
+    val actual = LtcChainParams.genesisBlock.transactions.head.inputs.head.scriptSignature.hex
+    actual.tail.tail must be (expected)
+  }
 }
