@@ -10,7 +10,7 @@ import org.slf4j.Logger
 abstract class RawBitcoinSerializer[T] {
 
   /** Reads a hexadecimal value and transforms it into the native scala type T. */
-  def read(hex : String) : T = read(BitcoinSUtil.decodeHex(hex))
+  def read(hex : String): T = read(BitcoinSUtil.decodeHex(hex))
 
   /** Reads in bytes and transforms it into the appropriate scala type T. */
   def read(bytes : List[Byte]) : T

@@ -17,7 +17,7 @@ object BitcoinSCoreBuild extends Build {
     "com.novocode" % "junit-interface" % "0.10" % "test",
     "org.scalacheck" %% "scalacheck" % scalacheckV withSources() withJavadoc(),
     
-    ("org.bitcoinj" % "bitcoinj-core" % "0.14.4" % "test").exclude("org.slf4j", "slf4j-api"),
+    ("org.bitcoinj" % "bitcoinj-core" % "0.14.6" % "test").exclude("org.slf4j", "slf4j-api"),
     "com.madgag.spongycastle" % "core" % spongyCastleV,
 
     "org.slf4j" % "slf4j-api" % slf4jV % "provided",
