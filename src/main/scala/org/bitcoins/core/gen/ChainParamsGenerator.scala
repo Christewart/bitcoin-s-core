@@ -11,6 +11,9 @@ sealed abstract class ChainParamsGenerator {
   def networkParams: Gen[NetworkParameters] = bitcoinNetworkParams
 
   def bitcoinNetworkParams: Gen[BitcoinNetwork] = Gen.oneOf(MainNet, TestNet3, RegTest)
+
+  def zcashNetworkParams: Gen[ZCashNetwork] = Gen.oneOf(ZCashNetworks.knownNetworks)
 }
+
 
 object ChainParamsGenerator extends ChainParamsGenerator
