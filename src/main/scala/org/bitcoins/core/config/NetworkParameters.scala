@@ -78,8 +78,92 @@ sealed abstract class RegTest extends BitcoinNetwork {
 
 object RegTest extends RegTest
 
-object Networks {
-  val knownNetworks: Seq[NetworkParameters] = Seq(MainNet, TestNet3, RegTest)
+
+sealed abstract class ZCashNetwork extends NetworkParameters
+
+/**
+  * ZCash's main network parameters
+  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L81]]
+  */
+sealed abstract class ZCashMainNet extends ZCashNetwork {
+  override def chainParams: ChainParams = ZCashMainNetChainParams
+  override def rpcPort: Int = 8232
+  override def port = 8233
+  override def difficultyChangeThreshold: Int = ???
+
+  override def dnsSeeds: Seq[String] = Seq(
+    "dnsseed.z.cash",
+    "dnsseed.str4d.xyz",
+    "dnsseed.znodes.org"
+  )
+
+  override def magicBytes: Seq[Byte] = Seq(0x24.toByte, 0xe9.toByte, 0x27.toByte, 0x64.toByte)
+}
+
+object ZCashMainNet extends ZCashMainNet
+
+/**
+  * ZCash's test network parameters
+  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L242]]
+  */
+sealed abstract class ZCashTestNet extends ZCashNetwork {
+  override def chainParams: ChainParams = ZCashTestNetChainParams
+  override def rpcPort: Int = 18232
+  override def port: Int = 8233
+
+  override def dnsSeeds: Seq[String] = Seq(
+    "dnsseed.testnet.z.cash"
+  )
+  override def difficultyChangeThreshold: Int = ???
+
+  override def magicBytes: Seq[Byte] = Seq(0xfa.toByte, 0x1a.toByte, 0xf9.toByte, 0xbf.toByte)
+
+
+}
+object ZCashTestNet extends ZCashTestNet
+
+/**
+  * ZCash's regtest network parameters
+  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L351]]
+  */
+sealed abstract class ZCashRegTest extends ZCashNetwork {
+  override def chainParams: ChainParams = ZCashRegTestChainParams
+  override def rpcPort = ZCashTestNet.rpcPort
+  override def port = ZCashTestNet.port
+
+  override def dnsSeeds: Seq[String] = Nil
+  override def difficultyChangeThreshold: Int = ???
+
+  override def magicBytes: Seq[Byte] = Seq(0xaa.toByte, 0xe8.toByte, 0x3f.toByte, 0x5f.toByte)
+}
+
+object ZCashRegTest extends ZCashRegTest
+
+object ZCashNetworks extends Networks {
+  val knownNetworks: Seq[ZCashNetwork] = Seq(ZCashMainNet, ZCashTestNet, ZCashRegTest)
+
+  override def bytesToNetwork: Map[Seq[Byte], NetworkParameters] = Map(
+    ZCashMainNet.p2pkhNetworkByte -> ZCashMainNet,
+    ZCashMainNet.p2shNetworkByte -> ZCashMainNet,
+    ZCashMainNet.privateKey -> ZCashMainNet,
+
+    ZCashTestNet.p2pkhNetworkByte -> ZCashTestNet,
+    ZCashTestNet.p2shNetworkByte -> ZCashTestNet,
+    ZCashTestNet.privateKey -> ZCashTestNet
+    //ommitting regtest as it has the same network bytes as ZCashTestNet
+  )
+
+}
+
+sealed abstract class Networks {
+  val knownNetworks: Seq[NetworkParameters]
+
+  def bytesToNetwork: Map[Seq[Byte], NetworkParameters]
+}
+
+object Networks extends Networks {
+  val knownNetworks: Seq[NetworkParameters] = Seq(MainNet, TestNet3, RegTest) ++
+    ZCashNetworks.knownNetworks
   val secretKeyBytes = knownNetworks.map(_.privateKey)
   val p2pkhNetworkBytes = knownNetworks.map(_.p2pkhNetworkByte)
   val p2shNetworkBytes = knownNetworks.map(_.p2shNetworkByte)
@@ -92,7 +176,6 @@ object Networks {
     TestNet3.p2pkhNetworkByte -> TestNet3,
     TestNet3.p2shNetworkByte -> TestNet3,
     TestNet3.privateKey -> TestNet3
-
-  //ommitting regtest as it has the same network bytes as testnet3
-  )
+    //ommitting regtest as it has the same network bytes as testnet3
+  ) ++ ZCashNetworks.bytesToNetwork
 }
