@@ -30,3 +30,9 @@ case class BitcoinUTXOSpendingInfo(outPoint: TransactionOutPoint, output: Transa
   scriptWitnessOpt: Option[ScriptWitness],
   hashType: HashType) extends UTXOSpendingInfo
 
+case class ZcashUTXOSpendingInfo(outPoint: TransactionOutPoint, output: TransactionOutput,
+  signers: Seq[Sign],
+  redeemScriptOpt: Option[ScriptPubKey],
+  scriptWitnessOpt: Option[ScriptWitness],
+  hashType: HashType) extends UTXOSpendingInfo
+

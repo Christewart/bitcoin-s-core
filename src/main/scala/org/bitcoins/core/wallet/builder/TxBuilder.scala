@@ -1,6 +1,7 @@
 package org.bitcoins.core.wallet.builder
 
-import org.bitcoins.core.config.{ BitcoinNetwork, NetworkParameters }
+import org.bitcoins.core.config.{ BitcoinNetwork, NetworkParameters, ZCashNetwork }
+import org.bitcoins.core.crypto.TxSigComponent
 import org.bitcoins.core.currency.{ CurrencyUnit, CurrencyUnits, Satoshis }
 import org.bitcoins.core.number.{ Int64, UInt32 }
 import org.bitcoins.core.policy.Policy
@@ -10,9 +11,10 @@ import org.bitcoins.core.script.constant.ScriptNumber
 import org.bitcoins.core.script.control.OP_RETURN
 import org.bitcoins.core.script.locktime.LockTimeInterpreter
 import org.bitcoins.core.util.BitcoinSLogger
+import org.bitcoins.core.wallet.builder.BitcoinTxBuilder.{ BitcoinTxBuilderImpl, UTXOMap }
 import org.bitcoins.core.wallet.fee.FeeUnit
 import org.bitcoins.core.wallet.signer._
-import org.bitcoins.core.wallet.utxo.{ BitcoinUTXOSpendingInfo, UTXOSpendingInfo }
+import org.bitcoins.core.wallet.utxo.{ BitcoinUTXOSpendingInfo, UTXOSpendingInfo, ZcashUTXOSpendingInfo }
 
 import scala.annotation.tailrec
 import scala.concurrent.{ ExecutionContext, Future }
@@ -260,9 +262,10 @@ sealed abstract class BitcoinTxBuilder extends TxBuilder {
           result.map(_.transaction)
         case p2wshSPK: P2WSHWitnessSPKV0 =>
           //if we don't have a WitnessTransaction we need to convert our unsignedTx to a WitnessTransaction
-          val unsignedWTx: WitnessTransaction = unsignedTx match {
-            case btx: BaseTransaction => WitnessTransaction(btx.version, btx.inputs, btx.outputs, btx.lockTime, EmptyWitness)
-            case wtx: WitnessTransaction => wtx
+          val unsignedWTxFuture: Future[WitnessTransaction] = unsignedTx match {
+            case btx: BaseTransaction => Future.successful(WitnessTransaction(btx.version, btx.inputs, btx.outputs, btx.lockTime, EmptyWitness))
+            case wtx: WitnessTransaction => Future.successful(wtx)
+            case ztx: ZcashTransaction => Future.fromTry(TxBuilderError.WrongNetwork)
           }
           val p2wshScriptWit = scriptWitnessOpt match {
             case Some(wit) =>
@@ -273,32 +276,34 @@ sealed abstract class BitcoinTxBuilder extends TxBuilder {
             case None => Future.fromTry(TxBuilderError.NoWitness)
           }
           val redeemScriptEither = p2wshScriptWit.map(_.redeemScript)
-          val result = redeemScriptEither.flatMap { redeemScript =>
-            if (P2WSHWitnessSPKV0(redeemScript) != p2wshSPK) {
-              Future.fromTry(TxBuilderError.WrongWitness)
-            } else {
-              redeemScript match {
-                case _: P2PKScriptPubKey => P2PKSigner.sign(signers, output, unsignedWTx, inputIndex, hashType)
-                case _: P2PKHScriptPubKey => P2PKHSigner.sign(signers, output, unsignedWTx, inputIndex, hashType)
-                case _: MultiSignatureScriptPubKey => MultiSigSigner.sign(signers, output, unsignedWTx, inputIndex, hashType)
-                case _: P2WPKHWitnessSPKV0 | _: P2WSHWitnessSPKV0 => Future.fromTry(TxBuilderError.NestedWitnessSPK)
-                case _: P2SHScriptPubKey => Future.fromTry(TxBuilderError.NestedP2SHSPK)
-                case lock: LockTimeScriptPubKey =>
-                  lock.nestedScriptPubKey match {
-                    case _: P2PKScriptPubKey => P2PKSigner.sign(signers, output, unsignedTx, inputIndex, hashType)
-                    case _: P2PKHScriptPubKey => P2PKHSigner.sign(signers, output, unsignedTx, inputIndex, hashType)
-                    case _: MultiSignatureScriptPubKey => MultiSigSigner.sign(signers, output, unsignedTx, inputIndex, hashType)
-                    case _: P2WPKHWitnessSPKV0 => P2WPKHSigner.sign(signers, output, unsignedTx, inputIndex, hashType)
-                    case _: P2SHScriptPubKey => Future.fromTry(TxBuilderError.NestedP2SHSPK)
-                    case _: P2WSHWitnessSPKV0 => Future.fromTry(TxBuilderError.NestedWitnessSPK)
-                    case _: CSVScriptPubKey | _: CLTVScriptPubKey | _: EscrowTimeoutScriptPubKey
-                      | _: NonStandardScriptPubKey | _: WitnessCommitment
-                      | EmptyScriptPubKey | _: UnassignedWitnessScriptPubKey
-                      | _: EscrowTimeoutScriptPubKey => Future.fromTry(TxBuilderError.NoSigner)
-                  }
-                case _: NonStandardScriptPubKey | _: WitnessCommitment | EmptyScriptPubKey
-                  | _: UnassignedWitnessScriptPubKey | _: EscrowTimeoutScriptPubKey =>
-                  Future.fromTry(TxBuilderError.NoSigner)
+          val result: Future[TxSigComponent] = unsignedWTxFuture.flatMap { unsignedWTx =>
+            redeemScriptEither.flatMap { redeemScript =>
+              if (P2WSHWitnessSPKV0(redeemScript) != p2wshSPK) {
+                Future.fromTry(TxBuilderError.WrongWitness)
+              } else {
+                redeemScript match {
+                  case _: P2PKScriptPubKey => P2PKSigner.sign(signers, output, unsignedWTx, inputIndex, hashType)
+                  case _: P2PKHScriptPubKey => P2PKHSigner.sign(signers, output, unsignedWTx, inputIndex, hashType)
+                  case _: MultiSignatureScriptPubKey => MultiSigSigner.sign(signers, output, unsignedWTx, inputIndex, hashType)
+                  case _: P2WPKHWitnessSPKV0 | _: P2WSHWitnessSPKV0 => Future.fromTry(TxBuilderError.NestedWitnessSPK)
+                  case _: P2SHScriptPubKey => Future.fromTry(TxBuilderError.NestedP2SHSPK)
+                  case lock: LockTimeScriptPubKey =>
+                    lock.nestedScriptPubKey match {
+                      case _: P2PKScriptPubKey => P2PKSigner.sign(signers, output, unsignedTx, inputIndex, hashType)
+                      case _: P2PKHScriptPubKey => P2PKHSigner.sign(signers, output, unsignedTx, inputIndex, hashType)
+                      case _: MultiSignatureScriptPubKey => MultiSigSigner.sign(signers, output, unsignedTx, inputIndex, hashType)
+                      case _: P2WPKHWitnessSPKV0 => P2WPKHSigner.sign(signers, output, unsignedTx, inputIndex, hashType)
+                      case _: P2SHScriptPubKey => Future.fromTry(TxBuilderError.NestedP2SHSPK)
+                      case _: P2WSHWitnessSPKV0 => Future.fromTry(TxBuilderError.NestedWitnessSPK)
+                      case _: CSVScriptPubKey | _: CLTVScriptPubKey | _: EscrowTimeoutScriptPubKey
+                        | _: NonStandardScriptPubKey | _: WitnessCommitment
+                        | EmptyScriptPubKey | _: UnassignedWitnessScriptPubKey
+                        | _: EscrowTimeoutScriptPubKey => Future.fromTry(TxBuilderError.NoSigner)
+                    }
+                  case _: NonStandardScriptPubKey | _: WitnessCommitment | EmptyScriptPubKey
+                    | _: UnassignedWitnessScriptPubKey | _: EscrowTimeoutScriptPubKey =>
+                    Future.fromTry(TxBuilderError.NoSigner)
+                }
               }
             }
           }
@@ -569,5 +574,196 @@ object BitcoinTxBuilder {
     }
     val map = loop(utxos, Map.empty)
     BitcoinTxBuilder(destinations, map, feeRate, changeSPK, network)
+  }
+}
+
+/**
+ * This is a [[TxBuilder]] for the [[org.bitcoins.core.config.ZCashNetwork]]. Currently it is limited in functionality.
+ * It can only spend a [[P2PKHScriptPubKey]], [[MultiSignatureScriptPubKey]] and a [[P2SHScriptPubKey]].
+ * Whenever segwit gets incorporated into zcash, we will have to update this [[TxBuilder]] to accomodate it.
+ * When we attempt to spend any utxos that are not one of the 3 types above, we will return a [[TxBuilderError.NoSigner]]
+ */
+sealed abstract class ZcashTxBuilder extends TxBuilder {
+  private val tc = ZcashTxConstants
+  private val logger = BitcoinSLogger.logger
+  override def network: ZCashNetwork
+
+  override def utxoMap: ZcashTxBuilder.UTXOMap
+
+  override def utxos: Seq[ZcashUTXOSpendingInfo] = utxoMap.values.toSeq
+
+  override def sign(implicit ec: ExecutionContext): Future[ZcashTransaction] = {
+    val f = (_: ZcashTxBuilder.UTXOMap, _: Transaction) => true
+    sign(f)
+  }
+
+  /**
+   * Signs the given transaction and then returns a signed tx that spends
+   * all of the given outputs.
+   * Checks the given invariants when the signing process is done
+   * An example of some invariants is that the fee on the signed transaction below a certain amount,
+   * or that RBF is enabled on the signed transaction.
+   *
+   * @param invariants - invariants that should hold true when we are done signing the transaction
+   * @return the signed transaction, or a [[TxBuilderError]] indicating what went wrong when signing the tx
+   */
+  def sign(invariants: (ZcashTxBuilder.UTXOMap, Transaction) => Boolean)(implicit ec: ExecutionContext): Future[ZcashTransaction] = {
+    def loop(
+      remaining: List[ZcashUTXOSpendingInfo],
+      txInProgress: Future[ZcashTransaction]): Future[ZcashTransaction] = remaining match {
+      case Nil => txInProgress
+      case utxo :: t =>
+        val partiallySigned = txInProgress.flatMap(t => signAndAddInput(utxo, t))
+        loop(t, partiallySigned)
+    }
+    val lockTime = tc.lockTime
+    val inputs = utxos.map(u => TransactionInput(u.outPoint, EmptyScriptSignature, tc.sequence))
+    val changeOutput = TransactionOutput(CurrencyUnits.zero, changeSPK)
+    val unsignedTxNoFee = ZcashTransaction(tc.version, inputs, destinations ++ Seq(changeOutput), lockTime).get
+    //NOTE: This signed version of the tx does NOT pay a fee, we are going to use this version to estimate the fee
+    //and then deduct that amount of satoshis from the changeOutput, and then resign the tx.
+    val signedTxNoFeeFuture = loop(utxos.toList, Future.successful(unsignedTxNoFee))
+    signedTxNoFeeFuture.flatMap { stxnf: ZcashTransaction =>
+      val fee = feeRate.calc(stxnf)
+      val newChangeOutput = TransactionOutput(creditingAmount - destinationAmount - fee, changeSPK)
+      //if the change output is below the dust threshold after calculating the fee, don't add it
+      //to the tx
+      val newOutputs = if (newChangeOutput.value <= Policy.dustThreshold) {
+        logger.debug("removing change output as value is below the dustThreshold")
+        destinations
+      } else {
+        destinations ++ Seq(newChangeOutput)
+      }
+      val z = stxnf
+      val unsignedTx = ZcashTransaction(z.version, z.versionGroupId, inputs, newOutputs, z.lockTime,
+        z.expiryHeight, z.joinSplits, z.joinSplitPubKey, z.joinSplitSig)
+      //re-sign the tx with the appropriate change / fee
+      val signedTx = loop(utxos.toList, Future.successful(unsignedTx))
+      signedTx.flatMap { tx =>
+        if (invariants(utxoMap, tx)) {
+          //final sanity checks
+          val err = TxBuilder.sanityChecks(this, tx)
+          if (err.isFailure) Future.failed[ZcashTransaction](err.failed.get)
+          else Future.successful(tx)
+        } else Future.fromTry(TxBuilderError.FailedUserInvariants)
+      }
+    }
+  }
+
+  /**
+   * This function creates a newly signed input, and then adds it to the unsigned transaction
+   * @param utxo - the information needed to validly spend the given output
+   * @param unsignedTx - the transaction that we are spending this output in
+   * @return either the transaction with the signed input added, or a [[TxBuilderError]]
+   */
+  private def signAndAddInput(utxo: ZcashUTXOSpendingInfo, unsignedTx: ZcashTransaction)(implicit ec: ExecutionContext): Future[ZcashTransaction] = {
+    val outpoint = utxo.outPoint
+    val output = utxo.output
+    val signers = utxo.signers
+    val redeemScriptOpt = utxo.redeemScriptOpt
+    val scriptWitnessOpt = utxo.scriptWitnessOpt
+    val hashType = utxo.hashType
+    val idx = unsignedTx.inputs.zipWithIndex.find(_._1.previousOutput == outpoint)
+    if (idx.isEmpty) {
+      Future.fromTry(TxBuilderError.MissingOutPoint)
+    } else {
+      val inputIndex = UInt32(idx.get._2)
+      val oldInput = unsignedTx.inputs(inputIndex.toInt)
+      val result: Future[Transaction] = output.scriptPubKey match {
+        case _: P2PKHScriptPubKey => P2PKHSigner.sign(signers, output, unsignedTx, inputIndex, hashType).map(_.transaction)
+        case _: MultiSignatureScriptPubKey => MultiSigSigner.sign(signers, output, unsignedTx, inputIndex, hashType).map(_.transaction)
+        case p2sh: P2SHScriptPubKey =>
+          redeemScriptOpt match {
+            case Some(redeemScript) =>
+              if (p2sh != P2SHScriptPubKey(redeemScript)) {
+                Future.fromTry(TxBuilderError.WrongRedeemScript)
+              } else {
+                val input = TransactionInput(outpoint, EmptyScriptSignature, oldInput.sequence)
+                val updatedTx: ZcashTransaction = unsignedTx match {
+                  case ztx: ZcashTransaction =>
+                    ZcashTransaction(ztx.version, ztx.versionGroupId, unsignedTx.inputs.updated(inputIndex.toInt, input),
+                      ztx.outputs, ztx.lockTime, ztx.expiryHeight, ztx.joinSplits, ztx.joinSplitPubKey, ztx.joinSplitSig)
+                }
+                val updatedOutput = TransactionOutput(output.value, redeemScript)
+                val signedTxFuture: Future[ZcashTransaction] = signAndAddInput(ZcashUTXOSpendingInfo(outpoint, updatedOutput, signers, None,
+                  scriptWitnessOpt, hashType), updatedTx)
+
+                signedTxFuture.map { signedTx =>
+                  val i = signedTx.inputs(inputIndex.toInt)
+                  val p2sh = P2SHScriptSignature(i.scriptSignature, redeemScript)
+                  val signedInput = TransactionInput(i.previousOutput, p2sh, i.sequence)
+                  val signedInputs = signedTx.inputs.updated(inputIndex.toInt, signedInput)
+                  signedTx match {
+                    case ztx: ZcashTransaction =>
+                      ZcashTransaction(ztx.version, ztx.versionGroupId, signedInputs, ztx.outputs, ztx.lockTime,
+                        ztx.expiryHeight, ztx.joinSplits, ztx.joinSplitPubKey, ztx.joinSplitSig)
+                  }
+                }
+              }
+            case None => Future.fromTry(TxBuilderError.NoRedeemScript)
+          }
+        case _: P2PKScriptPubKey | _: P2WPKHWitnessSPKV0 | _: P2WSHWitnessSPKV0 | _: NonStandardScriptPubKey
+          | _: CSVScriptPubKey | _: CLTVScriptPubKey | _: NonStandardScriptPubKey | _: WitnessCommitment
+          | _: EscrowTimeoutScriptPubKey | _: UnassignedWitnessScriptPubKey
+          | EmptyScriptPubKey => Future.fromTry(TxBuilderError.NoSigner)
+      }
+      result.flatMap {
+        case ztx: ZcashTransaction => Future.successful(ztx)
+        case btx: BaseTransaction =>
+          val ztxTry = ZcashTransaction(btx.version, btx.inputs, btx.outputs, btx.lockTime)
+          ztxTry match {
+            case Success(ztx) => Future.successful(ztx)
+            case Failure(_) => Future.fromTry(TxBuilderError.BadZcashTx)
+          }
+        case wtx: WitnessTransaction =>
+          //cannot have a witness trasnaction in ZCash, they have not integrated segwit support yet
+          Future.fromTry(TxBuilderError.UnknownError)
+      }
+    }
+  }
+}
+
+object ZcashTxBuilder {
+  type UTXOMap = Map[TransactionOutPoint, ZcashUTXOSpendingInfo]
+  private case class ZcashTxBuilderImpl(
+    destinations: Seq[TransactionOutput],
+    utxoMap: UTXOMap,
+    feeRate: FeeUnit,
+    changeSPK: ScriptPubKey,
+    network: ZCashNetwork) extends ZcashTxBuilder
+  /**
+   * @param destinations where the money is going in the signed tx
+   * @param utxos extra information needed to spend the outputs in the creditingTxs
+   * @param feeRate the desired fee rate for this tx
+   * @param changeSPK where we should send the change from the creditingTxs
+   * @return either a instance of a [[TxBuilder]],
+   *         from which you can call [[TxBuilder.sign]] to generate a signed tx,
+   *         or a [[TxBuilderError]]
+   */
+  def apply(
+    destinations: Seq[TransactionOutput],
+    utxos: ZcashTxBuilder.UTXOMap, feeRate: FeeUnit, changeSPK: ScriptPubKey,
+    network: ZCashNetwork): Future[ZcashTxBuilder] = {
+    if (feeRate.toLong <= 0) {
+      Future.fromTry(TxBuilderError.LowFee)
+    } else {
+      Future.successful(ZcashTxBuilderImpl(destinations, utxos, feeRate, changeSPK, network))
+    }
+  }
+
+  def apply(
+    destinations: Seq[TransactionOutput],
+    utxos: Seq[ZcashUTXOSpendingInfo], feeRate: FeeUnit, changeSPK: ScriptPubKey,
+    network: ZCashNetwork): Future[ZcashTxBuilder] = {
+    @tailrec
+    def loop(utxos: Seq[UTXOSpendingInfo], accum: UTXOMap): UTXOMap = utxos match {
+      case Nil => accum
+      case h :: t =>
+        val u = ZcashUTXOSpendingInfo(h.outPoint, h.output, h.signers, h.redeemScriptOpt, h.scriptWitnessOpt, h.hashType)
+        val result: ZcashTxBuilder.UTXOMap = accum.updated(h.outPoint, u)
+        loop(t, result)
+    }
+    val map = loop(utxos, Map.empty)
+    ZcashTxBuilder(destinations, map, feeRate, changeSPK, network)
   }
 }

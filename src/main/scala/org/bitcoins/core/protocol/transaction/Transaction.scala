@@ -126,7 +126,7 @@ sealed abstract class WitnessTransaction extends Transaction {
 
 }
 
-sealed abstract class ZcashTransaction extends BaseTransaction {
+sealed abstract class ZcashTransaction extends Transaction {
   override def bytes = RawZcashTransactionParser.write(this)
 
   def overwintered: Boolean
@@ -141,6 +141,12 @@ sealed abstract class ZcashTransaction extends BaseTransaction {
   def joinSplitPubKey: Seq[Byte]
 
   def joinSplitSig: Seq[Byte]
+
+  /**
+   * ZCash transactions do not currently have segwit,
+   * thus do exactly [[org.bitcoins.core.protocol.transaction.BaseTransaction]] does for weight
+   */
+  override def weight = size * 4
 }
 
 object Transaction extends Factory[Transaction] {
@@ -192,5 +198,26 @@ object ZcashTransaction extends Factory[ZcashTransaction] {
   def apply(overwintered: Boolean, version: UInt32, versionGroupId: UInt32,
     inputs: Seq[TransactionInput], outputs: Seq[TransactionOutput],
     lockTime: UInt32, expiryHeight: UInt32, joinSplits: Seq[JSDescription],
-    joinSplitPubKey: Seq[Byte], joinSplitSig: Seq[Byte]): ZcashTransaction = ZcashTransactionImpl(overwintered, version, versionGroupId, inputs, outputs, lockTime, expiryHeight, joinSplits, joinSplitPubKey, joinSplitSig)
+    joinSplitPubKey: Seq[Byte], joinSplitSig: Seq[Byte]): ZcashTransaction = {
+    ZcashTransactionImpl(overwintered, version, versionGroupId, inputs, outputs, lockTime, expiryHeight, joinSplits, joinSplitPubKey, joinSplitSig)
+  }
+
+  def apply(version: UInt32, versionGroupId: UInt32,
+    inputs: Seq[TransactionInput], outputs: Seq[TransactionOutput],
+    lockTime: UInt32, expiryHeight: UInt32, joinSplits: Seq[JSDescription],
+    joinSplitPubKey: Seq[Byte], joinSplitSig: Seq[Byte]): ZcashTransaction = {
+    val overwintered = version == ZcashTxConstants.overwintered
+    ZcashTransaction(overwintered, version, versionGroupId, inputs, outputs, lockTime,
+      expiryHeight, joinSplits, joinSplitPubKey, joinSplitSig)
+  }
+
+  def apply(version: UInt32, inputs: Seq[TransactionInput], outputs: Seq[TransactionOutput],
+    lockTime: UInt32): Try[ZcashTransaction] = {
+    if (version != ZcashTxConstants.version) {
+      Failure(new IllegalArgumentException("Old style zcash transactions *must* have a verison number of 1"))
+    } else {
+      Success(ZcashTransaction(version, UInt32.zero, inputs, outputs,
+        lockTime, UInt32.zero, Nil, Nil, Nil))
+    }
+  }
 }

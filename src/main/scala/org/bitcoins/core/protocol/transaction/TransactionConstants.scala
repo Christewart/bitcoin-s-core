@@ -43,3 +43,12 @@ trait TransactionConstants {
 }
 
 object TransactionConstants extends TransactionConstants
+
+sealed abstract class ZcashTxConstants {
+  val version: UInt32 = UInt32.one
+  val lockTime = UInt32.zero
+  val sequence = UInt32(4294967295L)
+  val overwintered = UInt32(3)
+}
+
+object ZcashTxConstants extends ZcashTxConstants

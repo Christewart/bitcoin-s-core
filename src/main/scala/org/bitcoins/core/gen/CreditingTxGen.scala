@@ -186,8 +186,87 @@ sealed abstract class CreditingTxGen {
       }
     }
   }
+
+  /**
+   * Generates a [[org.bitcoins.core.protocol.transaction.ZcashTransaction]] with a
+   * valid [[P2PKHScriptPubKey]] for us to spend on the [[org.bitcoins.core.config.ZCashNetwork]]
+   */
+  def p2pkhOutputZcash: Gen[CreditingTxGen.CreditingTxInfoZcash] = ScriptGenerators.p2pkhScriptPubKey.flatMap { p2pkh =>
+    buildZcash(p2pkh._1, Seq(p2pkh._2), None, None)
+  }
+
+  def p2pkhOutputsZcash: Gen[Seq[CreditingTxGen.CreditingTxInfoZcash]] = {
+    Gen.choose(min, max).flatMap(n => Gen.listOfN(n, p2pkhOutputZcash))
+  }
+
+  /**
+   * Generates a [[org.bitcoins.core.protocol.transaction.ZcashTransaction]] with a
+   * valid [[MultiSignatureScriptPubKey]] for us to spend on the [[org.bitcoins.core.config.ZCashNetwork]]
+   */
+  def multiSigOutputZcash: Gen[CreditingTxGen.CreditingTxInfoZcash] = ScriptGenerators.multiSigScriptPubKey.flatMap { multisig =>
+    buildZcash(multisig._1, multisig._2, None, None)
+  }
+
+  def multiSigOutputsZcash: Gen[Seq[CreditingTxGen.CreditingTxInfoZcash]] = {
+    Gen.choose(min, max).flatMap(n => Gen.listOfN(n, multiSigOutputZcash))
+  }
+
+  /**
+   * Generates valid [[org.bitcoins.core.protocol.transaction.ZcashTransaction]]'s with
+   * outputs for us to spend on the [[org.bitcoins.core.config.ZCashNetwork]]
+   * @return
+   */
+  def zCashOutput: Gen[CreditingTxGen.CreditingTxInfoZcash] = Gen.oneOf(
+    p2pkhOutputZcash,
+    multiSigOutputZcash)
+
+  def zCashOutputs: Gen[Seq[CreditingTxGen.CreditingTxInfoZcash]] = {
+    Gen.choose(min, max).flatMap(n => Gen.listOfN(n, zCashOutput))
+  }
+
+  /**
+   * Generates a random [[org.bitcoins.core.protocol.transaction.ZcashTransaction]] for us
+   * to attempt to spend in a property
+   */
+  def randomZcash: Gen[CreditingTxGen.CreditingTxInfoZcash] = nonEmptyOutputs.flatMap { outputs =>
+    Gen.choose(0, outputs.size - 1).flatMap { outputIndex: Int =>
+      ScriptGenerators.scriptPubKey.flatMap {
+        case (spk, keys) =>
+          WitnessGenerators.scriptWitness.flatMap { wit: ScriptWitness =>
+            CryptoGenerators.hashType.map { hashType: HashType =>
+              val tc = ZcashTxConstants
+              val creditingTx = ZcashTransaction(tc.version, Nil, outputs, tc.lockTime).get
+              (creditingTx, outputIndex, keys, Some(spk), Some(wit), hashType)
+            }
+          }
+      }
+    }
+  }
+
+  /**
+   * Generates a sequence of random [[org.bitcoins.core.protocol.transaction.ZcashTransaction]]
+   * that we can attempt to spend in a property
+   */
+  def randomsZcash: Gen[Seq[CreditingTxGen.CreditingTxInfoZcash]] = {
+    Gen.choose(min, max).flatMap(n => Gen.listOfN(n, randomZcash))
+  }
+  private def buildZcash(spk: ScriptPubKey, signers: Seq[Sign],
+    redeemScript: Option[ScriptPubKey],
+    scriptWitness: Option[ScriptWitness]): Gen[CreditingTxGen.CreditingTxInfoZcash] = nonEmptyOutputs.flatMap { outputs =>
+    CryptoGenerators.hashType.flatMap { hashType =>
+      Gen.choose(0, outputs.size - 1).map { idx =>
+        val old = outputs(idx)
+        val updated = outputs.updated(idx, TransactionOutput(old.value, spk))
+        val tc = ZcashTxConstants
+        val ztx = ZcashTransaction(tc.version, Nil, updated, tc.lockTime).get
+        val data = (ztx, idx, signers, redeemScript, scriptWitness, hashType)
+        data
+      }
+    }
+  }
 }
 
 object CreditingTxGen extends CreditingTxGen {
   type CreditingTxInfo = (Transaction, Int, Seq[Sign], Option[ScriptPubKey], Option[ScriptWitness], HashType)
+  type CreditingTxInfoZcash = (ZcashTransaction, Int, Seq[Sign], Option[ScriptPubKey], Option[ScriptWitness], HashType)
 }

@@ -5,7 +5,7 @@ import org.bitcoins.core.crypto._
 import org.bitcoins.core.currency.{ CurrencyUnit, CurrencyUnits }
 import org.bitcoins.core.protocol.CompactSizeUInt
 import org.bitcoins.core.protocol.script._
-import org.bitcoins.core.protocol.transaction.{ BaseTransaction, EmptyTransactionOutPoint, Transaction, WitnessTransaction }
+import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.script._
 import org.bitcoins.core.script.arithmetic._
 import org.bitcoins.core.script.bitwise._
@@ -534,6 +534,7 @@ sealed abstract class ScriptInterpreter {
           case wtx: WitnessTransaction =>
             wtx.witness.witnesses(txSigComponent.inputIndex.toInt).stack.nonEmpty
           case _: BaseTransaction => false
+          case _: ZcashTransaction => false
         }
       case _: WitnessTxSigComponentRaw => false
       case w: WitnessTxSigComponentP2SH =>
@@ -543,6 +544,7 @@ sealed abstract class ScriptInterpreter {
           case wtx: WitnessTransaction =>
             wtx.witness.witnesses(txSigComponent.inputIndex.toInt).stack.nonEmpty
           case _: BaseTransaction => false
+          case _: ZcashTransaction => false
         }
     }
 

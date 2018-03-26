@@ -120,4 +120,22 @@ object TxBuilderError {
   val OutputBelowDustThreshold = Failure(new IllegalArgumentException("The p2p network discourages outputs below the dustThreshold, this tx won't be relayed"))
 
   val UnknownError = Failure(new IllegalArgumentException)
+  /**
+   * Indicates we have a bad [[org.bitcoins.core.protocol.transaction.ZcashTransaction]]. This could be because
+   * we used a constructor for a [[org.bitcoins.core.protocol.transaction.ZcashTransaction]] that required a
+   * non-overwintered version number, i.e. [[org.bitcoins.core.protocol.transaction.ZCashTxConstants.version]]
+   */
+  val BadZcashTx = Failure(new IllegalArgumentException("We could not construct a zcash tx from the given input"))
+
+  /**
+   * Certain networks may not support segwit. We cannot do anything segwit related on these networks.
+   * An example of this is [[org.bitcoins.core.config.ZCashNetwork]] or Bcash
+   */
+  val NoSegwitSupport = Failure(new IllegalArgumentException("This network does not support segwit"))
+
+  /**
+   * Means you might be trying to build a [[org.bitcoins.core.protocol.transaction.ZcashTransaction]]
+   * with a [[BitcoinTxBuilder]]. That is the wrong network.
+   */
+  val WrongNetwork = Failure(new IllegalArgumentException("This is the wrong network for this transaction type, you probably created the wrong TxBuilder"))
 }

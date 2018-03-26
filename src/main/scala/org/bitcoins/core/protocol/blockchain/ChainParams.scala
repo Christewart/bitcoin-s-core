@@ -6,7 +6,6 @@ import org.bitcoins.core.consensus.Merkle
 import org.bitcoins.core.crypto.DoubleSha256Digest
 import org.bitcoins.core.currency.{ CurrencyUnit, CurrencyUnits, Satoshis }
 import org.bitcoins.core.number.{ Int32, Int64, UInt32 }
-import org.bitcoins.core.protocol.blockchain.ZCashMainNetChainParams.createGenesisBlock
 import org.bitcoins.core.protocol.script.{ ScriptPubKey, ScriptSignature }
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.script.constant.{ BytesToPushOntoStack, ScriptConstant, ScriptNumber }
@@ -151,7 +150,6 @@ sealed abstract class ZCashChainParams extends ChainParams {
     createGenesisBlockZCash(timestamp, genesisOutputScript, time, nonce, nSolution, nBits, nVersion, genesisReward)
   }
 }
-
 /**
  * ZCash MainNetwork chain parameters
  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L81]]
