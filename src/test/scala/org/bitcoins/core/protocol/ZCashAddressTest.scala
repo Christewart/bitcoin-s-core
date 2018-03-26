@@ -1,9 +1,9 @@
 package test.scala.org.bitcoins.core.protocol
 
-import org.bitcoins.core.config.{ZCashMainNet, ZCashTestNet}
+import org.bitcoins.core.config.{ ZCashMainNet, ZCashTestNet }
 import org.bitcoins.core.crypto.ECPrivateKey
 import org.bitcoins.core.protocol.P2PKHAddress
-import org.scalatest.{FlatSpec, MustMatchers}
+import org.scalatest.{ FlatSpec, MustMatchers }
 
 class ZCashAddressTest extends FlatSpec with MustMatchers {
   "P2PKHAddress" must "be able to create a zcash address" in {
@@ -12,6 +12,6 @@ class ZCashAddressTest extends FlatSpec with MustMatchers {
     val publicKey = privateKey.publicKey
     val network = ZCashTestNet
     val addr = P2PKHAddress(publicKey, network)
-    addr.value must be (expectedAddress)
+    addr.value must be(expectedAddress)
   }
 }

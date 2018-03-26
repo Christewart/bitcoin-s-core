@@ -78,13 +78,12 @@ sealed abstract class RegTest extends BitcoinNetwork {
 
 object RegTest extends RegTest
 
-
 sealed abstract class ZCashNetwork extends NetworkParameters
 
 /**
-  * ZCash's main network parameters
-  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L81]]
-  */
+ * ZCash's main network parameters
+ * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L81]]
+ */
 sealed abstract class ZCashMainNet extends ZCashNetwork {
   override def chainParams: ChainParams = ZCashMainNetChainParams
   override def rpcPort: Int = 8232
@@ -94,8 +93,7 @@ sealed abstract class ZCashMainNet extends ZCashNetwork {
   override def dnsSeeds: Seq[String] = Seq(
     "dnsseed.z.cash",
     "dnsseed.str4d.xyz",
-    "dnsseed.znodes.org"
-  )
+    "dnsseed.znodes.org")
 
   override def magicBytes: Seq[Byte] = Seq(0x24.toByte, 0xe9.toByte, 0x27.toByte, 0x64.toByte)
 }
@@ -103,29 +101,27 @@ sealed abstract class ZCashMainNet extends ZCashNetwork {
 object ZCashMainNet extends ZCashMainNet
 
 /**
-  * ZCash's test network parameters
-  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L242]]
-  */
+ * ZCash's test network parameters
+ * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L242]]
+ */
 sealed abstract class ZCashTestNet extends ZCashNetwork {
   override def chainParams: ChainParams = ZCashTestNetChainParams
   override def rpcPort: Int = 18232
   override def port: Int = 8233
 
   override def dnsSeeds: Seq[String] = Seq(
-    "dnsseed.testnet.z.cash"
-  )
+    "dnsseed.testnet.z.cash")
   override def difficultyChangeThreshold: Int = ???
 
   override def magicBytes: Seq[Byte] = Seq(0xfa.toByte, 0x1a.toByte, 0xf9.toByte, 0xbf.toByte)
-
 
 }
 object ZCashTestNet extends ZCashTestNet
 
 /**
-  * ZCash's regtest network parameters
-  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L351]]
-  */
+ * ZCash's regtest network parameters
+ * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L351]]
+ */
 sealed abstract class ZCashRegTest extends ZCashNetwork {
   override def chainParams: ChainParams = ZCashRegTestChainParams
   override def rpcPort = ZCashTestNet.rpcPort
@@ -150,7 +146,7 @@ object ZCashNetworks extends Networks {
     ZCashTestNet.p2pkhNetworkByte -> ZCashTestNet,
     ZCashTestNet.p2shNetworkByte -> ZCashTestNet,
     ZCashTestNet.privateKey -> ZCashTestNet
-    //ommitting regtest as it has the same network bytes as ZCashTestNet
+  //ommitting regtest as it has the same network bytes as ZCashTestNet
   )
 
 }
@@ -176,6 +172,6 @@ object Networks extends Networks {
     TestNet3.p2pkhNetworkByte -> TestNet3,
     TestNet3.p2shNetworkByte -> TestNet3,
     TestNet3.privateKey -> TestNet3
-    //ommitting regtest as it has the same network bytes as testnet3
+  //ommitting regtest as it has the same network bytes as testnet3
   ) ++ ZCashNetworks.bytesToNetwork
 }

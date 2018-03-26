@@ -15,5 +15,4 @@ sealed abstract class ChainParamsGenerator {
   def zcashNetworkParams: Gen[ZCashNetwork] = Gen.oneOf(ZCashNetworks.knownNetworks)
 }
 
-
 object ChainParamsGenerator extends ChainParamsGenerator

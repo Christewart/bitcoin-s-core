@@ -4,10 +4,10 @@ import java.nio.charset.StandardCharsets
 
 import org.bitcoins.core.consensus.Merkle
 import org.bitcoins.core.crypto.DoubleSha256Digest
-import org.bitcoins.core.currency.{CurrencyUnit, CurrencyUnits, Satoshis}
-import org.bitcoins.core.number.{Int32, Int64, UInt32}
+import org.bitcoins.core.currency.{ CurrencyUnit, CurrencyUnits, Satoshis }
+import org.bitcoins.core.number.{ Int32, Int64, UInt32 }
 import org.bitcoins.core.protocol.blockchain.ZCashMainNetChainParams.createGenesisBlock
-import org.bitcoins.core.protocol.script.{ScriptPubKey, ScriptSignature}
+import org.bitcoins.core.protocol.script.{ ScriptPubKey, ScriptSignature }
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.script.constant.{ BytesToPushOntoStack, ScriptConstant, ScriptNumber }
 import org.bitcoins.core.script.crypto.OP_CHECKSIG
@@ -137,25 +137,25 @@ object RegTestNetChainParams extends BitcoinChainParams {
 /** A abstract class to represent the ZCash cryptocurrency's chain parameters */
 sealed abstract class ZCashChainParams extends ChainParams {
   def createGenesisBlockZCash(timestamp: String, genesisOutputScript: ScriptPubKey, time: UInt32, nonce: UInt32,
-                              nSolution: Seq[Byte], nBits: UInt32, nVersion: Int32, genesisReward: CurrencyUnit): Block = {
+    nSolution: Seq[Byte], nBits: UInt32, nVersion: Int32, genesisReward: CurrencyUnit): Block = {
 
     ???
   }
 
   def createGenesisBlockZCash(time: UInt32, nonce: UInt32, nSolution: Seq[Byte], nBits: UInt32,
-                              nVersion: Int32, genesisReward: CurrencyUnit): Block = {
+    nVersion: Int32, genesisReward: CurrencyUnit): Block = {
     val timestamp = "Zcash0b9c4eef8b7cc417ee5001e3500984b6fea35683a7cac141a043c42064835d34"
     val constant = ScriptConstant("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f")
     val asm = BitcoinScriptUtil.calculatePushOp(constant) ++ Seq(constant, OP_CHECKSIG)
     val genesisOutputScript = ScriptPubKey.fromAsm(asm)
-    createGenesisBlockZCash(timestamp,genesisOutputScript,time,nonce,nSolution,nBits,nVersion,genesisReward)
+    createGenesisBlockZCash(timestamp, genesisOutputScript, time, nonce, nSolution, nBits, nVersion, genesisReward)
   }
 }
 
 /**
-  * ZCash MainNetwork chain parameters
-  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L81]]
-  */
+ * ZCash MainNetwork chain parameters
+ * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L81]]
+ */
 object ZCashMainNetChainParams extends ZCashChainParams {
   override def networkId = "main"
   /** Creates the ZCash main network genesis block */
@@ -177,14 +177,14 @@ object ZCashMainNetChainParams extends ZCashChainParams {
     Base58Type.ExtPublicKey -> Seq(BitcoinSUtil.hexToByte("04"), BitcoinSUtil.hexToByte("88"),
       BitcoinSUtil.hexToByte("b2"), BitcoinSUtil.hexToByte("1e")),
     Base58Type.ExtSecretKey -> Seq(BitcoinSUtil.hexToByte("04"), BitcoinSUtil.hexToByte("88"),
-      BitcoinSUtil.hexToByte("ad"), BitcoinSUtil.hexToByte("e4"))
-  )
+      BitcoinSUtil.hexToByte("ad"), BitcoinSUtil.hexToByte("e4")))
 
 }
 
-/** ZCash Testnet Chain parameters
-  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L242]]
-  */
+/**
+ * ZCash Testnet Chain parameters
+ * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L242]]
+ */
 object ZCashTestNetChainParams extends ZCashChainParams {
   override def networkId = "test"
   override def genesisBlock: Block = {
@@ -205,19 +205,18 @@ object ZCashTestNetChainParams extends ZCashChainParams {
     Base58Type.ExtPublicKey -> Seq(BitcoinSUtil.hexToByte("04"), BitcoinSUtil.hexToByte("35"),
       BitcoinSUtil.hexToByte("87"), BitcoinSUtil.hexToByte("cf")),
     Base58Type.ExtSecretKey -> Seq(BitcoinSUtil.hexToByte("04"), BitcoinSUtil.hexToByte("35"),
-      BitcoinSUtil.hexToByte("83"), BitcoinSUtil.hexToByte("94"))
-  )
+      BitcoinSUtil.hexToByte("83"), BitcoinSUtil.hexToByte("94")))
 }
 
 /**
-  * ZCash regtest network parameters
-  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L351]]
-  */
+ * ZCash regtest network parameters
+ * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L351]]
+ */
 object ZCashRegTestChainParams extends ZCashChainParams {
   override def networkId = "regtest"
   override def genesisBlock: Block = {
     val hex = "01936b7db1eb4ac39f151b8704642d0a8bda13ec547d54cd5e43ba142fc6d8877cab07b3"
-    createGenesisBlockZCash(UInt32(1296688602),UInt32(9), BitcoinSUtil.decodeHex(hex), UInt32("200f0f0f"), Int32(4), CurrencyUnits.zero)
+    createGenesisBlockZCash(UInt32(1296688602), UInt32(9), BitcoinSUtil.decodeHex(hex), UInt32("200f0f0f"), Int32(4), CurrencyUnits.zero)
   }
 
   override def base58Prefixes: Map[Base58Type, Seq[Byte]] = ZCashTestNetChainParams.base58Prefixes

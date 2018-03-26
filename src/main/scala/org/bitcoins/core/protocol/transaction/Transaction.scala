@@ -3,8 +3,8 @@ package org.bitcoins.core.protocol.transaction
 import org.bitcoins.core.crypto.DoubleSha256Digest
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.NetworkElement
-import org.bitcoins.core.serializers.transaction.{RawBaseTransactionParser, RawWitnessTransactionParser, RawZcashTransactionParser}
-import org.bitcoins.core.util.{BitcoinSUtil, CryptoUtil, Factory}
+import org.bitcoins.core.serializers.transaction.{ RawBaseTransactionParser, RawWitnessTransactionParser, RawZcashTransactionParser }
+import org.bitcoins.core.util.{ BitcoinSUtil, CryptoUtil, Factory }
 
 import scala.util.{ Failure, Success, Try }
 
@@ -168,17 +168,16 @@ object WitnessTransaction extends Factory[WitnessTransaction] {
 }
 
 object ZcashTransaction extends Factory[ZcashTransaction] {
-  private case class ZcashTransactionImpl(overwintered : Boolean, version : UInt32, versionGroupId : UInt32,
-                                          inputs : Seq[TransactionInput], outputs : Seq[TransactionOutput],
-                                          lockTime : UInt32, expiryHeight : UInt32,
-                                          joinSplits : Seq[JSDescription], joinSplitPubKey : Seq[Byte],
-                                          joinSplitSig : Seq[Byte]) extends ZcashTransaction
+  private case class ZcashTransactionImpl(overwintered: Boolean, version: UInt32, versionGroupId: UInt32,
+    inputs: Seq[TransactionInput], outputs: Seq[TransactionOutput],
+    lockTime: UInt32, expiryHeight: UInt32,
+    joinSplits: Seq[JSDescription], joinSplitPubKey: Seq[Byte],
+    joinSplitSig: Seq[Byte]) extends ZcashTransaction
 
-  override def fromBytes(bytes: Seq[Byte]):  ZcashTransaction = RawZcashTransactionParser.read(bytes)
+  override def fromBytes(bytes: Seq[Byte]): ZcashTransaction = RawZcashTransactionParser.read(bytes)
 
-
-  def apply(overwintered : Boolean, version : UInt32, versionGroupId : UInt32,
-            inputs : Seq[TransactionInput], outputs : Seq[TransactionOutput],
-            lockTime : UInt32, expiryHeight : UInt32, joinSplits : Seq[JSDescription],
-            joinSplitPubKey : Seq[Byte], joinSplitSig : Seq[Byte]) : ZcashTransaction = ZcashTransactionImpl(overwintered,version,versionGroupId,inputs,outputs,lockTime,expiryHeight,joinSplits,joinSplitPubKey,joinSplitSig)
+  def apply(overwintered: Boolean, version: UInt32, versionGroupId: UInt32,
+    inputs: Seq[TransactionInput], outputs: Seq[TransactionOutput],
+    lockTime: UInt32, expiryHeight: UInt32, joinSplits: Seq[JSDescription],
+    joinSplitPubKey: Seq[Byte], joinSplitSig: Seq[Byte]): ZcashTransaction = ZcashTransactionImpl(overwintered, version, versionGroupId, inputs, outputs, lockTime, expiryHeight, joinSplits, joinSplitPubKey, joinSplitSig)
 }
