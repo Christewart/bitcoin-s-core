@@ -10,16 +10,16 @@ import org.bitcoins.core.util.Factory
  */
 sealed abstract class JSDescription extends NetworkElement {
 
-  def vpubOld : CurrencyUnit
-  def vpubNew : CurrencyUnit
-  def anchor : Seq[Byte]
-  def nullifiers : Seq[Seq[Byte]]
-  def commitments : Seq[Seq[Byte]]
-  def onetimePubKey : Seq[Byte]
-  def randomSeed : Seq[Byte]
-  def macs : Seq[Seq[Byte]]
-  def proof : ZCProof
-  def ciphertexts : Seq[Seq[Byte]]
+  def vpubOld: CurrencyUnit
+  def vpubNew: CurrencyUnit
+  def anchor: Seq[Byte]
+  def nullifiers: Seq[Seq[Byte]]
+  def commitments: Seq[Seq[Byte]]
+  def onetimePubKey: Seq[Byte]
+  def randomSeed: Seq[Byte]
+  def macs: Seq[Seq[Byte]]
+  def proof: ZCProof
+  def ciphertexts: Seq[Seq[Byte]]
 
   override def size = proof.size + 1506
 
@@ -27,19 +27,19 @@ sealed abstract class JSDescription extends NetworkElement {
 }
 
 object JSDescription extends Factory[JSDescription] {
-  private case class JSDescriptionImpl(vpubOld : CurrencyUnit, vpubNew : CurrencyUnit, anchor : Seq[Byte],
-                                       nullifiers : Seq[Seq[Byte]], commitments : Seq[Seq[Byte]],
-                                       onetimePubKey : Seq[Byte], randomSeed : Seq[Byte],
-                                       macs : Seq[Seq[Byte]], proof : ZCProof,
-                                       ciphertexts : Seq[Seq[Byte]]) extends JSDescription
+  private case class JSDescriptionImpl(vpubOld: CurrencyUnit, vpubNew: CurrencyUnit, anchor: Seq[Byte],
+    nullifiers: Seq[Seq[Byte]], commitments: Seq[Seq[Byte]],
+    onetimePubKey: Seq[Byte], randomSeed: Seq[Byte],
+    macs: Seq[Seq[Byte]], proof: ZCProof,
+    ciphertexts: Seq[Seq[Byte]]) extends JSDescription
 
-  def fromBytes(bytes : Seq[Byte]) : JSDescription = RawJSDescriptionParser.read(bytes)
+  def fromBytes(bytes: Seq[Byte]): JSDescription = RawJSDescriptionParser.read(bytes)
 
-  def apply(vpubOld : CurrencyUnit, vpubNew : CurrencyUnit, anchor : Seq[Byte],
-            nullifiers : Seq[Seq[Byte]], commitments : Seq[Seq[Byte]],
-            onetimePubKey : Seq[Byte], randomSeed : Seq[Byte],
-            macs : Seq[Seq[Byte]], proof : ZCProof,
-            ciphertexts : Seq[Seq[Byte]]) : JSDescription = {
-    JSDescriptionImpl(vpubOld,vpubNew,anchor,nullifiers,commitments,onetimePubKey,randomSeed,macs,proof,ciphertexts)
+  def apply(vpubOld: CurrencyUnit, vpubNew: CurrencyUnit, anchor: Seq[Byte],
+    nullifiers: Seq[Seq[Byte]], commitments: Seq[Seq[Byte]],
+    onetimePubKey: Seq[Byte], randomSeed: Seq[Byte],
+    macs: Seq[Seq[Byte]], proof: ZCProof,
+    ciphertexts: Seq[Seq[Byte]]): JSDescription = {
+    JSDescriptionImpl(vpubOld, vpubNew, anchor, nullifiers, commitments, onetimePubKey, randomSeed, macs, proof, ciphertexts)
   }
 }

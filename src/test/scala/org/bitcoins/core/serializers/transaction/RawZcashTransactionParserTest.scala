@@ -1,10 +1,10 @@
 package org.bitcoins.core.serializers.transaction
 
-import org.bitcoins.core.currency.{Bitcoins, Satoshis}
-import org.bitcoins.core.number.{Int64, UInt32}
+import org.bitcoins.core.currency.{ Bitcoins, Satoshis }
+import org.bitcoins.core.number.{ Int64, UInt32 }
 import org.bitcoins.core.protocol.transaction.ZcashTransaction
 import org.bitcoins.core.util.BitcoinSUtil
-import org.scalatest.{FlatSpec, MustMatchers}
+import org.scalatest.{ FlatSpec, MustMatchers }
 
 /**
  * Created by str4d on 3/26/18.
@@ -20,58 +20,58 @@ class RawZcashTransactionParserTest extends FlatSpec with MustMatchers {
   val encode = BitcoinSUtil.encodeHex(_: Seq[Byte])
 
   "RawZcashTransactionParser" must "parse a raw v1 transaction" in {
-    val tx : ZcashTransaction = RawZcashTransactionParser.read(rawTxV1)
-    tx.overwintered must be (false)
-    tx.version must be (UInt32.one)
-    tx.inputs.size must be (1)
-    tx.outputs.size must be (2)
-    tx.lockTime must be (UInt32.zero)
-    tx.joinSplits.size must be (0)
-    tx.txId.hex must be (BitcoinSUtil.flipEndianness("4070553dbcd801788e381692c8cf78cea3ed690ec93b359c5d91848dcc4e3a6c"))
+    val tx: ZcashTransaction = RawZcashTransactionParser.read(rawTxV1)
+    tx.overwintered must be(false)
+    tx.version must be(UInt32.one)
+    tx.inputs.size must be(1)
+    tx.outputs.size must be(2)
+    tx.lockTime must be(UInt32.zero)
+    tx.joinSplits.size must be(0)
+    tx.txId.hex must be(BitcoinSUtil.flipEndianness("4070553dbcd801788e381692c8cf78cea3ed690ec93b359c5d91848dcc4e3a6c"))
   }
 
   it must "parse a raw v2 transaction" in {
-    val tx : ZcashTransaction = RawZcashTransactionParser.read(rawTxV2)
-    tx.overwintered must be (false)
-    tx.version must be (UInt32(2))
-    tx.inputs.size must be (1)
-    tx.outputs.size must be (0)
-    tx.lockTime must be (UInt32.zero)
-    tx.joinSplits.size must be (1)
-    tx.joinSplits.head.vpubOld must be (Satoshis(Int64(1001771776)))
-    tx.joinSplits.head.vpubNew must be (Satoshis(Int64(0)))
-    tx.txId.hex must be (BitcoinSUtil.flipEndianness("bf1706af01f60f5347eac2291358def1467cae709223018c0bfff38732390c67"))
+    val tx: ZcashTransaction = RawZcashTransactionParser.read(rawTxV2)
+    tx.overwintered must be(false)
+    tx.version must be(UInt32(2))
+    tx.inputs.size must be(1)
+    tx.outputs.size must be(0)
+    tx.lockTime must be(UInt32.zero)
+    tx.joinSplits.size must be(1)
+    tx.joinSplits.head.vpubOld must be(Satoshis(Int64(1001771776)))
+    tx.joinSplits.head.vpubNew must be(Satoshis(Int64(0)))
+    tx.txId.hex must be(BitcoinSUtil.flipEndianness("bf1706af01f60f5347eac2291358def1467cae709223018c0bfff38732390c67"))
   }
 
   it must "parse a raw v3 transaction" in {
-    val tx : ZcashTransaction = RawZcashTransactionParser.read(rawTxV3)
-    tx.overwintered must be (true)
-    tx.version must be (UInt32(3))
-    tx.inputs.size must be (5)
-    tx.outputs.size must be (0)
-    tx.lockTime must be (UInt32.zero)
-    tx.expiryHeight must be (UInt32(126))
-    tx.joinSplits.size must be (1)
-    tx.joinSplits.head.vpubOld must be (Bitcoins(49.9999).satoshis)
-    tx.joinSplits.head.vpubNew must be (Satoshis(Int64(0)))
-    tx.txId.hex must be (BitcoinSUtil.flipEndianness("ec6711f8250e1f7972789c937220fc1171e9e93052fc6f0e8e4955f6b5a47530"))
+    val tx: ZcashTransaction = RawZcashTransactionParser.read(rawTxV3)
+    tx.overwintered must be(true)
+    tx.version must be(UInt32(3))
+    tx.inputs.size must be(5)
+    tx.outputs.size must be(0)
+    tx.lockTime must be(UInt32.zero)
+    tx.expiryHeight must be(UInt32(126))
+    tx.joinSplits.size must be(1)
+    tx.joinSplits.head.vpubOld must be(Bitcoins(49.9999).satoshis)
+    tx.joinSplits.head.vpubNew must be(Satoshis(Int64(0)))
+    tx.txId.hex must be(BitcoinSUtil.flipEndianness("ec6711f8250e1f7972789c937220fc1171e9e93052fc6f0e8e4955f6b5a47530"))
   }
 
   it must "read and write a raw v1 tx" in {
     val tx = RawZcashTransactionParser.read(rawTxV1)
     val serializedTx = RawZcashTransactionParser.write(tx)
-    encode(serializedTx) must be (rawTxV1)
+    encode(serializedTx) must be(rawTxV1)
   }
 
   it must "read and write a raw v2 tx" in {
     val tx = RawZcashTransactionParser.read(rawTxV2)
     val serializedTx = RawZcashTransactionParser.write(tx)
-    encode(serializedTx) must be (rawTxV2)
+    encode(serializedTx) must be(rawTxV2)
   }
 
   it must "read and write a raw v3 tx" in {
     val tx = RawZcashTransactionParser.read(rawTxV3)
     val serializedTx = RawZcashTransactionParser.write(tx)
-    encode(serializedTx) must be (rawTxV3)
+    encode(serializedTx) must be(rawTxV3)
   }
 }

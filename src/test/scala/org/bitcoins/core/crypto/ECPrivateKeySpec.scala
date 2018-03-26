@@ -1,8 +1,8 @@
 package org.bitcoins.core.crypto
 
 import org.bitcoins.core.config._
-import org.bitcoins.core.gen.{ChainParamsGenerator, CryptoGenerators}
-import org.scalacheck.{Prop, Properties}
+import org.bitcoins.core.gen.{ ChainParamsGenerator, CryptoGenerators }
+import org.scalacheck.{ Prop, Properties }
 
 /**
  * Created by chris on 7/25/16.
@@ -15,7 +15,7 @@ class ECPrivateKeySpec extends Properties("ECPrivateKeySpec") {
       //commenting out this portion of the test for now, multiple cryptocurrency networks share the
       //same private key WIF prefix, which means you can't distinguish what network a private key is meant
       //for. For instance ZCash copies the same network byte with bitcoin.
-/*      val isCorrectNetwork = network match {
+      /*      val isCorrectNetwork = network match {
         case bn : BitcoinNetwork => bn match {
           case MainNet => ECPrivateKey.parseNetworkFromWIF(wif).get == network
           case TestNet3 | RegTest => ECPrivateKey.parseNetworkFromWIF(wif).get == TestNet3
