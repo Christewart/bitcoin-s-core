@@ -1,7 +1,6 @@
 lazy val commonSettings = Seq(
   organization := "org.bitcoins",
   name := "bitcoin-s-core",
-  version := "0.0.2-SNAPSHOT",
   scalaVersion := "2.11.7"
 )
 
