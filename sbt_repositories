@@ -1,0 +1,9 @@
+# See: http://www.scala-sbt.org/0.13/docs/Proxy-Repositories.html
+
+[repositories]
+  local
+  maven-local
+  gemini-ivy-proxy-releases: https://artifactory.service.systems.internal.projecticeland.net/artifactory/ivy-releases/, [organization]/[module]/(scala_[scalaVersion]/)(sbt_[sbtVersion]/)[revision]/[type]s/[artifact](-[classifier]).[ext]
+  gemini-maven-proxy-releases: https://artifactory.service.systems.internal.projecticeland.net/artifactory/maven-releases/
+  jcenter-fallback: https://jcenter.bintray.com/
+  maven-central
