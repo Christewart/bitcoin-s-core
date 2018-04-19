@@ -1,10 +1,10 @@
 package org.bitcoins.core.protocol.blockchain
 
-import org.bitcoins.core.crypto.DoubleSha256Digest
+import org.bitcoins.core.crypto.{ DoubleSha256Digest, Sha256Digest }
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.NetworkElement
-import org.bitcoins.core.serializers.blockchain.RawBlockHeaderSerializer
-import org.bitcoins.core.util.{ BitcoinSUtil, CryptoUtil, BitcoinSLogger, Factory }
+import org.bitcoins.core.serializers.blockchain.{ RawBlockHeaderSerializer, RawZcashBlockHeaderSerializer }
+import org.bitcoins.core.util.{ BitcoinSLogger, BitcoinSUtil, CryptoUtil, Factory }
 
 /**
  * Created by chris on 5/19/16.
@@ -125,5 +125,58 @@ object BlockHeader extends Factory[BlockHeader] {
   }
 
   def fromBytes(bytes: Seq[Byte]): BlockHeader = RawBlockHeaderSerializer.read(bytes)
+
+}
+
+/**
+ * The Zcash block header is slightly different than the bitcoin block header
+ * Namely it was two extra fields
+ * 1.) hashReserved - 32 byte hash that is currently unused according to the zcash docs
+ * 2.) solution - the equihash solution
+ * See page 39 on this document:
+ * [[https://github.com/zcash/zips/blob/master/protocol/protocol.pdf]]
+ */
+sealed abstract class ZcashBlockHeader extends BlockHeader {
+
+  def hashReserved: Sha256Digest
+
+  def solution: Seq[Byte]
+
+  override def bytes: Seq[Byte] = RawZcashBlockHeaderSerializer.write(this)
+
+  override def nonce: UInt32 = throw new IllegalArgumentException("Not supported in zcash")
+  /**
+   * Note that zcash differents from bitcoin block header here,
+   * In bitcoin the nonce is encoded as a [[UInt32]], while
+   * in zcash they decided to make the nonce larger, a 256 byte number.
+   * @return
+   */
+  def nonceBytes: Seq[Byte]
+
+}
+
+object ZcashBlockHeader {
+  private sealed case class ZcashBlockHeaderImpl(
+    version: UInt32,
+    previousBlockHash: DoubleSha256Digest,
+    merkleRootHash: DoubleSha256Digest,
+    hashReserved: Sha256Digest,
+    time: UInt32,
+    nBits: UInt32,
+    nonceBytes: Seq[Byte],
+    solution: Seq[Byte]) extends ZcashBlockHeader
+
+  def apply(
+    version: UInt32,
+    previousBlockHash: DoubleSha256Digest,
+    merkleRootHash: DoubleSha256Digest,
+    hashReserved: Sha256Digest,
+    time: UInt32,
+    nBits: UInt32,
+    nonceBytes: Seq[Byte],
+    solution: Seq[Byte]): ZcashBlockHeader = {
+    ZcashBlockHeaderImpl(version, previousBlockHash, merkleRootHash,
+      hashReserved, time, nBits, nonceBytes, solution)
+  }
 
 }

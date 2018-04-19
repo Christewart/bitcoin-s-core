@@ -126,5 +126,42 @@ object CurrencyUnits {
   def toSatoshis(unit: CurrencyUnit): Satoshis = unit match {
     case b: Bitcoins => b.satoshis
     case x: Satoshis => x
+    case z: Zatoshis => throw new IllegalArgumentException("Should not be converting zatoshi's to satoshis")
   }
+}
+
+/**
+ * The currency unit for Zcash
+ * Like bitcoin, it is just a typdef for a Int64
+ * [[https://github.com/zcash/zcash/blob/master/src/amount.h#L14]]
+ */
+sealed abstract class Zatoshis extends CurrencyUnit {
+  override type A = Int64
+
+  override def satoshis: Satoshis = {
+    //this is technically cheating, but the serialization for zcash stuff is the same,
+    //and this gives us all of the numeric operations above
+    Satoshis(underlying)
+  }
+  override def toBigDecimal = BigDecimal(toLong)
+
+  def toLong = underlying.toLong
+}
+
+object Zatoshis extends Factory[Zatoshis] with BaseNumbers[Zatoshis] {
+  private case class ZatoshisImpl(underlying: Int64) extends Zatoshis
+
+  val min = Zatoshis(Int64.min)
+  val max = Zatoshis(Int64.max)
+  val zero = Zatoshis(Int64.zero)
+  val one = Zatoshis(Int64.one)
+
+  override def fromBytes(bytes: Seq[Byte]): Zatoshis = {
+    //i'm cheating here and using the Satoshi serializer,
+    //i believe they are the same since zcash is a bitcoin fork
+    val sat = RawSatoshisSerializer.read(bytes)
+    Zatoshis(Int64(sat.toLong))
+  }
+
+  def apply(int64: Int64): Zatoshis = ZatoshisImpl(int64)
 }

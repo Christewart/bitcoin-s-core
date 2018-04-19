@@ -92,5 +92,14 @@ class CurrencyUnitSpec extends Properties("CurrencyUnitSpec") {
       else actual.isFailure && expected.isFailure
     }
   }
+
+  property("serializatoin symmetry for zatoshi") = {
+    Prop.forAll(CurrencyUnitGenerator.zatoshi) {
+      case zat: Zatoshis =>
+        Zatoshis(zat.hex) == zat &&
+          Zatoshis(Int64(zat.toLong)) == zat
+
+    }
+  }
 }
 
