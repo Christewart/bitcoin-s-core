@@ -1,0 +1,2 @@
+# for libsecp256k1 libs
+-Djava.library.path=/usr/local/lib
