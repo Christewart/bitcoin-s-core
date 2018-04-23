@@ -1,1 +1,1 @@
-version in ThisBuild := "0.0.3-LOCAL-SNAPSHOT"
+version in ThisBuild := "0.0.4-GEMINI-SNAPSHOT"
