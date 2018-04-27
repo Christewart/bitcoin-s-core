@@ -60,12 +60,13 @@ sealed trait BlockHeader extends NetworkElement {
 
   def merkleRootHash: DoubleSha256Digest
 
-  /** Returns the merkle root hash in BIG ENDIAN format. This is not compatible with the bitcoin
-    * protocol but it is useful for rpc clients and block explorers
-    * See this link for more info
-    * [[https://bitcoin.stackexchange.com/questions/2063/why-does-the-bitcoin-protocol-use-the-little-endian-notation]]
-    * @return
-    */
+  /**
+   * Returns the merkle root hash in BIG ENDIAN format. This is not compatible with the bitcoin
+   * protocol but it is useful for rpc clients and block explorers
+   * See this link for more info
+   * [[https://bitcoin.stackexchange.com/questions/2063/why-does-the-bitcoin-protocol-use-the-little-endian-notation]]
+   * @return
+   */
   def merkleRootHashBE: DoubleSha256Digest = merkleRootHash.flip
 
   /**
@@ -86,15 +87,6 @@ sealed trait BlockHeader extends NetworkElement {
    */
   def nBits: UInt32
 
-  /**
-   * An arbitrary number miners change to modify the header hash in order to produce a hash below the target threshold.
-   * If all 32-bit values are tested, the time can be updated or the coinbase
-   * transaction can be changed and the merkle root updated.
-   *
-   * @return the nonce used to try and solve a block
-   */
-  def nonce: UInt32
-
   /** Returns the block's hash in the protocol level little endian encoding */
   def hash: DoubleSha256Digest = CryptoUtil.doubleSHA256(bytes)
 
@@ -107,24 +99,36 @@ sealed trait BlockHeader extends NetworkElement {
    */
   def hashBE: DoubleSha256Digest = hash.flip
 
-  override def bytes: Seq[Byte] = RawBlockHeaderSerializer.write(this)
+}
 
+sealed abstract class BitcoinBlockHeader extends BlockHeader {
+
+  /**
+   * An arbitrary number miners change to modify the header hash in order to produce a hash below the target threshold.
+   * If all 32-bit values are tested, the time can be updated or the coinbase
+   * transaction can be changed and the merkle root updated.
+   *
+   * @return the nonce used to try and solve a block
+   */
+  def nonce: UInt32
+
+  def bytes: Seq[Byte] = RawBlockHeaderSerializer.write(this)
 }
 
 /**
  * Companion object used for creating BlockHeaders
  */
-object BlockHeader extends Factory[BlockHeader] {
+object BitcoinBlockHeader extends Factory[BitcoinBlockHeader] {
 
-  private sealed case class BlockHeaderImpl(version: UInt32, previousBlockHash: DoubleSha256Digest,
-    merkleRootHash: DoubleSha256Digest, time: UInt32, nBits: UInt32, nonce: UInt32) extends BlockHeader
+  private sealed case class BitcoinBlockHeaderImpl(version: UInt32, previousBlockHash: DoubleSha256Digest,
+    merkleRootHash: DoubleSha256Digest, time: UInt32, nBits: UInt32, nonce: UInt32) extends BitcoinBlockHeader
 
   def apply(version: UInt32, previousBlockHash: DoubleSha256Digest, merkleRootHash: DoubleSha256Digest,
-    time: UInt32, nBits: UInt32, nonce: UInt32): BlockHeader = {
-    BlockHeaderImpl(version, previousBlockHash, merkleRootHash, time, nBits, nonce)
+    time: UInt32, nBits: UInt32, nonce: UInt32): BitcoinBlockHeader = {
+    BitcoinBlockHeaderImpl(version, previousBlockHash, merkleRootHash, time, nBits, nonce)
   }
 
-  def fromBytes(bytes: Seq[Byte]): BlockHeader = RawBlockHeaderSerializer.read(bytes)
+  def fromBytes(bytes: Seq[Byte]): BitcoinBlockHeader = RawBlockHeaderSerializer.read(bytes)
 
 }
 
@@ -144,7 +148,6 @@ sealed abstract class ZcashBlockHeader extends BlockHeader {
 
   override def bytes: Seq[Byte] = RawZcashBlockHeaderSerializer.write(this)
 
-  override def nonce: UInt32 = throw new IllegalArgumentException("Not supported in zcash")
   /**
    * Note that zcash differents from bitcoin block header here,
    * In bitcoin the nonce is encoded as a [[UInt32]], while
