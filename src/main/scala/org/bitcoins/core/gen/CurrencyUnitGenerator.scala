@@ -1,6 +1,6 @@
 package org.bitcoins.core.gen
 
-import org.bitcoins.core.currency.{ Bitcoins, CurrencyUnit, CurrencyUnits, Satoshis }
+import org.bitcoins.core.currency._
 import org.bitcoins.core.number.Int64
 import org.scalacheck.Gen
 
@@ -28,6 +28,11 @@ trait CurrencyUnitGenerator {
   def positiveRealistic: Gen[Satoshis] = Gen.choose(0, Bitcoins(1000000).satoshis.toLong).map { n =>
     Satoshis(Int64(n))
   }
+
+  /** The currency unit used in Zcash */
+  def zatoshi: Gen[Zatoshis] = for {
+    int64 <- NumberGenerator.int64s
+  } yield Zatoshis(int64)
 }
 
 object CurrencyUnitGenerator extends CurrencyUnitGenerator

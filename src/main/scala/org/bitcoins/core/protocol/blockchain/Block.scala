@@ -1,9 +1,9 @@
 package org.bitcoins.core.protocol.blockchain
 
 import org.bitcoins.core.number.UInt64
-import org.bitcoins.core.protocol.transaction.{ BaseTransaction, Transaction, WitnessTransaction }
+import org.bitcoins.core.protocol.transaction.{ BaseTransaction, Transaction, WitnessTransaction, ZcashTransaction }
 import org.bitcoins.core.protocol.{ CompactSizeUInt, NetworkElement }
-import org.bitcoins.core.serializers.blockchain.RawBlockSerializer
+import org.bitcoins.core.serializers.blockchain.{ RawBlockSerializer, RawZcashBlockSerializer }
 import org.bitcoins.core.util.{ BitcoinSLogger, Factory }
 
 /**
@@ -65,4 +65,27 @@ object Block extends Factory[Block] {
 
   def fromBytes(bytes: Seq[Byte]): Block = RawBlockSerializer.read(bytes)
 
+}
+
+sealed abstract class ZcashBlock extends Block {
+  override def blockHeader: ZcashBlockHeader
+
+  override def txCount: CompactSizeUInt = CompactSizeUInt(UInt64(transactions.size))
+
+  override def transactions: Seq[ZcashTransaction]
+
+}
+
+object ZcashBlock extends Factory[ZcashBlock] {
+  private sealed case class ZcashBlockImpl(
+    blockHeader: ZcashBlockHeader,
+    transactions: Seq[ZcashTransaction]) extends ZcashBlock
+
+  def apply(
+    blockHeader: ZcashBlockHeader,
+    transactions: Seq[ZcashTransaction]): ZcashBlock = {
+    ZcashBlockImpl(blockHeader, transactions)
+  }
+
+  def fromBytes(bytes: Seq[Byte]): ZcashBlock = RawZcashBlockSerializer.read(bytes)
 }

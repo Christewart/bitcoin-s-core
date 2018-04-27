@@ -3,7 +3,7 @@ package org.bitcoins.core.gen
 import org.bitcoins.core.consensus.Merkle
 import org.bitcoins.core.crypto.DoubleSha256Digest
 import org.bitcoins.core.number.UInt32
-import org.bitcoins.core.protocol.blockchain.{ Block, BlockHeader }
+import org.bitcoins.core.protocol.blockchain.{ BitcoinBlockHeader, Block, BlockHeader }
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.scalacheck.Gen
 
@@ -55,7 +55,7 @@ sealed abstract class BlockchainElementsGenerator {
     merkleRootHash = Merkle.computeMerkleRoot(txs)
     time <- NumberGenerator.uInt32s
     nonce <- NumberGenerator.uInt32s
-  } yield BlockHeader(version, previousBlockHash, merkleRootHash, time, nBits, nonce)
+  } yield BitcoinBlockHeader(version, previousBlockHash, merkleRootHash, time, nBits, nonce)
 
   /** Generates a [[BlockHeader]] that has a merkle root hash corresponding to the given txs */
   def blockHeader(txs: Seq[Transaction]): Gen[BlockHeader] = for {

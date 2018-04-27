@@ -2,7 +2,7 @@ package org.bitcoins.core.serializers.blockchain
 
 import org.bitcoins.core.crypto.DoubleSha256Digest
 import org.bitcoins.core.number.UInt32
-import org.bitcoins.core.protocol.blockchain.BlockHeader
+import org.bitcoins.core.protocol.blockchain.{ BitcoinBlockHeader, BlockHeader }
 import org.bitcoins.core.serializers.RawBitcoinSerializer
 
 /**
@@ -10,10 +10,10 @@ import org.bitcoins.core.serializers.RawBitcoinSerializer
  * Serializes block headers
  * https://bitcoin.org/en/developer-reference#block-headers
  */
-sealed abstract class RawBlockHeaderSerializer extends RawBitcoinSerializer[BlockHeader] {
+sealed abstract class RawBlockHeaderSerializer extends RawBitcoinSerializer[BitcoinBlockHeader] {
 
   /** Converts a list of bytes into a block header */
-  def read(bytes: List[Byte]): BlockHeader = {
+  def read(bytes: List[Byte]): BitcoinBlockHeader = {
     //version first 4 bytes
     val version = UInt32(bytes.take(4).reverse)
     //previous header hash next 32 bytes
@@ -31,11 +31,11 @@ sealed abstract class RawBlockHeaderSerializer extends RawBitcoinSerializer[Bloc
     //nonce 4 bytes
     val nonceBytes = bytes.slice(76, 80)
     val nonce = UInt32(nonceBytes.reverse)
-    BlockHeader(version, prevBlockHash, merkleRoot, time, nBits, nonce)
+    BitcoinBlockHeader(version, prevBlockHash, merkleRoot, time, nBits, nonce)
   }
 
   /** Serializes the BlockHeader to a byte array */
-  def write(blockHeader: BlockHeader): Seq[Byte] = {
+  def write(blockHeader: BitcoinBlockHeader): Seq[Byte] = {
     val version = blockHeader.version.bytes.reverse
 
     val prevHash = blockHeader.previousBlockHash.bytes

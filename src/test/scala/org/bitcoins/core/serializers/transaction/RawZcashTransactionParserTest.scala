@@ -74,4 +74,12 @@ class RawZcashTransactionParserTest extends FlatSpec with MustMatchers {
     val serializedTx = RawZcashTransactionParser.write(tx)
     encode(serializedTx) must be(rawTxV3)
   }
+
+  it must "read/write this tx from regtest" in {
+    val txId = BitcoinSUtil.flipEndianness("9cced130b9799995bcf848753192e5063004885e97eb9651ba75525f8a1c9f5f")
+    val txHex = "01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff03510101ffffffff0200ca9a3b000000001976a914455a61c37227aa12b4fea74da5cb9e973c0c6ef088ac80b2e60e0000000017a9146708e6670db0b950dac68031025cc5b63213a4918700000000"
+    val tx = RawZcashTransactionParser.read(txHex)
+    txHex must be(tx.hex)
+    tx.txId.hex must be(txId)
+  }
 }
