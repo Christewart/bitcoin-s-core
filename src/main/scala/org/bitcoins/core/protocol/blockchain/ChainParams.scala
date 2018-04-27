@@ -87,7 +87,7 @@ sealed abstract class ChainParams {
     val tx = BaseTransaction(TransactionConstants.version, Seq(input), Seq(output), TransactionConstants.lockTime)
     val prevBlockHash = DoubleSha256Digest("0000000000000000000000000000000000000000000000000000000000000000")
     val merkleRootHash = Merkle.computeMerkleRoot(Seq(tx))
-    val genesisBlockHeader = BlockHeader(version, prevBlockHash, merkleRootHash, time, nBits, nonce)
+    val genesisBlockHeader = BitcoinBlockHeader(version, prevBlockHash, merkleRootHash, time, nBits, nonce)
     val genesisBlock = Block(genesisBlockHeader, Seq(tx))
     genesisBlock
   }
