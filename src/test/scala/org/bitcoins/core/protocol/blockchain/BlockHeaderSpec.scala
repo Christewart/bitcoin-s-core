@@ -9,6 +9,6 @@ import org.scalacheck.{ Prop, Properties }
 class BlockHeaderSpec extends Properties("BlockHeaderSpec") {
   property("serialization symmetry") =
     Prop.forAll(BlockchainElementsGenerator.blockHeader) { header =>
-      BlockHeader(header.hex) == header
+      BitcoinBlockHeader(header.hex) == header
     }
 }
