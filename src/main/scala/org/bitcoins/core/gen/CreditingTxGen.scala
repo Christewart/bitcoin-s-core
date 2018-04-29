@@ -1,6 +1,6 @@
 package org.bitcoins.core.gen
 
-import org.bitcoins.core.crypto.Sign
+import org.bitcoins.core.crypto.{ ECPrivateKey, Sign }
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.script.crypto.HashType
@@ -231,14 +231,18 @@ sealed abstract class CreditingTxGen {
   def randomZcash: Gen[CreditingTxGen.CreditingTxInfoZcash] = nonEmptyOutputs.flatMap { outputs =>
     Gen.choose(0, outputs.size - 1).flatMap { outputIndex: Int =>
       ScriptGenerators.scriptPubKey.flatMap {
-        case (spk, keys) =>
-          WitnessGenerators.scriptWitness.flatMap { wit: ScriptWitness =>
-            CryptoGenerators.hashType.map { hashType: HashType =>
-              val tc = ZcashTxConstants
-              val creditingTx = ZcashTransaction(tc.version, Nil, outputs, tc.lockTime).get
-              (creditingTx, outputIndex, keys, Some(spk), Some(wit), hashType)
-            }
+        case (spk, correctKeys) =>
+          Gen.listOfN(correctKeys.size, CryptoGenerators.privateKey).flatMap {
+            case wrongKeys: Seq[ECPrivateKey] =>
+              WitnessGenerators.scriptWitness.flatMap { wit: ScriptWitness =>
+                CryptoGenerators.hashType.map { hashType: HashType =>
+                  val tc = ZcashTxConstants
+                  val creditingTx = ZcashTransaction(tc.version, Nil, outputs, tc.lockTime).get
+                  (creditingTx, outputIndex, wrongKeys, Some(spk), Some(wit), hashType)
+                }
+              }
           }
+
       }
     }
   }

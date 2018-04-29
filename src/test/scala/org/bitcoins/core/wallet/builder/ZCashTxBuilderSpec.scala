@@ -57,6 +57,7 @@ class ZCashTxBuilderSpec extends Properties("ZCashTxBuilderSpec") {
           case (destinations: Seq[TransactionOutput], changeSPK, network) =>
             val fee = SatoshisPerVirtualByte(Satoshis(Int64(1000)))
             val outpointsWithKeys = buildCreditingTxInfo(creditingTxsInfo)
+            //probably should fail here building the TxBuilder
             val builder = ZcashTxBuilder(destinations, outpointsWithKeys, fee, changeSPK._1, network)
             val result = Try(Await.result(builder.flatMap(_.sign), timeout))
             val noRedeem = creditingTxsInfo.map(c => (c._1, c._2))
