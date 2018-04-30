@@ -17,34 +17,8 @@ sealed abstract class FundingInfo {
   def utxos: Seq[UTXOSpendingInfo]
 }
 
-sealed abstract class BitcoinFundingInfo extends FundingInfo {
-  override def utxos: Seq[BitcoinUTXOSpendingInfo]
-}
+/** Funding information for a bitcoin transaction */
+case class BitcoinFundingInfo(transaction: Transaction, utxos: Seq[BitcoinUTXOSpendingInfo]) extends FundingInfo
 
-object BitcoinFundingInfo {
-  private case class BitcoinFundingInfoImpl(
-    transaction: Transaction,
-    utxos: Seq[BitcoinUTXOSpendingInfo]) extends BitcoinFundingInfo
-  def apply(tx: BaseTransaction, utxos: Seq[BitcoinUTXOSpendingInfo]): BitcoinFundingInfo = {
-    BitcoinFundingInfoImpl(tx, utxos)
-  }
-
-  def apply(wtx: WitnessTransaction, utxos: Seq[BitcoinUTXOSpendingInfo]): BitcoinFundingInfo = {
-    BitcoinFundingInfoImpl(wtx, utxos)
-  }
-}
-
-sealed abstract class ZcashFundingInfo extends FundingInfo {
-  override def transaction: ZcashTransaction
-  override def utxos: Seq[ZcashUTXOSpendingInfo]
-}
-
-object ZcashFundingInfo {
-  private case class ZcashFundingInfoImpl(
-    transaction: ZcashTransaction,
-    utxos: Seq[ZcashUTXOSpendingInfo]) extends ZcashFundingInfo
-
-  def apply(transaction: ZcashTransaction, utxos: Seq[ZcashUTXOSpendingInfo]): ZcashFundingInfo = {
-    ZcashFundingInfoImpl(transaction, utxos)
-  }
-}
+/** Funding information for a zcash transaction */
+case class ZcashFundingInfo(transaction: ZcashTransaction, utxos: Seq[ZcashUTXOSpendingInfo]) extends FundingInfo
