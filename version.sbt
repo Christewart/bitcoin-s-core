@@ -1,1 +1,1 @@
-version in ThisBuild := "0.0.4-ZHEADER-SNAPSHOT"
+version in ThisBuild := "0.0.5-SNAPSHOT"
