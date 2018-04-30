@@ -54,7 +54,7 @@ object Sha256Digest extends Factory[Sha256Digest] {
  * Represents the result of SHA256(SHA256())
  */
 sealed abstract class DoubleSha256Digest extends HashDigest {
-  def flip: DoubleSha256Digest = DoubleSha256Digest(bytes.reverse)
+  def flip: BEDoubleSha256Digest = BEDoubleSha256Digest(bytes.reverse)
 }
 
 object DoubleSha256Digest extends Factory[DoubleSha256Digest] {
@@ -94,4 +94,21 @@ object Sha256Hash160Digest extends Factory[Sha256Hash160Digest] {
     override def toString = s"Sha256Hash160DigestImpl($hex)"
   }
   override def fromBytes(bytes: Seq[Byte]): Sha256Hash160Digest = Sha256Hash160DigestImpl(bytes)
+}
+
+/**
+ * Represents the result of SHA256(SHA256()) in BigEndian
+ */
+sealed abstract class BEDoubleSha256Digest extends HashDigest {
+  def flip: DoubleSha256Digest = DoubleSha256Digest(bytes.reverse)
+}
+
+object BEDoubleSha256Digest extends Factory[BEDoubleSha256Digest] {
+  private case class BEDoubleSha256DigestImpl(bytes: Seq[Byte]) extends BEDoubleSha256Digest {
+    require(bytes.length == 32, "BEDoubleSha256Digest must always be 32 bytes, got: " + bytes.length)
+    override def toString = s"BEDoubleSha256Digest($hex)"
+  }
+
+  def fromBytes(bytes: Seq[Byte]): BEDoubleSha256Digest = BEDoubleSha256DigestImpl(bytes)
+
 }
