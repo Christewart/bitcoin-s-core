@@ -1,6 +1,6 @@
 package org.bitcoins.core.protocol.transaction
 
-import org.bitcoins.core.crypto.DoubleSha256Digest
+import org.bitcoins.core.crypto.{ BEDoubleSha256Digest, DoubleSha256Digest }
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.NetworkElement
 import org.bitcoins.core.serializers.transaction.{ RawBaseTransactionParser, RawWitnessTransactionParser, RawZcashTransactionParser }
@@ -27,7 +27,7 @@ sealed abstract class Transaction extends NetworkElement {
    * [[https://bitcoin.stackexchange.com/questions/2063/why-does-the-bitcoin-protocol-use-the-little-endian-notation]]
    * @return
    */
-  def txIdBE: DoubleSha256Digest = txId.flip
+  def txIdBE: BEDoubleSha256Digest = txId.flip
 
   /** The version number for this transaction */
   def version: UInt32
@@ -112,7 +112,7 @@ sealed abstract class WitnessTransaction extends Transaction {
   def wTxId: DoubleSha256Digest = CryptoUtil.doubleSHA256(bytes)
 
   /** Returns the big endian encoding of the wtxid */
-  def wTxIdBE: DoubleSha256Digest = wTxId.flip
+  def wTxIdBE: BEDoubleSha256Digest = wTxId.flip
   /**
    * Weight calculation in bitcoin for witness txs
    * [[https://github.com/bitcoin/bitcoin/blob/5961b23898ee7c0af2626c46d5d70e80136578d3/src/consensus/validation.h#L96]]
@@ -221,3 +221,4 @@ object ZcashTransaction extends Factory[ZcashTransaction] {
     }
   }
 }
+

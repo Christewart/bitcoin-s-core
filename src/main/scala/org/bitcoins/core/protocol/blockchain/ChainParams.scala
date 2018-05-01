@@ -228,3 +228,4 @@ object Base58Type {
   case object ExtPublicKey extends Base58Type
   case object ExtSecretKey extends Base58Type
 }
+

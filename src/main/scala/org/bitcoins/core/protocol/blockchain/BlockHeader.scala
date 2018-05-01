@@ -1,6 +1,6 @@
 package org.bitcoins.core.protocol.blockchain
 
-import org.bitcoins.core.crypto.{ DoubleSha256Digest, Sha256Digest }
+import org.bitcoins.core.crypto.{ BEDoubleSha256Digest, DoubleSha256Digest, Sha256Digest }
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.NetworkElement
 import org.bitcoins.core.serializers.blockchain.{ RawBlockHeaderSerializer, RawZcashBlockHeaderSerializer }
@@ -47,7 +47,7 @@ sealed trait BlockHeader extends NetworkElement {
    * [[https://bitcoin.stackexchange.com/questions/2063/why-does-the-bitcoin-protocol-use-the-little-endian-notation]]
    * @return
    */
-  def previousBlockHashBE: DoubleSha256Digest = previousBlockHash.flip
+  def previousBlockHashBE: BEDoubleSha256Digest = previousBlockHash.flip
 
   /**
    * A SHA256(SHA256()) hash in internal byte order.
@@ -67,7 +67,7 @@ sealed trait BlockHeader extends NetworkElement {
    * [[https://bitcoin.stackexchange.com/questions/2063/why-does-the-bitcoin-protocol-use-the-little-endian-notation]]
    * @return
    */
-  def merkleRootHashBE: DoubleSha256Digest = merkleRootHash.flip
+  def merkleRootHashBE: BEDoubleSha256Digest = merkleRootHash.flip
 
   /**
    * The block time is a Unix epoch time when the miner started hashing the header (according to the miner).
@@ -97,7 +97,7 @@ sealed trait BlockHeader extends NetworkElement {
    * [[https://bitcoin.stackexchange.com/questions/2063/why-does-the-bitcoin-protocol-use-the-little-endian-notation]]
    * @return
    */
-  def hashBE: DoubleSha256Digest = hash.flip
+  def hashBE: BEDoubleSha256Digest = hash.flip
 
 }
 
@@ -183,3 +183,4 @@ object ZcashBlockHeader {
   }
 
 }
+
