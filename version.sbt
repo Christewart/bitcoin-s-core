@@ -1,1 +1,1 @@
-version in ThisBuild := "0.0.7-GEMINI"
+version in ThisBuild := "0.0.8-GEMINI-SNAPSHOT"
