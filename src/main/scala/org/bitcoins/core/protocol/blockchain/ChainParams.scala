@@ -150,6 +150,7 @@ sealed abstract class ZCashChainParams extends ChainParams {
     createGenesisBlockZCash(timestamp, genesisOutputScript, time, nonce, nSolution, nBits, nVersion, genesisReward)
   }
 }
+
 /**
  * ZCash MainNetwork chain parameters
  * [[https://github.com/zcash/zcash/blob/138cf7700457b08ad7993c40d26da2f425387daf/src/chainparams.cpp#L81]]
