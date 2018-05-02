@@ -47,25 +47,6 @@ class ZCashTxBuilderSpec extends Properties("ZCashTxBuilderSpec") {
     }
   }
 
-  property("random fuzz test for tx builder") = {
-    Prop.forAllNoShrink(CreditingTxGen.randomsZcash) {
-      case creditingTxsInfo =>
-        val creditingOutputs = creditingTxsInfo.map(c => c._1.outputs(c._2))
-        val creditingOutputsAmt = creditingOutputs.map(_.value)
-        val totalAmount = creditingOutputsAmt.fold(CurrencyUnits.zero)(_ + _)
-        Prop.forAllNoShrink(TransactionGenerators.smallOutputs(totalAmount), ScriptGenerators.scriptPubKey, ChainParamsGenerator.zcashNetworkParams) {
-          case (destinations: Seq[TransactionOutput], changeSPK, network) =>
-            val fee = SatoshisPerVirtualByte(Satoshis(Int64(1000)))
-            val outpointsWithKeys = buildCreditingTxInfo(creditingTxsInfo)
-            //probably should fail here building the TxBuilder
-            val builder = ZcashTxBuilder(destinations, outpointsWithKeys, fee, changeSPK._1, network)
-            val result = Try(Await.result(builder.flatMap(_.sign), timeout))
-            val noRedeem = creditingTxsInfo.map(c => (c._1, c._2))
-            if (result.isFailure) true else !verifyScript(result.get, noRedeem)
-        }
-    }
-  }
-
   private def buildCreditingTxInfo(info: Seq[CreditingTxGen.CreditingTxInfoZcash]): ZcashTxBuilder.UTXOMap = {
     @tailrec
     def loop(
