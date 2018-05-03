@@ -151,15 +151,15 @@ sealed abstract class ZcashBlockHeader extends BlockHeader {
   /**
    * Note that zcash differents from bitcoin block header here,
    * In bitcoin the nonce is encoded as a [[UInt32]], while
-   * in zcash they decided to make the nonce larger, a 256 byte number.
+   * in zcash they decided to make the nonce larger, a 32 byte number.
    * @return
    */
   def nonceBytes: Seq[Byte]
 
 }
 
-object ZcashBlockHeader {
-  private sealed case class ZcashBlockHeaderImpl(
+object ZcashBlockHeader extends Factory[ZcashBlockHeader] {
+  private case class ZcashBlockHeaderImpl(
     version: UInt32,
     previousBlockHash: DoubleSha256Digest,
     merkleRootHash: DoubleSha256Digest,
@@ -182,5 +182,8 @@ object ZcashBlockHeader {
       hashReserved, time, nBits, nonceBytes, solution)
   }
 
+  override def fromBytes(bytes: Seq[Byte]): ZcashBlockHeader = {
+    RawZcashBlockHeaderSerializer.read(bytes)
+  }
 }
 
