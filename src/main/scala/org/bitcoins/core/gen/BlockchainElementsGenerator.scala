@@ -3,10 +3,10 @@ package org.bitcoins.core.gen
 import org.bitcoins.core.consensus.Merkle
 import org.bitcoins.core.crypto.DoubleSha256Digest
 import org.bitcoins.core.number.UInt32
-import org.bitcoins.core.protocol.blockchain.{ BitcoinBlockHeader, Block, BlockHeader }
+import org.bitcoins.core.protocol.blockchain.{ BitcoinBlockHeader, Block, BlockHeader, ZcashBlockHeader }
 import org.bitcoins.core.protocol.transaction.{ EmptyTransaction, Transaction }
 import org.scalacheck.Gen
-
+import org.scalacheck.Arbitrary.arbitrary
 import scala.annotation.tailrec
 
 /**
@@ -95,3 +95,4 @@ sealed abstract class BlockchainElementsGenerator {
 }
 
 object BlockchainElementsGenerator extends BlockchainElementsGenerator
+

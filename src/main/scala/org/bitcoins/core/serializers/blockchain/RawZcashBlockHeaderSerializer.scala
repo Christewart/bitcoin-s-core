@@ -5,9 +5,10 @@ import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.CompactSizeUInt
 import org.bitcoins.core.protocol.blockchain.ZcashBlockHeader
 import org.bitcoins.core.serializers.RawBitcoinSerializer
+import org.bitcoins.core.util.BitcoinSLogger
 
 sealed abstract class RawZcashBlockHeaderSerializer extends RawBitcoinSerializer[ZcashBlockHeader] {
-
+  private val logger = BitcoinSLogger.logger
   override def read(bytes: List[Byte]): ZcashBlockHeader = {
     val version = UInt32(bytes.take(4).reverse)
     //previous header hash next 32 bytes
@@ -33,7 +34,8 @@ sealed abstract class RawZcashBlockHeaderSerializer extends RawBitcoinSerializer
     val compactSizeUInt = CompactSizeUInt.parse(rem)
     val len = compactSizeUInt.num.toInt
     val solution = rem.slice(compactSizeUInt.size, len + compactSizeUInt.size)
-    ZcashBlockHeader(version, prevBlockHash, merkleRoot, hashReserved, time, nBits, nonceBytes, solution)
+    ZcashBlockHeader(version, prevBlockHash, merkleRoot, hashReserved,
+      time, nBits, nonceBytes, solution)
   }
 
   override def write(blockHeader: ZcashBlockHeader): Seq[Byte] = {
@@ -45,9 +47,9 @@ sealed abstract class RawZcashBlockHeaderSerializer extends RawBitcoinSerializer
     val time = blockHeader.time.bytes.reverse
     val nBits = blockHeader.nBits.bytes.reverse
     val nonce = blockHeader.nonceBytes
-
+    val cmpctSolution = CompactSizeUInt.calc(blockHeader.solution)
     version ++ prevHash ++ merkleRoot ++ blockHeader.hashReserved.bytes ++
-      time ++ nBits ++ nonce ++ CompactSizeUInt.calc(blockHeader.solution).bytes ++
+      time ++ nBits ++ nonce ++ cmpctSolution.bytes ++
       blockHeader.solution
   }
 
