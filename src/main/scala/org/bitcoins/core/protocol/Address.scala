@@ -319,13 +319,13 @@ object P2PKHAddress {
   }
 
   /** Checks if an address is a valid p2pkh address */
-  def isP2PKHAddress(address: String): Boolean = Try(fromString(address)).isSuccess
+  def isP2PKHAddress(address: String): Boolean = Try(fromString(address, Networks.knownNetworks)).isSuccess
 
-  def fromString(address: String): P2PKHAddress = {
+  def fromString(address: String, validNetworks: Seq[NetworkParameters]): P2PKHAddress = {
     val decodeCheckP2PKH: Try[Seq[Byte]] = Base58.decodeCheck(address)
     decodeCheckP2PKH match {
       case Success(bytes) =>
-        val networkBytes: Option[(NetworkParameters, Seq[Byte])] = Networks.knownNetworks.map(n => (n, n.p2pkhNetworkByte))
+        val networkBytes: Option[(NetworkParameters, Seq[Byte])] = validNetworks.map(n => (n, n.p2pkhNetworkByte))
           .find {
             case (_, bs) =>
               bytes.startsWith(bs)
@@ -343,6 +343,9 @@ object P2PKHAddress {
         throw new IllegalArgumentException(s"Given address was not a valid P2PKH address, got: $address")
     }
   }
+
+  @deprecated("You need to provide a network to determine if a p2sh address is valid", "2018/05/07")
+  def fromString(address: String): P2PKHAddress = fromString(address, Networks.knownNetworks)
 
   /** Checks if an address is a valid p2pkh address */
   def isP2PKHAddress(address: BitcoinAddress): Boolean = isP2PKHAddress(address.value)
@@ -368,13 +371,16 @@ object P2SHAddress {
   def apply(hash: Sha256Hash160Digest, network: NetworkParameters): P2SHAddress = P2SHAddressImpl(hash, network)
 
   /** Checks if a address is a valid p2sh address */
-  def isP2SHAddress(address: String): Boolean = Try(fromString(address)).isSuccess
+  def isP2SHAddress(address: String): Boolean = Try(fromString(address, Networks.knownNetworks)).isSuccess
 
-  def fromString(address: String): P2SHAddress = {
+  /** Checks if a address is a valid p2sh address */
+  def isP2SHAddress(address: BitcoinAddress): Boolean = isP2SHAddress(address.value)
+
+  def fromString(address: String, validNetworks: Seq[NetworkParameters]): P2SHAddress = {
     val decodeCheckP2PKH: Try[Seq[Byte]] = Base58.decodeCheck(address)
     decodeCheckP2PKH match {
       case Success(bytes) =>
-        val networkBytes: Option[(NetworkParameters, Seq[Byte])] = Networks.knownNetworks.map(n => (n, n.p2shNetworkByte))
+        val networkBytes: Option[(NetworkParameters, Seq[Byte])] = validNetworks.map(n => (n, n.p2shNetworkByte))
           .find {
             case (_, bs) =>
               bytes.startsWith(bs)
@@ -386,14 +392,14 @@ object P2SHAddress {
             val payload = bytes.slice(p2shNetworkBytes.size, bytes.size)
             P2SHAddress(Sha256Hash160Digest(payload), network)
         }
-
         result.getOrElse(throw new IllegalArgumentException(s"Given address was not a valid P2PKH address, got: $address"))
       case Failure(exception) =>
         throw new IllegalArgumentException(s"Given address was not a valid P2PKH address, got: $address")
     }
   }
-  /** Checks if a address is a valid p2sh address */
-  def isP2SHAddress(address: BitcoinAddress): Boolean = isP2SHAddress(address.value)
+
+  @deprecated("You need to provide a network to determine if a p2sh address is valid", "2018/05/07")
+  def fromString(address: String): P2SHAddress = fromString(address, Networks.knownNetworks)
 
 }
 
@@ -472,5 +478,86 @@ object Address {
 
   def apply(spk: ScriptPubKey, networkParameters: NetworkParameters): Try[BitcoinAddress] = {
     fromScriptPubKey(spk, networkParameters)
+  }
+}
+
+sealed abstract class ZcashAddress extends Address {
+  override def networkParameters: ZCashNetwork
+}
+
+sealed abstract class ZcashP2PKHAddress extends ZcashAddress {
+
+  override def value: String = {
+    val versionByte = networkParameters.p2pkhNetworkByte
+    val bytes = versionByte ++ hash.bytes
+    val checksum = CryptoUtil.doubleSHA256(bytes).bytes.take(4)
+    Base58.encode(bytes ++ checksum)
+  }
+
+  override def hash: Sha256Hash160Digest
+  override def scriptPubKey: P2PKHScriptPubKey = P2PKHScriptPubKey(hash)
+
+}
+
+object ZcashP2PKHAddress {
+  private case class ZcashP2PKHAddressImpl(
+    hash: Sha256Hash160Digest,
+    networkParameters: ZCashNetwork) extends ZcashP2PKHAddress
+
+  def apply(hash: Sha256Hash160Digest, networkParameters: ZCashNetwork): ZcashP2PKHAddress = {
+    ZcashP2PKHAddressImpl(hash, networkParameters)
+  }
+
+  def fromString(str: String): ZcashP2PKHAddress = {
+    val p2pkhAddr = P2PKHAddress.fromString(str, ZCashNetworks.knownNetworks)
+    ZcashP2PKHAddress(p2pkhAddr.hash, p2pkhAddr.networkParameters.asInstanceOf[ZCashNetwork])
+  }
+}
+
+sealed abstract class ZcashP2SHAddress extends ZcashAddress {
+  /** The base58 string representation of this address */
+  override def value: String = {
+    val versionByte = networkParameters.p2shNetworkByte
+    val bytes = versionByte ++ hash.bytes
+    val checksum = CryptoUtil.doubleSHA256(bytes).bytes.take(4)
+    Base58.encode(bytes ++ checksum)
+  }
+
+  override def scriptPubKey = P2SHScriptPubKey(hash)
+
+  override def hash: Sha256Hash160Digest
+}
+
+object ZcashP2SHAddress {
+  private case class ZcashP2SHAddressImpl(hash: Sha256Hash160Digest, networkParameters: ZCashNetwork) extends ZcashP2SHAddress
+
+  def apply(hash: Sha256Hash160Digest, networkParameters: ZCashNetwork): ZcashP2SHAddress = {
+    ZcashP2SHAddressImpl(hash, networkParameters)
+  }
+
+  def fromString(str: String): ZcashP2SHAddress = {
+    val p2shAddr = P2SHAddress.fromString(str, ZCashNetworks.knownNetworks)
+    ZcashP2SHAddress(p2shAddr.hash, p2shAddr.networkParameters.asInstanceOf[ZCashNetwork])
+  }
+}
+
+object ZcashAddress {
+  def isValid(zcashAddr: String): Boolean = {
+    val decodeChecked = Base58.decodeCheck(zcashAddr)
+    decodeChecked.isSuccess
+  }
+
+  def fromString(value: String): ZcashAddress = {
+    val p2pkhTry = Try(ZcashP2PKHAddress.fromString(value))
+    if (p2pkhTry.isSuccess) {
+      p2pkhTry.get
+    } else {
+      val p2shTry = Try(ZcashP2SHAddress.fromString(value))
+      if (p2shTry.isSuccess) {
+        p2shTry.get
+      } else {
+        throw new IllegalArgumentException(s"Could not decode the given value to a ZcashAddress, got: $value")
+      }
+    }
   }
 }

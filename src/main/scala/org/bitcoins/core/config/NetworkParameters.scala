@@ -158,8 +158,10 @@ sealed abstract class Networks {
 }
 
 object Networks extends Networks {
-  val knownNetworks: Seq[NetworkParameters] = Seq(MainNet, TestNet3, RegTest) ++
-    ZCashNetworks.knownNetworks
+  val bitcoinNetworks = Seq(MainNet, TestNet3, RegTest)
+  val zcashNetworks = ZCashNetworks.knownNetworks
+  val knownNetworks: Seq[NetworkParameters] = bitcoinNetworks ++ zcashNetworks
+
   val secretKeyBytes = knownNetworks.map(_.privateKey)
   val p2pkhNetworkBytes = knownNetworks.map(_.p2pkhNetworkByte)
   val p2shNetworkBytes = knownNetworks.map(_.p2shNetworkByte)
