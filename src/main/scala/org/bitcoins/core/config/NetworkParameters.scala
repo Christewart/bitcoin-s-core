@@ -1,5 +1,6 @@
 package org.bitcoins.core.config
 
+import org.bitcoins.core.config
 import org.bitcoins.core.protocol.blockchain._
 
 /**
@@ -135,6 +136,21 @@ sealed abstract class ZCashRegTest extends ZCashNetwork {
 
 object ZCashRegTest extends ZCashRegTest
 
+object BitcoinNetworks extends Networks {
+  override val knownNetworks = Seq(MainNet, TestNet3, RegTest)
+
+  override def bytesToNetwork: Map[Seq[Byte], NetworkParameters] = Map(
+    MainNet.p2pkhNetworkByte -> MainNet,
+    MainNet.p2shNetworkByte -> MainNet,
+    MainNet.privateKey -> MainNet,
+
+    TestNet3.p2pkhNetworkByte -> TestNet3,
+    TestNet3.p2shNetworkByte -> TestNet3,
+    TestNet3.privateKey -> TestNet3
+  //omitting regtest as it has the network same network bytes as regtest
+  )
+}
+
 object ZCashNetworks extends Networks {
   val knownNetworks: Seq[ZCashNetwork] = Seq(ZCashMainNet, ZCashTestNet, ZCashRegTest)
 
@@ -158,7 +174,7 @@ sealed abstract class Networks {
 }
 
 object Networks extends Networks {
-  val bitcoinNetworks = Seq(MainNet, TestNet3, RegTest)
+  val bitcoinNetworks = BitcoinNetworks.knownNetworks
   val zcashNetworks = ZCashNetworks.knownNetworks
   val knownNetworks: Seq[NetworkParameters] = bitcoinNetworks ++ zcashNetworks
 
@@ -166,14 +182,5 @@ object Networks extends Networks {
   val p2pkhNetworkBytes = knownNetworks.map(_.p2pkhNetworkByte)
   val p2shNetworkBytes = knownNetworks.map(_.p2shNetworkByte)
 
-  def bytesToNetwork: Map[Seq[Byte], NetworkParameters] = Map(
-    MainNet.p2shNetworkByte -> MainNet,
-    MainNet.p2pkhNetworkByte -> MainNet,
-    MainNet.privateKey -> MainNet,
-
-    TestNet3.p2pkhNetworkByte -> TestNet3,
-    TestNet3.p2shNetworkByte -> TestNet3,
-    TestNet3.privateKey -> TestNet3
-  //ommitting regtest as it has the same network bytes as testnet3
-  ) ++ ZCashNetworks.bytesToNetwork
+  def bytesToNetwork: Map[Seq[Byte], NetworkParameters] = BitcoinNetworks.bytesToNetwork ++ ZCashNetworks.bytesToNetwork
 }

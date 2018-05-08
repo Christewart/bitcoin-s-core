@@ -4,6 +4,8 @@ import org.bitcoins.core.config.{ ZCashRegTest, ZCashTestNet }
 import org.bitcoins.core.gen.AddressGenerator
 import org.scalacheck.{ Gen, Prop, Properties }
 
+import scala.util.Try
+
 class ZcashAddressSpec extends Properties("ZcashAddressSpec") {
 
   property("serialization symmetry for p2pkh") = {
@@ -42,7 +44,12 @@ class ZcashAddressSpec extends Properties("ZcashAddressSpec") {
         ZcashAddress.fromString(addr.value) == addr
       }
       bool
+    }
+  }
 
+  property("always fail to parse a bitcoin address") = {
+    Prop.forAll(AddressGenerator.address) { addr: BitcoinAddress =>
+      Try(ZcashAddress.fromString(addr.value)).isFailure
     }
   }
 

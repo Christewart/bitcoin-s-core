@@ -4,7 +4,7 @@ import org.bitcoins.core.config.ZCashRegTest
 import org.bitcoins.core.crypto.ECPrivateKey
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.{ Int64, UInt32 }
-import org.bitcoins.core.protocol.Address
+import org.bitcoins.core.protocol.{ Address, ZcashAddress }
 import org.bitcoins.core.protocol.script.{ MultiSignatureScriptPubKey, P2SHScriptPubKey }
 import org.bitcoins.core.protocol.transaction.{ Transaction, TransactionOutPoint, TransactionOutput }
 import org.bitcoins.core.script.crypto.HashType
@@ -53,11 +53,11 @@ tmA3mCo2QLqeX81tba3WC8eqdMj8phk8Hus
     val outPoint = TransactionOutPoint(creditingTx.txId, UInt32.zero)
     val output = creditingTx.outputs(outPoint.vout.toInt)
     val privKey = ECPrivateKey.fromWIFToPrivateKey("cTyw5hyEdAVRLX4BFdh53afYEqGLvw8y3gvVBHWp9xzZqCzBx3xB")
-    val destinationAddr = Address("tmA3mCo2QLqeX81tba3WC8eqdMj8phk8Hus").get
+    val destinationAddr = ZcashAddress.fromString("tmA3mCo2QLqeX81tba3WC8eqdMj8phk8Hus")
     val destinationSPK = destinationAddr.scriptPubKey
     val destinationOutput = TransactionOutput(Satoshis(Int64(5000000)), destinationSPK)
-    val changeAddr = Address("tmNvSvUdNhRujft8eq6AJvi7dAUS3NnoGFo")
-    val changeSPK = changeAddr.get.scriptPubKey
+    val changeAddr = ZcashAddress.fromString("tmNvSvUdNhRujft8eq6AJvi7dAUS3NnoGFo")
+    val changeSPK = changeAddr.scriptPubKey
     val feeRate = SatoshisPerVirtualByte(Satoshis(Int64(5)))
     val network = ZCashRegTest
     val utxos = ZcashUTXOSpendingInfo(outPoint, output, Seq(privKey), None, None, HashType.sigHashAll)
@@ -125,9 +125,9 @@ tmA3mCo2QLqeX81tba3WC8eqdMj8phk8Hus
         o.scriptPubKey == p2sh
     }.get
     val outPoint = TransactionOutPoint(creditingTx.txId, UInt32(idx))
-    val destinationSPK = Address("tmVB1PX3HGyKv5y2UbT6D8cWhDH6Z4BcqoR").get.scriptPubKey
+    val destinationSPK = ZcashAddress.fromString("tmVB1PX3HGyKv5y2UbT6D8cWhDH6Z4BcqoR").scriptPubKey
     val destinationOutput = TransactionOutput(Satoshis(Int64(5000000)), destinationSPK)
-    val changeSPK = Address("tmHsHDDtWvnRV2eUZEEcyQ6EYKE6HJqEXkn").get.scriptPubKey
+    val changeSPK = ZcashAddress.fromString("tmHsHDDtWvnRV2eUZEEcyQ6EYKE6HJqEXkn").scriptPubKey
     val feeRate = SatoshisPerVirtualByte(Satoshis(Int64(5)))
     val network = ZCashRegTest
     val utxos = ZcashUTXOSpendingInfo(outPoint, output, privKeys, Some(multisig), None, HashType.sigHashAll)

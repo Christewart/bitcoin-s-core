@@ -6,6 +6,8 @@ import org.bitcoins.core.protocol.script.P2SHScriptPubKey
 import org.bitcoins.core.util.CryptoUtil
 import org.scalacheck.{ Prop, Properties }
 
+import scala.util.Try
+
 /**
  * Created by chris on 7/21/16.
  */
@@ -44,6 +46,12 @@ class BitcoinAddressSpec extends Properties("BitcoinAddressSpec") {
       val spk = addr.scriptPubKey
       val network = addr.networkParameters
       Address.fromScriptPubKey(spk, network).get == addr
+    }
+  }
+
+  property("fail to parse a zcash address") = {
+    Prop.forAll(AddressGenerator.zcashAddress) { zaddr =>
+      Try(BitcoinAddress.fromString(zaddr.value)).isFailure
     }
   }
 }

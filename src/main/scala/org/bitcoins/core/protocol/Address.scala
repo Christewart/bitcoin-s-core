@@ -104,12 +104,16 @@ object Bech32Address {
     //we don't encode the wit version or pushop for program into base5
     val prog = UInt8.toUInt8s(witSPK.asmBytes.tail.tail)
     val encoded = Bech32Address.encode(prog)
-    val hrp = networkParameters match {
-      case _: MainNet => bc
-      case _: TestNet3 | _: RegTest => tb
+    val hrpTry: Try[HumanReadablePart] = networkParameters match {
+      case _: MainNet => Success(bc)
+      case _: TestNet3 | _: RegTest => Success(tb)
+      case _: ZCashMainNet | _: ZCashTestNet | _: ZCashRegTest =>
+        Failure(new IllegalArgumentException("Cannot create a bech32 address from a zcash network"))
     }
     val witVersion = witSPK.witnessVersion.version.toLong.toShort
-    encoded.map(e => Bech32Address(hrp, Seq(UInt8(witVersion)) ++ e))
+    hrpTry.flatMap { hrp =>
+      encoded.map(e => Bech32Address(hrp, Seq(UInt8(witVersion)) ++ e))
+    }
   }
 
   def apply(hrp: HumanReadablePart, data: Seq[UInt8]): Bech32Address = {
@@ -415,11 +419,11 @@ object BitcoinAddress {
   def apply(value: String): BitcoinAddress = fromString(value)
 
   def fromString(value: String): BitcoinAddress = {
-    val p2pkhTry = Try(P2PKHAddress.fromString(value))
+    val p2pkhTry = Try(P2PKHAddress.fromString(value, BitcoinNetworks.knownNetworks))
     if (p2pkhTry.isSuccess) {
       p2pkhTry.get
     } else {
-      val p2shTry = Try(P2SHAddress.fromString(value))
+      val p2shTry = Try(P2SHAddress.fromString(value, BitcoinNetworks.knownNetworks))
       if (p2shTry.isSuccess) {
         p2shTry.get
       } else {
@@ -504,6 +508,15 @@ object ZcashP2PKHAddress {
     hash: Sha256Hash160Digest,
     networkParameters: ZCashNetwork) extends ZcashP2PKHAddress
 
+  def apply(pubKey: ECPublicKey, networkParameters: ZCashNetwork): ZcashP2PKHAddress = {
+    val hash = CryptoUtil.sha256Hash160(pubKey.bytes)
+    ZcashP2PKHAddress(hash, networkParameters)
+  }
+
+  def apply(spk: P2PKHScriptPubKey, networkParameters: ZCashNetwork): ZcashP2PKHAddress = {
+    ZcashP2PKHAddress(spk.pubKeyHash, networkParameters)
+  }
+
   def apply(hash: Sha256Hash160Digest, networkParameters: ZCashNetwork): ZcashP2PKHAddress = {
     ZcashP2PKHAddressImpl(hash, networkParameters)
   }
@@ -533,6 +546,15 @@ object ZcashP2SHAddress {
 
   def apply(hash: Sha256Hash160Digest, networkParameters: ZCashNetwork): ZcashP2SHAddress = {
     ZcashP2SHAddressImpl(hash, networkParameters)
+  }
+
+  def apply(scriptPubKey: ScriptPubKey, network: ZCashNetwork): ZcashP2SHAddress = {
+    val p2shScriptPubKey = P2SHScriptPubKey(scriptPubKey)
+    ZcashP2SHAddress(p2shScriptPubKey, network)
+  }
+
+  def apply(p2shScriptPubKey: P2SHScriptPubKey, network: ZCashNetwork): ZcashP2SHAddress = {
+    ZcashP2SHAddress(p2shScriptPubKey.scriptHash, network)
   }
 
   def fromString(str: String): ZcashP2SHAddress = {
