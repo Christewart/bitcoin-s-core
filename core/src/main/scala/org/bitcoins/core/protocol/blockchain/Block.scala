@@ -23,7 +23,7 @@ sealed abstract class Block extends NetworkElement {
    * The total number of transactions in this block,
    * including the coinbase transaction.
    */
-  def txCount: CompactSizeUInt
+  def txCount: CompactSizeUInt = CompactSizeUInt(UInt64(transactions.size))
 
   /** The transactions contained in this block */
   def transactions: Seq[Transaction]
@@ -50,17 +50,11 @@ sealed abstract class Block extends NetworkElement {
  */
 object Block extends Factory[Block] {
 
-  private sealed case class BlockImpl(
-    blockHeader: BlockHeader,
-    txCount: CompactSizeUInt, transactions: Seq[Transaction]) extends Block
-
-  def apply(blockHeader: BlockHeader, txCount: CompactSizeUInt, transactions: Seq[Transaction]): Block = {
-    BlockImpl(blockHeader, txCount, transactions)
-  }
+  private case class BlockImpl(
+    blockHeader: BlockHeader, transactions: Seq[Transaction]) extends Block
 
   def apply(blockHeader: BlockHeader, transactions: Seq[Transaction]): Block = {
-    val txCount = CompactSizeUInt(UInt64(transactions.size))
-    Block(blockHeader, txCount, transactions)
+    BlockImpl(blockHeader, transactions)
   }
 
   def fromBytes(bytes: Seq[Byte]): Block = RawBlockSerializer.read(bytes)

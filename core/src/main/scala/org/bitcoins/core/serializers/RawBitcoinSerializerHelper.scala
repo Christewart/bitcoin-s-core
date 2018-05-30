@@ -1,6 +1,7 @@
 package org.bitcoins.core.serializers
 
 import org.bitcoins.core.number.UInt64
+import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.protocol.{ CompactSizeUInt, NetworkElement }
 import org.bitcoins.core.util.BitcoinSLogger
 
@@ -18,10 +19,15 @@ sealed abstract class RawSerializerHelper {
     val count = CompactSizeUInt.parse(bytes)
     val payload = bytes.splitAt(count.size.toInt)._2
     def loop(accum: Seq[T], remaining: Seq[Byte]): (Seq[T], Seq[Byte]) = {
+      logger.debug(s"count.num ${count.num}")
       if (accum.size == count.num.toInt) {
         (accum.reverse, remaining)
       } else {
         val parsed = constructor(remaining)
+        if (parsed.isInstanceOf[Transaction]) {
+          logger.debug(s"parsed: $parsed")
+        }
+
         val (_, newRemaining) = remaining.splitAt(parsed.size)
         loop(parsed +: accum, newRemaining)
       }

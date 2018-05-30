@@ -3,6 +3,7 @@ package org.bitcoins.core.serializers.transaction
 import org.bitcoins.core.number.{ Int32, UInt32 }
 import org.bitcoins.core.protocol.transaction.{ BaseTransaction, TransactionInput, TransactionOutput }
 import org.bitcoins.core.serializers.{ RawBitcoinSerializer, RawSerializerHelper }
+import org.bitcoins.core.util.{ BitcoinSLogger, BitcoinSUtil }
 
 /**
  * Created by chris on 1/14/16.
@@ -11,11 +12,13 @@ import org.bitcoins.core.serializers.{ RawBitcoinSerializer, RawSerializerHelper
  */
 sealed abstract class RawBaseTransactionParser extends RawBitcoinSerializer[BaseTransaction] {
 
-  val helper = RawSerializerHelper
+  private val logger = BitcoinSLogger.logger
+  private val helper = RawSerializerHelper
   def read(bytes: List[Byte]): BaseTransaction = {
     val versionBytes = bytes.take(4)
     val version = Int32(versionBytes.reverse)
     val txInputBytes = bytes.slice(4, bytes.size)
+    logger.debug(s"parsing input bytes ${BitcoinSUtil.encodeHex(txInputBytes)}")
     val (inputs, outputBytes) = helper.parseCmpctSizeUIntSeq(txInputBytes, RawTransactionInputParser.read(_))
     val (outputs, lockTimeBytes) = helper.parseCmpctSizeUIntSeq(
       outputBytes,

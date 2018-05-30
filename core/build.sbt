@@ -7,7 +7,6 @@ testOptions in Test += Tests.Argument(TestFrameworks.ScalaCheck, "-verbosity", "
 
 //test in assembly := {}
 
-//testOptions in Test += Tests.Argument("-oF")
 
 //parallelExecution in Test := false
 

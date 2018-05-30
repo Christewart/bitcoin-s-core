@@ -3,6 +3,7 @@ package org.bitcoins.core.serializers.blockchain
 import org.bitcoins.core.protocol.blockchain.{ Block, BlockHeader }
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.serializers.{ RawBitcoinSerializer, RawSerializerHelper }
+import org.bitcoins.core.util.BitcoinSLogger
 
 /**
  * Created by chris on 5/20/16.
@@ -10,7 +11,7 @@ import org.bitcoins.core.serializers.{ RawBitcoinSerializer, RawSerializerHelper
  * https://bitcoin.org/en/developer-reference#serialized-blocks
  */
 sealed abstract class RawBlockSerializer extends RawBitcoinSerializer[Block] {
-
+  private val logger = BitcoinSLogger.logger
   /** Takes a list of bytes and converts it into a Block */
   def read(bytes: List[Byte]): Block = {
     val blockHeader: BlockHeader = BlockHeader(bytes.take(80))
