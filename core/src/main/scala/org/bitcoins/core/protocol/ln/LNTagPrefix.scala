@@ -1,4 +1,4 @@
-package org.bitcoins.core.protocol
+package org.bitcoins.core.protocol.ln
 
 sealed abstract class LNTagPrefix {
   def value: String
