@@ -1,13 +1,25 @@
-
-
-lazy val compilerOpts =
-  List("-unchecked", "-deprecation", "-feature", "-Xmax-classfile-name", "128")
+lazy val compilerOpts = List("-unchecked", "-deprecation", "-feature", "-Xmax-classfile-name","128")
 
 lazy val commonSettings = List(
+  test in assembly := {},
   scalacOptions := compilerOpts,
-  assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false)
+  assemblyOption in assembly := (assemblyOption in assembly).value.copy(includeScala = false),
   //testOptions in Test += Tests.Argument(TestFrameworks.ScalaTest, "-oF")
+  scalaVersion := "2.11.12",
+
+  //artifactory stuff
+  resolvers += 
+    "Artifactory" at "http://artifactory.suredbits.com:8081/artifactory/suredbits-api/",
+
+  //release publication
+  publishTo := Some("Artifactory Realm" at "http://artifactory.suredbits.com:8081/artifactory/suredbits-api"),
+  credentials += Credentials("Artifactory Realm", "artifactory.suredbits.com", "admin", System.getenv("ARTIFACTORY_PW")),
+
+  //snapshot publication
+  publishTo := Some("Artifactory Realm" at "http://artifactory.suredbits.com:8081/artifactory/suredbits-api;build.timestamp=" + new java.util.Date().getTime),
+  credentials += Credentials("Artifactory Realm", "artifactory.suredbits.com", "admin", System.getenv("ARTIFACTORY_PW"))
 )
+
 lazy val root = project
     .in(file("."))
     .aggregate(
