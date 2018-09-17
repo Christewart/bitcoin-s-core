@@ -1,7 +1,7 @@
 package org.bitcoins.core.gen
 
 import org.bitcoins.core.currency.{ Bitcoins, CurrencyUnit, CurrencyUnits, Satoshis }
-import org.bitcoins.core.number.{ Int32, Int64 }
+import org.bitcoins.core.number.Int64
 import org.bitcoins.core.protocol.ln._
 import org.scalacheck.Gen
 
@@ -35,21 +35,21 @@ object CurrencyUnitGenerator extends CurrencyUnitGenerator
 
 trait LnCurrencyUnitGenerator {
 
-  def milliBitcoin: Gen[MilliBitcoins] = for {
-    amount <- Gen.choose(MilliBitcoins.min.toLong, MilliBitcoins.max.toLong)
-  } yield MilliBitcoins(amount)
+  def milliBitcoin: Gen[MilliSatoshis] = for {
+    amount <- Gen.choose(MilliSatoshis.min.toLong, MilliSatoshis.max.toLong)
+  } yield MilliSatoshis(amount)
 
-  def microBitcoin: Gen[MicroBitcoins] = for {
-    amount <- Gen.choose(MicroBitcoins.min.toLong, MicroBitcoins.max.toLong)
-  } yield MicroBitcoins(amount)
+  def microBitcoin: Gen[MicroSatoshis] = for {
+    amount <- Gen.choose(MicroSatoshis.min.toLong, MicroSatoshis.max.toLong)
+  } yield MicroSatoshis(amount)
 
-  def nanoBitcoin: Gen[NanoBitcoins] = for {
-    amount <- Gen.choose(NanoBitcoins.min.toLong, NanoBitcoins.max.toLong)
-  } yield NanoBitcoins(amount)
+  def nanoBitcoin: Gen[NanoSatoshis] = for {
+    amount <- Gen.choose(NanoSatoshis.min.toLong, NanoSatoshis.max.toLong)
+  } yield NanoSatoshis(amount)
 
-  def picoBitcoin: Gen[PicoBitcoins] = for {
-    amount <- Gen.choose(PicoBitcoins.min.toLong, PicoBitcoins.max.toLong)
-  } yield PicoBitcoins(amount)
+  def picoBitcoin: Gen[PicoSatoshis] = for {
+    amount <- Gen.choose(PicoSatoshis.min.toLong, PicoSatoshis.max.toLong)
+  } yield PicoSatoshis(amount)
 
   def lnCurrencyUnit: Gen[LnCurrencyUnit] = Gen.oneOf(milliBitcoin, microBitcoin, nanoBitcoin, picoBitcoin)
 

@@ -3,44 +3,44 @@ package org.bitcoins.core.protocol.ln
 import org.scalatest.{ FlatSpec, MustMatchers }
 
 class LnCurrencyUnitTest extends FlatSpec with MustMatchers {
-  it must "serialize MilliBitcoins to string" in {
-    val milliBitcoins = MilliBitcoins(1000)
-    milliBitcoins.toEncodedString must be("1000m")
+  it must "serialize MilliSatoshis to string" in {
+    val milliSatoshis = MilliSatoshis(1000)
+    milliSatoshis.toEncodedString must be("1000m")
   }
 
-  it must "serialize MicroBitcoins to string" in {
-    val microBitcoins = MicroBitcoins(1000)
-    microBitcoins.toEncodedString must be("1000u")
+  it must "serialize MicroSatoshis to string" in {
+    val microSatoshis = MicroSatoshis(1000)
+    microSatoshis.toEncodedString must be("1000u")
   }
 
-  it must "serialize NanoBitcoins to string" in {
-    val nanoBitcoins = NanoBitcoins(1000)
-    nanoBitcoins.toEncodedString must be("1000n")
+  it must "serialize NanoSatoshis to string" in {
+    val nanoSatoshis = NanoSatoshis(1000)
+    nanoSatoshis.toEncodedString must be("1000n")
   }
 
-  it must "serialize PicoBitcoins to string" in {
-    val picoBitcoins = PicoBitcoins(1000)
-    picoBitcoins.toEncodedString must be("1000p")
+  it must "serialize PicoSatoshis to string" in {
+    val picoSatoshis = PicoSatoshis(1000)
+    picoSatoshis.toEncodedString must be("1000p")
   }
 
-  it must "deserialize MilliBitcoins from string" in {
+  it must "deserialize MilliSatoshis from string" in {
     val input = "1000m"
-    LnCurrencyUnits.fromEncodedString(input).get must be(MilliBitcoins(1000))
+    LnCurrencyUnits.fromEncodedString(input).get must be(MilliSatoshis(1000))
   }
 
-  it must "deserialize MicroBitcoins from string" in {
+  it must "deserialize MicroSatoshis from string" in {
     val input = "1000u"
-    LnCurrencyUnits.fromEncodedString(input).get must be(MicroBitcoins(1000))
+    LnCurrencyUnits.fromEncodedString(input).get must be(MicroSatoshis(1000))
   }
 
-  it must "deserialize NanoBitcoins from string" in {
+  it must "deserialize NanoSatoshis from string" in {
     val input = "1000n"
-    LnCurrencyUnits.fromEncodedString(input).get must be(NanoBitcoins(1000))
+    LnCurrencyUnits.fromEncodedString(input).get must be(NanoSatoshis(1000))
   }
 
-  it must "deserialize PicoBitcoins from string" in {
+  it must "deserialize PicoSatoshis from string" in {
     val input = "1000p"
-    LnCurrencyUnits.fromEncodedString(input).get must be(PicoBitcoins(1000))
+    LnCurrencyUnits.fromEncodedString(input).get must be(PicoSatoshis(1000))
   }
 
   it must "fail to deserialize an invalid amount" in {
@@ -58,90 +58,90 @@ class LnCurrencyUnitTest extends FlatSpec with MustMatchers {
     LnCurrencyUnits.fromEncodedString(input).isFailure must be(true)
   }
 
-  it must "have the correct maximum and minimum number representation for MilliBitcoins" in {
-    MilliBitcoins.max must be(MilliBitcoins(9223372036L))
-    MilliBitcoins.min must be(MilliBitcoins(-9223372036L))
+  it must "have the correct maximum and minimum number representation for MilliSatoshis" in {
+    MilliSatoshis.max must be(MilliSatoshis(9223372036L))
+    MilliSatoshis.min must be(MilliSatoshis(-9223372036L))
   }
 
-  it must "have the correct maximum and minimum number representation for MicroBitcoins" in {
-    MicroBitcoins.max must be(MicroBitcoins(9223372036854L))
-    MicroBitcoins.min must be(MicroBitcoins(-9223372036854L))
+  it must "have the correct maximum and minimum number representation for MicroSatoshis" in {
+    MicroSatoshis.max must be(MicroSatoshis(9223372036854L))
+    MicroSatoshis.min must be(MicroSatoshis(-9223372036854L))
   }
 
-  it must "have the correct maximum and minimum number representation for NanoBitcoins" in {
-    NanoBitcoins.max must be(NanoBitcoins(9223372036854775L))
-    NanoBitcoins.min must be(NanoBitcoins(-9223372036854775L))
+  it must "have the correct maximum and minimum number representation for NanoSatoshis" in {
+    NanoSatoshis.max must be(NanoSatoshis(9223372036854775L))
+    NanoSatoshis.min must be(NanoSatoshis(-9223372036854775L))
   }
 
-  it must "have the correct maximum and minimum number representation for PicoBitcoins" in {
-    PicoBitcoins.max must be(PicoBitcoins(9223372036854775807L))
-    PicoBitcoins.min must be(PicoBitcoins(-9223372036854775808L))
+  it must "have the correct maximum and minimum number representation for PicoSatoshis" in {
+    PicoSatoshis.max must be(PicoSatoshis(9223372036854775807L))
+    PicoSatoshis.min must be(PicoSatoshis(-9223372036854775808L))
   }
 
   it must "fail to create a MilliBitcoin outside of the maximum range" in {
     intercept[IllegalArgumentException] {
-      MilliBitcoins(LnPolicy.maxMilliBitcoins + 1)
+      MilliSatoshis(LnPolicy.maxMilliSatoshis + 1)
     }
   }
 
   it must "fail to create a MicroBitcoin outside of the maximum range" in {
     intercept[IllegalArgumentException] {
-      MicroBitcoins(LnPolicy.maxMicroBitcoins + 1)
+      MicroSatoshis(LnPolicy.maxMicroSatoshis + 1)
     }
   }
 
   it must "fail to create a NanoBitcoin outside of the maximum range" in {
     intercept[IllegalArgumentException] {
-      NanoBitcoins(LnPolicy.maxNanoBitcoins + 1)
+      NanoSatoshis(LnPolicy.maxNanoSatoshis + 1)
     }
   }
 
   it must "fail to create a PicoBitcion outside of the maximum range" in {
     intercept[IllegalArgumentException] {
-      PicoBitcoins(LnPolicy.maxPicoBitcoins + 1)
+      PicoSatoshis(LnPolicy.maxPicoSatoshis + 1)
     }
   }
 
   it must "fail to create a MilliBitcoin outside of the minimum range" in {
     intercept[IllegalArgumentException] {
-      MilliBitcoins(LnPolicy.minMilliBitcoins - 1)
+      MilliSatoshis(LnPolicy.minMilliSatoshis - 1)
     }
   }
 
   it must "fail to create a MicroBitcoin outside of the minimum range" in {
     intercept[IllegalArgumentException] {
-      MicroBitcoins(LnPolicy.minMicroBitcoins - 1)
+      MicroSatoshis(LnPolicy.minMicroSatoshis - 1)
     }
   }
 
   it must "fail to create a NanoBitcoin outside of the minimum range" in {
     intercept[IllegalArgumentException] {
-      NanoBitcoins(LnPolicy.minNanoBitcoins - 1)
+      NanoSatoshis(LnPolicy.minNanoSatoshis - 1)
     }
   }
 
   it must "fail to create a PicoBitcion outside of the minimum range" in {
     intercept[IllegalArgumentException] {
-      PicoBitcoins(LnPolicy.minPicoBitcoins - 1)
+      PicoSatoshis(LnPolicy.minPicoSatoshis - 1)
     }
   }
 
   it must "have the correct representation for 0" in {
-    MilliBitcoins.zero must be(MilliBitcoins(0))
-    MicroBitcoins.zero must be(MicroBitcoins(0))
-    NanoBitcoins.zero must be(NanoBitcoins(0))
-    PicoBitcoins.zero must be(PicoBitcoins(0))
-    LnCurrencyUnits.zero must be(PicoBitcoins(0))
+    MilliSatoshis.zero must be(MilliSatoshis(0))
+    MicroSatoshis.zero must be(MicroSatoshis(0))
+    NanoSatoshis.zero must be(NanoSatoshis(0))
+    PicoSatoshis.zero must be(PicoSatoshis(0))
+    LnCurrencyUnits.zero must be(PicoSatoshis(0))
   }
 
   it must "have the correct representation for 1" in {
-    MilliBitcoins.one must be(MilliBitcoins(1))
-    MicroBitcoins.one must be(MicroBitcoins(1))
-    NanoBitcoins.one must be(NanoBitcoins(1))
-    PicoBitcoins.one must be(PicoBitcoins(1))
-    LnCurrencyUnits.oneMilliBTC must be(MilliBitcoins(1))
-    LnCurrencyUnits.oneMicroBTC must be(MicroBitcoins(1))
-    LnCurrencyUnits.oneNanoBTC must be(NanoBitcoins(1))
-    LnCurrencyUnits.onePicoBTC must be(PicoBitcoins(1))
+    MilliSatoshis.one must be(MilliSatoshis(1))
+    MicroSatoshis.one must be(MicroSatoshis(1))
+    NanoSatoshis.one must be(NanoSatoshis(1))
+    PicoSatoshis.one must be(PicoSatoshis(1))
+    LnCurrencyUnits.oneMilliBTC must be(MilliSatoshis(1))
+    LnCurrencyUnits.oneMicroBTC must be(MicroSatoshis(1))
+    LnCurrencyUnits.oneNanoBTC must be(NanoSatoshis(1))
+    LnCurrencyUnits.onePicoBTC must be(PicoSatoshis(1))
   }
 }

@@ -16,8 +16,8 @@ class LnCurrencyUnitSpec extends Properties("LnCurrencyUnitSpec") {
   property("Add two LnCurrencyUnits") =
     Prop.forAll(LnCurrencyUnitGenerator.lnCurrencyUnit, LnCurrencyUnitGenerator.lnCurrencyUnit) { (num1: LnCurrencyUnit, num2: LnCurrencyUnit) =>
       val result: Try[LnCurrencyUnit] = Try(num1 + num2)
-      if (result.isSuccess && result.get >= PicoBitcoins.min &&
-        result.get <= PicoBitcoins.max) num1 + num2 == result.get
+      if (result.isSuccess && result.get >= PicoSatoshis.min &&
+        result.get <= PicoSatoshis.max) num1 + num2 == result.get
       else Try(num1 + num2).isFailure
     }
 
@@ -29,8 +29,8 @@ class LnCurrencyUnitSpec extends Properties("LnCurrencyUnitSpec") {
   property("Subtract two LnCurrencyUnit values") =
     Prop.forAll(LnCurrencyUnitGenerator.lnCurrencyUnit, LnCurrencyUnitGenerator.lnCurrencyUnit) { (num1: LnCurrencyUnit, num2: LnCurrencyUnit) =>
       val result: Try[LnCurrencyUnit] = Try(num1 - num2)
-      if (result.isSuccess && result.get >= PicoBitcoins.min &&
-        result.get <= PicoBitcoins.max) num1 - num2 == result.get
+      if (result.isSuccess && result.get >= PicoSatoshis.min &&
+        result.get <= PicoSatoshis.max) num1 - num2 == result.get
       else Try(num1 - num2).isFailure
     }
 
@@ -47,8 +47,8 @@ class LnCurrencyUnitSpec extends Properties("LnCurrencyUnitSpec") {
   property("Multiply two LnCurrencyUnit values") =
     Prop.forAll(LnCurrencyUnitGenerator.lnCurrencyUnit, LnCurrencyUnitGenerator.lnCurrencyUnit) { (num1: LnCurrencyUnit, num2: LnCurrencyUnit) =>
       val result: Try[LnCurrencyUnit] = Try(num1 * num2)
-      if (result.isSuccess && result.get >= PicoBitcoins.min &&
-        result.get <= PicoBitcoins.max) num1 * num2 == result.get
+      if (result.isSuccess && result.get >= PicoSatoshis.min &&
+        result.get <= PicoSatoshis.max) num1 * num2 == result.get
       else Try(num1 * num2).isFailure
     }
 

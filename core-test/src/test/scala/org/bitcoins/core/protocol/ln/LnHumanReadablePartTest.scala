@@ -7,8 +7,11 @@ import org.scalatest.{ FlatSpec, MustMatchers }
 import scala.util.Try
 
 class LnHumanReadablePartTest extends FlatSpec with MustMatchers {
-  val mBtc = MilliBitcoins(1000)
+  val mBtc = MilliSatoshis(1000)
   val mBtcOpt = Some(mBtc)
+
+  behavior of "LnHumanReadablePart"
+
   it must "match the correct hrp with the correct network" in {
     LnHumanReadablePart(MainNet).get must be(LnHumanReadablePart(LnBitcoinMainNet))
     LnHumanReadablePart(TestNet3).get must be(LnHumanReadablePart(LnBitcoinTestNet))
@@ -30,9 +33,9 @@ class LnHumanReadablePartTest extends FlatSpec with MustMatchers {
   }
 
   it must "fail to create hrp from invalid amount" in {
-    val tooBig = Some(MilliBitcoins(LnPolicy.maxAmountMSat.toBigInt + 1))
+    val tooBig = Some(MilliSatoshis(LnPolicy.maxAmountMSat.toBigInt + 1))
     val zero = Some(LnCurrencyUnits.zero)
-    val tooSmall = Some(MilliBitcoins(-1))
+    val tooSmall = Some(MilliSatoshis(-1))
 
     Try(LnHumanReadablePart(LnBitcoinMainNet, tooBig)).isFailure must be(true)
     Try(LnHumanReadablePart(LnBitcoinMainNet, zero)).isFailure must be(true)

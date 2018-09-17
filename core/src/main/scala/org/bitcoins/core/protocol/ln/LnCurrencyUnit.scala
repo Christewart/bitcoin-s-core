@@ -1,12 +1,12 @@
 package org.bitcoins.core.protocol.ln
 
-import org.bitcoins.core.currency.{ Bitcoins, Satoshis }
+import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.{ BaseNumbers, Int64 }
 import org.bitcoins.core.protocol.NetworkElement
 import scodec.bits.ByteVector
 
 import scala.math.BigDecimal.RoundingMode
-import scala.util.{ Failure, Success, Try }
+import scala.util.{ Failure, Try }
 
 sealed abstract class LnCurrencyUnit extends NetworkElement {
   type A
@@ -36,19 +36,19 @@ sealed abstract class LnCurrencyUnit extends NetworkElement {
   def ==(ln: LnCurrencyUnit): Boolean = toPicoBitcoinValue == ln.toPicoBitcoinValue
 
   def +(ln: LnCurrencyUnit): LnCurrencyUnit = {
-    PicoBitcoins(toPicoBitcoinValue + ln.toPicoBitcoinValue)
+    PicoSatoshis(toPicoBitcoinValue + ln.toPicoBitcoinValue)
   }
 
   def -(ln: LnCurrencyUnit): LnCurrencyUnit = {
-    PicoBitcoins(toPicoBitcoinValue - ln.toPicoBitcoinValue)
+    PicoSatoshis(toPicoBitcoinValue - ln.toPicoBitcoinValue)
   }
 
   def *(ln: LnCurrencyUnit): LnCurrencyUnit = {
-    PicoBitcoins(toPicoBitcoinValue * ln.toPicoBitcoinValue)
+    PicoSatoshis(toPicoBitcoinValue * ln.toPicoBitcoinValue)
   }
 
   def unary_- : LnCurrencyUnit = {
-    PicoBitcoins(-toPicoBitcoinValue)
+    PicoSatoshis(-toPicoBitcoinValue)
   }
 
   override def bytes: ByteVector = Int64(toPicoBitcoinValue).bytes.reverse
@@ -74,7 +74,7 @@ sealed abstract class LnCurrencyUnit extends NetworkElement {
   def toEncodedString: String = this.toBigInt + this.character.toString()
 }
 
-sealed abstract class MilliBitcoins extends LnCurrencyUnit {
+sealed abstract class MilliSatoshis extends LnCurrencyUnit {
   override type A = BigInt
 
   override def character: Char = 'm'
@@ -90,23 +90,23 @@ sealed abstract class MilliBitcoins extends LnCurrencyUnit {
   override def toPicoBitcoinValue: BigInt = LnCurrencyUnits.toPicoBitcoinValue(this)
 }
 
-object MilliBitcoins extends BaseNumbers[MilliBitcoins] {
-  val min = MilliBitcoins(LnPolicy.minMilliBitcoins)
-  val max = MilliBitcoins(LnPolicy.maxMilliBitcoins)
-  val zero = MilliBitcoins(0)
-  val one = MilliBitcoins(1)
+object MilliSatoshis extends BaseNumbers[MilliSatoshis] {
+  val min = MilliSatoshis(LnPolicy.minMilliSatoshis)
+  val max = MilliSatoshis(LnPolicy.maxMilliSatoshis)
+  val zero = MilliSatoshis(0)
+  val one = MilliSatoshis(1)
 
-  def apply(milliBitcoins: Int64): MilliBitcoins = MilliBitcoins(milliBitcoins.toBigInt)
+  def apply(milliSatoshis: Int64): MilliSatoshis = MilliSatoshis(milliSatoshis.toBigInt)
 
-  def apply(underlying: BigInt): MilliBitcoins = MilliBitcoinsImpl(underlying)
+  def apply(underlying: BigInt): MilliSatoshis = MilliSatoshisImpl(underlying)
 
-  private case class MilliBitcoinsImpl(underlying: BigInt) extends MilliBitcoins {
-    require(underlying >= LnPolicy.minMilliBitcoins, "Number was too small for MilliBitcoins, got: " + underlying)
-    require(underlying <= LnPolicy.maxMilliBitcoins, "Number was too big for MilliBitcoins, got: " + underlying)
+  private case class MilliSatoshisImpl(underlying: BigInt) extends MilliSatoshis {
+    require(underlying >= LnPolicy.minMilliSatoshis, "Number was too small for MilliSatoshis, got: " + underlying)
+    require(underlying <= LnPolicy.maxMilliSatoshis, "Number was too big for MilliSatoshis, got: " + underlying)
   }
 }
 
-sealed abstract class MicroBitcoins extends LnCurrencyUnit {
+sealed abstract class MicroSatoshis extends LnCurrencyUnit {
   override type A = BigInt
 
   override def character: Char = 'u'
@@ -122,23 +122,23 @@ sealed abstract class MicroBitcoins extends LnCurrencyUnit {
   override def toPicoBitcoinValue: BigInt = LnCurrencyUnits.toPicoBitcoinValue(this)
 }
 
-object MicroBitcoins extends BaseNumbers[MicroBitcoins] {
-  val min = MicroBitcoins(LnPolicy.minMicroBitcoins)
-  val max = MicroBitcoins(LnPolicy.maxMicroBitcoins)
-  val zero = MicroBitcoins(0)
-  val one = MicroBitcoins(1)
+object MicroSatoshis extends BaseNumbers[MicroSatoshis] {
+  val min = MicroSatoshis(LnPolicy.minMicroSatoshis)
+  val max = MicroSatoshis(LnPolicy.maxMicroSatoshis)
+  val zero = MicroSatoshis(0)
+  val one = MicroSatoshis(1)
 
-  def apply(microBitcoins: Int64): MicroBitcoins = MicroBitcoins(microBitcoins.toBigInt)
+  def apply(microSatoshis: Int64): MicroSatoshis = MicroSatoshis(microSatoshis.toBigInt)
 
-  def apply(underlying: BigInt): MicroBitcoins = MicroBitcoinsImpl(underlying)
+  def apply(underlying: BigInt): MicroSatoshis = MicroSatoshisImpl(underlying)
 
-  private case class MicroBitcoinsImpl(underlying: BigInt) extends MicroBitcoins {
-    require(underlying >= LnPolicy.minMicroBitcoins, "Number was too small for MicroBitcoins, got: " + underlying)
-    require(underlying <= LnPolicy.maxMicroBitcoins, "Number was too big for MicroBitcoins, got: " + underlying)
+  private case class MicroSatoshisImpl(underlying: BigInt) extends MicroSatoshis {
+    require(underlying >= LnPolicy.minMicroSatoshis, "Number was too small for MicroSatoshis, got: " + underlying)
+    require(underlying <= LnPolicy.maxMicroSatoshis, "Number was too big for MicroSatoshis, got: " + underlying)
   }
 }
 
-sealed abstract class NanoBitcoins extends LnCurrencyUnit {
+sealed abstract class NanoSatoshis extends LnCurrencyUnit {
   override type A = BigInt
 
   override def character: Char = 'n'
@@ -154,23 +154,23 @@ sealed abstract class NanoBitcoins extends LnCurrencyUnit {
   override def toPicoBitcoinValue: BigInt = LnCurrencyUnits.toPicoBitcoinValue(this)
 }
 
-object NanoBitcoins extends BaseNumbers[NanoBitcoins] {
-  val min = NanoBitcoins(LnPolicy.minNanoBitcoins)
-  val max = NanoBitcoins(LnPolicy.maxNanoBitcoins)
-  val zero = NanoBitcoins(0)
-  val one = NanoBitcoins(1)
+object NanoSatoshis extends BaseNumbers[NanoSatoshis] {
+  val min = NanoSatoshis(LnPolicy.minNanoSatoshis)
+  val max = NanoSatoshis(LnPolicy.maxNanoSatoshis)
+  val zero = NanoSatoshis(0)
+  val one = NanoSatoshis(1)
 
-  def apply(nanoBitcoins: Int64): NanoBitcoins = NanoBitcoins(nanoBitcoins.toBigInt)
+  def apply(nanoSatoshis: Int64): NanoSatoshis = NanoSatoshis(nanoSatoshis.toBigInt)
 
-  def apply(underlying: BigInt): NanoBitcoins = NanoBitcoinsImpl(underlying)
+  def apply(underlying: BigInt): NanoSatoshis = NanoSatoshisImpl(underlying)
 
-  private case class NanoBitcoinsImpl(underlying: BigInt) extends NanoBitcoins {
-    require(underlying >= LnPolicy.minNanoBitcoins, "Number was too small for NanoBitcoins, got: " + underlying)
-    require(underlying <= LnPolicy.maxNanoBitcoins, "Number was too big for NanoBitcoins, got: " + underlying)
+  private case class NanoSatoshisImpl(underlying: BigInt) extends NanoSatoshis {
+    require(underlying >= LnPolicy.minNanoSatoshis, "Number was too small for NanoSatoshis, got: " + underlying)
+    require(underlying <= LnPolicy.maxNanoSatoshis, "Number was too big for NanoSatoshis, got: " + underlying)
   }
 }
 
-sealed abstract class PicoBitcoins extends LnCurrencyUnit {
+sealed abstract class PicoSatoshis extends LnCurrencyUnit {
   override type A = BigInt
 
   override def character: Char = 'p'
@@ -186,28 +186,28 @@ sealed abstract class PicoBitcoins extends LnCurrencyUnit {
   override def toPicoBitcoinValue: BigInt = this.toBigInt
 }
 
-object PicoBitcoins extends BaseNumbers[PicoBitcoins] {
-  val min = PicoBitcoins(LnPolicy.minPicoBitcoins)
-  val max = PicoBitcoins(LnPolicy.maxPicoBitcoins)
-  val zero = PicoBitcoins(0)
-  val one = PicoBitcoins(1)
+object PicoSatoshis extends BaseNumbers[PicoSatoshis] {
+  val min = PicoSatoshis(LnPolicy.minPicoSatoshis)
+  val max = PicoSatoshis(LnPolicy.maxPicoSatoshis)
+  val zero = PicoSatoshis(0)
+  val one = PicoSatoshis(1)
 
-  def apply(picoBitcoins: Int64): PicoBitcoins = PicoBitcoins(picoBitcoins.toBigInt)
+  def apply(picoSatoshis: Int64): PicoSatoshis = PicoSatoshis(picoSatoshis.toBigInt)
 
-  def apply(underlying: BigInt): PicoBitcoins = PicoBitcoinsImpl(underlying)
+  def apply(underlying: BigInt): PicoSatoshis = PicoSatoshisImpl(underlying)
 
-  private case class PicoBitcoinsImpl(underlying: BigInt) extends PicoBitcoins {
-    require(underlying >= LnPolicy.minPicoBitcoins, "Number was too small for PicoBitcoins, got: " + underlying)
-    require(underlying <= LnPolicy.maxPicoBitcoins, "Number was too big for PicoBitcoins, got: " + underlying)
+  private case class PicoSatoshisImpl(underlying: BigInt) extends PicoSatoshis {
+    require(underlying >= LnPolicy.minPicoSatoshis, "Number was too small for PicoSatoshis, got: " + underlying)
+    require(underlying <= LnPolicy.maxPicoSatoshis, "Number was too big for PicoSatoshis, got: " + underlying)
   }
 }
 
 object LnCurrencyUnits {
-  val oneMilliBTC: LnCurrencyUnit = MilliBitcoins.one
-  val oneMicroBTC: LnCurrencyUnit = MicroBitcoins.one
-  val oneNanoBTC: LnCurrencyUnit = NanoBitcoins.one
-  val onePicoBTC: LnCurrencyUnit = PicoBitcoins.one
-  val zero = PicoBitcoins(0)
+  val oneMilliBTC: LnCurrencyUnit = MilliSatoshis.one
+  val oneMicroBTC: LnCurrencyUnit = MicroSatoshis.one
+  val oneNanoBTC: LnCurrencyUnit = NanoSatoshis.one
+  val onePicoBTC: LnCurrencyUnit = PicoSatoshis.one
+  val zero = PicoSatoshis(0)
 
   val milliMultiplier: BigDecimal = LnPolicy.milliMultiplier
   val microMultiplier: BigDecimal = LnPolicy.microMultiplier
@@ -223,7 +223,7 @@ object LnCurrencyUnits {
    * https://github.com/lightningnetwork/lightning-rfc/blob/master/03-transactions.md#commitment-transaction-outputs
    */
   def toSatoshi(lnCurrencyUnits: LnCurrencyUnit): Satoshis = {
-    val sat = BigDecimal(lnCurrencyUnits.toBigInt) * Bitcoins.one.satoshis.toBigDecimal * lnCurrencyUnits.multiplier
+    val sat = BigDecimal(lnCurrencyUnits.toBigInt) * Satoshis.one.satoshis.toBigDecimal * lnCurrencyUnits.multiplier
     val rounded = sat.setScale(0, RoundingMode.DOWN)
     if (rounded >= 1) {
       Satoshis(Int64(rounded.toBigIntExact().get))
@@ -236,11 +236,11 @@ object LnCurrencyUnits {
     if (amount.isSuccess) {
       val unit = currency._2
       unit match {
-        case "m" => Try(MilliBitcoins(amount.get))
-        case "u" => Try(MicroBitcoins(amount.get))
-        case "n" => Try(NanoBitcoins(amount.get))
-        case "p" => Try(PicoBitcoins(amount.get))
-        case _ => Failure(new IllegalArgumentException(s"LnCurrencyUnit not found. Expected MilliBitcoins (m), MicroBitcoins (u), NanoBitcoins (n), or PicoBitcoins (p), got: $unit"))
+        case "m" => Try(MilliSatoshis(amount.get))
+        case "u" => Try(MicroSatoshis(amount.get))
+        case "n" => Try(NanoSatoshis(amount.get))
+        case "p" => Try(PicoSatoshis(amount.get))
+        case _ => Failure(new IllegalArgumentException(s"LnCurrencyUnit not found. Expected MilliSatoshis (m), MicroSatoshis (u), NanoSatoshis (n), or PicoSatoshis (p), got: $unit"))
       }
     } else { Failure(new IllegalArgumentException(s"Could not convert amount to valid number, got: $amount")) }
   }
