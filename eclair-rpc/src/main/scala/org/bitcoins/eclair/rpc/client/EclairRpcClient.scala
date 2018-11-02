@@ -165,7 +165,7 @@ class EclairRpcClient(val instance: EclairInstance)(implicit system: ActorSystem
     pushMsat: Option[LnCurrencyUnit],
     feerateSatPerByte: Option[SatoshisPerByte],
     channelFlags: Option[Byte]): Future[FundedChannelId] = {
-    val num = pushMsat.getOrElse(LnCurrencyUnits.zero).toPicoBitcoinDecimal
+    val num = pushMsat.getOrElse(LnCurrencyUnits.zero).toMSatDecimal
     val pushMsatJson = JsNumber(num)
     val sat = fundingSatoshis.satoshis.toBigDecimal
 
@@ -256,10 +256,10 @@ class EclairRpcClient(val instance: EclairInstance)(implicit system: ActorSystem
       if (amountMsat.isEmpty) {
         List(JsString(description.getOrElse("")))
       } else if (expirySeconds.isEmpty) {
-        List(JsNumber(amountMsat.get.toPicoBitcoinDecimal), JsString(description.getOrElse("")))
+        List(JsNumber(amountMsat.get.toMSatDecimal), JsString(description.getOrElse("")))
       } else {
         List(
-          JsNumber(amountMsat.get.toPicoBitcoinDecimal),
+          JsNumber(amountMsat.get.toMSatDecimal),
           JsString(description.getOrElse("")),
           JsNumber(expirySeconds.get))
       }
@@ -365,7 +365,7 @@ class EclairRpcClient(val instance: EclairInstance)(implicit system: ActorSystem
     nodeId: NodeId): Future[PaymentResult] = {
     eclairCall[PaymentResult](
       "send",
-      List(JsNumber(amountMsat.toPicoBitcoinDecimal), JsString(paymentHash.hex), JsString(nodeId.toString)))
+      List(JsNumber(amountMsat.toMSatDecimal), JsString(paymentHash.hex), JsString(nodeId.toString)))
   }
 
   private def send(
@@ -376,7 +376,7 @@ class EclairRpcClient(val instance: EclairInstance)(implicit system: ActorSystem
       if (amountMsat.isEmpty) {
         List(JsString(invoice.toString))
       } else {
-        List(JsString(invoice.toString), JsNumber(amountMsat.get.toPicoBitcoinDecimal))
+        List(JsString(invoice.toString), JsNumber(amountMsat.get.toMSatDecimal))
       }
     }
 
@@ -396,7 +396,7 @@ class EclairRpcClient(val instance: EclairInstance)(implicit system: ActorSystem
       "updaterelayfee",
       List(
         JsString(channelId.hex),
-        JsNumber(feeBaseMsat.toPicoBitcoinDecimal),
+        JsNumber(feeBaseMsat.toMSatDecimal),
         JsNumber(feeProportionalMillionths)))
   }
 
