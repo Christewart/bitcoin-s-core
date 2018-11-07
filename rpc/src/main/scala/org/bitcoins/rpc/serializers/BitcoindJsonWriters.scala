@@ -1,6 +1,7 @@
 package org.bitcoins.rpc.serializers
 
-import org.bitcoins.core.crypto.DoubleSha256Digest
+import org.bitcoins.core.config.NetworkParameters
+import org.bitcoins.core.crypto.{ DoubleSha256Digest, ECPrivateKey }
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -8,6 +9,7 @@ import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction.{ Transaction, TransactionInput }
 import org.bitcoins.core.util.BitcoinSUtil
 import org.bitcoins.rpc.client.RpcOpts
+import org.bitcoins.rpc.client.RpcOpts.ImportMultiRequest
 import play.api.libs.json._
 
 import scala.language.implicitConversions
@@ -56,9 +58,29 @@ object BitcoindJsonWriters {
     }
   }
 
+  implicit def ecPrivateKeyWrites(k: ECPrivateKey)(implicit np: NetworkParameters): Writes[ECPrivateKey] = {
+    new Writes[ECPrivateKey] {
+      override def writes(o: ECPrivateKey): JsValue = {
+        JsString(k.toWIF(np))
+      }
+    }
+  }
+
   implicit val importMultiAddressWrites: Writes[RpcOpts.ImportMultiAddress] =
     Json.writes[RpcOpts.ImportMultiAddress]
-  implicit val importMultiRequestWrites: Writes[RpcOpts.ImportMultiRequest] =
-    Json.writes[RpcOpts.ImportMultiRequest]
+
+  def importMultiRequestWrites(np: NetworkParameters)(importMulti: ImportMultiRequest): JsValue = {
+    val m: Map[String, JsValue] = Map(
+      "scriptPubKey" -> ???,
+      "timestamp" -> ???,
+      "redeemscript" -> ???,
+      "pubkeys" -> ???,
+      "keys" -> ???,
+      "internal" -> ???,
+      "watchonly" -> ???,
+      "label" -> ???)
+
+    Json.toJsObject(m)
+  }
 }
 

@@ -1,5 +1,6 @@
 package org.bitcoins.rpc.client
 
+import org.bitcoins.core.config.NetworkParameters
 import org.bitcoins.core.crypto.{ DoubleSha256Digest, ECPrivateKey, ECPublicKey }
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -9,6 +10,7 @@ import org.bitcoins.rpc.client.RpcOpts.AddressType
 import org.bitcoins.rpc.jsonmodels._
 import org.bitcoins.rpc.serializers.BitcoindJsonWriters._
 import org.bitcoins.rpc.serializers.BitcoindJsonSerializers._
+import org.bitcoins.rpc.serializers.BitcoindJsonWriters
 import play.api.libs.json._
 
 import scala.concurrent.Future
@@ -143,9 +145,19 @@ protected trait WalletRpc extends Client {
       List(JsString(key.toWIF(network)), JsString(account), JsBoolean(rescan)))
   }
 
+  implicit val writer: Writes[RpcOpts.ImportMultiRequest] = {
+    new Writes[RpcOpts.ImportMultiRequest] {
+      override def writes(i: RpcOpts.ImportMultiRequest): JsValue = {
+        BitcoindJsonWriters.importMultiRequestWrites(network)(i)
+      }
+    }
+
+  }
+
   def importMulti(
     requests: Vector[RpcOpts.ImportMultiRequest],
     rescan: Boolean = true): Future[Vector[ImportMultiResult]] = {
+
     bitcoindCall[Vector[ImportMultiResult]](
       "importmulti",
       List(Json.toJson(requests), JsObject(Map("rescan" -> JsBoolean(rescan)))))

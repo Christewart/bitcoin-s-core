@@ -18,6 +18,8 @@ object RpcOpts {
     feeRate: Option[Bitcoins] = None,
     subtractFeeFromOutputs: Option[Array[Int]])
 
+  import BitcoindJsonWriters._
+
   implicit val fundRawTransactionOptionsWrites: Writes[FundRawTransactionOptions] = Json.writes[FundRawTransactionOptions]
 
   case class SignRawTransactionOutputParameter(
