@@ -155,7 +155,7 @@ lazy val core = project
   .settings(commonSettings: _*)
   .dependsOn(
     secp256k1jni
-  ).enablePlugins()
+  ).enablePlugins(ScalaJSPlugin)
 
 lazy val coreTest = project
   .in(file("core-test"))

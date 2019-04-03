@@ -28,3 +28,5 @@ addSbtPlugin(
   "com.thoughtworks.sbt-api-mappings" % "sbt-api-mappings" % "latest.release")
 
 addSbtPlugin("com.typesafe.sbt" % "sbt-git" % "0.9.3")
+
+addSbtPlugin("org.scala-js" % "sbt-scalajs" % "0.6.26")
