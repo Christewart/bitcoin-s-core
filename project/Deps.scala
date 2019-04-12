@@ -9,7 +9,7 @@ object Deps {
     val scalaTest = "3.0.5"
     val slf4j = "1.7.5"
     val spray = "1.3.2"
-    val zeromq = "0.4.3"
+    val zeromq = "0.5.2-SNAPSHOT"
     val akkav = "10.1.7"
     val akkaStreamv = "2.5.21"
     val playv = "2.7.0"
@@ -203,7 +203,8 @@ object Deps {
   )
 
   val doc = List(
-    Test.ammonite,
+    "com.lihaoyi" %% "ammonite" % V.ammoniteV cross CrossVersion.full,
+    "ch.qos.logback" % "logback-classic" % V.logback withSources () withJavadoc (),
     Test.scalaTest,
     Test.logback
   )
