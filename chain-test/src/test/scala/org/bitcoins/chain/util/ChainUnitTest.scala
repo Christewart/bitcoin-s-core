@@ -48,7 +48,7 @@ trait ChainUnitTest
   lazy val blockchain: Blockchain =
     Blockchain.fromHeaders(Vector(genesisHeaderDb), blockHeaderDAO)
 
-  private lazy val chainHandler: ChainHandler = ChainHandler(blockchain)
+  private lazy val chainHandler: ChainHandler = ChainHandler(blockchain = blockchain,chainAppConfig = appConfig)
 
   implicit def ec: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global
