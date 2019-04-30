@@ -29,8 +29,8 @@ class TipValidationTest extends ChainUnitTest {
   //blocks 566,092 and 566,093
   val newValidTip = BlockHeaderHelper.header1
   val currentTipDb = BlockHeaderHelper.header2Db
-  override val dbConfig =
-    ChainDbConfig.UnitTestDbConfig(NetworkDb.MainNetDbConfig)
+
+  override val networkDb = NetworkDb.MainNetDbConfig
 
   it must "connect two blocks with that are valid" in { bhDAO =>
     val newValidTipDb =

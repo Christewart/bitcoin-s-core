@@ -8,7 +8,9 @@ import org.bitcoins.chain.util.ChainUnitTest
 import org.bitcoins.core.protocol.blockchain.MainNetChainParams
 import org.bitcoins.db.NetworkDb
 import org.bitcoins.testkit.chain.ChainTestUtil
-import org.scalatest.FutureOutcome
+import org.scalatest.{Assertion, FutureOutcome}
+
+import scala.concurrent.Future
 
 class BitcoinPowTest extends ChainUnitTest {
 
@@ -67,6 +69,6 @@ class BitcoinPowTest extends ChainUnitTest {
           } assert(nextNBits == nextTip.nBits)
       }
 
-      succeed
+    succeed
   }
 }

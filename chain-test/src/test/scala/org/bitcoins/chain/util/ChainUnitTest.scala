@@ -45,7 +45,7 @@ trait ChainUnitTest
   val timeout: FiniteDuration = 10.seconds
 
   def networkDb: NetworkDb = NetworkDb.UnitTestDbConfig
-  def dbConfig: ChainDbConfig = ChainDbConfig.UnitTestDbConfig(networkDb)
+  lazy val dbConfig: ChainDbConfig = ChainDbConfig.UnitTestDbConfig(networkDb)
 
   val genesisHeaderDb: BlockHeaderDb = ChainTestUtil.regTestGenesisHeaderDb
 
