@@ -46,9 +46,9 @@ trait ChainUnitTest
   private lazy val blockHeaderDAO = BlockHeaderDAO(appConfig)
 
   lazy val blockchain: Blockchain =
-    Blockchain.fromHeaders(Vector(genesisHeaderDb), blockHeaderDAO)
+    Blockchain.fromHeaders(Vector(genesisHeaderDb))
 
-  private lazy val chainHandler: ChainHandler = ChainHandler(blockchain = blockchain,chainAppConfig = appConfig)
+  private lazy val chainHandler: ChainHandler = ChainHandler(blockHeaderDAO = blockHeaderDAO,chainAppConfig = appConfig)
 
   implicit def ec: ExecutionContext =
     scala.concurrent.ExecutionContext.Implicits.global
@@ -214,7 +214,7 @@ trait ChainUnitTest
             Future.successful[Vector[BlockHeaderDb]](Vector.empty)) {
             case (fut, batch) =>
               fut.flatMap(_ =>
-                chainHandler.blockchain.blockHeaderDAO.createAll(batch))
+                chainHandler.blockHeaderDAO.createAll(batch))
           }
         }
 
@@ -246,7 +246,7 @@ trait ChainUnitTest
     val tableSetupF = setupHeaderTable()
 
     val genesisHeaderF = tableSetupF.flatMap(_ =>
-      chainHandler.blockchain.blockHeaderDAO.create(genesisHeaderDb))
+      chainHandler.blockHeaderDAO.create(genesisHeaderDb))
     genesisHeaderF
   }
 

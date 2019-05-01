@@ -9,7 +9,7 @@ case class BlockchainBuilder(blockHeaderDAO: BlockHeaderDAO) extends mutable.Reu
 
 
   override def result(): Blockchain = {
-    Blockchain.fromHeaders(internal.result(), blockHeaderDAO)
+    Blockchain.fromHeaders(internal.result())
   }
 
   override def +=(blockHeaderDb: BlockHeaderDb): this.type = {
