@@ -53,6 +53,7 @@ object Deps {
     val slickHikari = "com.typesafe.slick" %% "slick-hikaricp" % V.slickV
     val sqlite = "org.xerial" % "sqlite-jdbc" % V.sqliteV
     val postgres = "org.postgresql" % "postgresql" % V.postgresV
+    val ammonite = "com.lihaoyi" %% "ammonite" % V.ammoniteV cross CrossVersion.full
   }
 
   object Test {
@@ -67,7 +68,7 @@ object Deps {
     val spray = "io.spray" %% "spray-json" % V.spray % "test" withSources () withJavadoc ()
     val akkaHttp = "com.typesafe.akka" %% "akka-http-testkit" % V.akkav % "test" withSources () withJavadoc ()
     val akkaStream = "com.typesafe.akka" %% "akka-stream-testkit" % V.akkaStreamv % "test" withSources () withJavadoc ()
-    val ammonite = "com.lihaoyi" %% "ammonite" % V.ammoniteV % "test" cross CrossVersion.full
+    val ammonite = Compile.ammonite % "test"
     val playJson = Compile.playJson % "test"
     val akkaTestkit = "com.typesafe.akka" %% "akka-testkit" % V.akkaActorV withSources () withJavadoc ()
   }
@@ -203,7 +204,7 @@ object Deps {
   )
 
   val doc = List(
-    "com.lihaoyi" %% "ammonite" % V.ammoniteV cross CrossVersion.full,
+    Compile.ammonite,
     "ch.qos.logback" % "logback-classic" % V.logback withSources () withJavadoc (),
     Test.scalaTest,
     Test.logback
