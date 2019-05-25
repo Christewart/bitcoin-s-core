@@ -61,27 +61,31 @@ class SpvNodeTest extends NodeUnitTest {
       val spvNode = spvNodeConnectedWithBitcoind.spvNode
       val bitcoind = spvNodeConnectedWithBitcoind.bitcoind
 
+      //we need to generate 1 block for bitcoind to consider
+      //itself out of IBD. bitcoind will not sendheaders
+      //when it believes itself, or it's peer is in IBD
+      val gen1F = bitcoind.generate(1)
+
       //this needs to be called to get our peer to send us headers
       //as they happen with the 'sendheaders' message
       //both our spv node and our bitcoind node _should_ both be at the genesis block (regtest)
       //at this point so no actual syncing is happening
-      val initSyncF = spvNode.sync()
+      val initSyncF = gen1F.flatMap(_ => spvNode.sync())
 
       //start generating a block every 10 seconds with bitcoind
       //this should result in 5 blocks
       val startGenF = initSyncF.map { _ =>
-        Thread.sleep(5000)
         //generate a block every 5 seconds
         //until we have generated 5 total blocks
         genBlock5seconds(bitcoind)
       }
 
       startGenF.flatMap { _ =>
-        Thread.sleep(40000)
+        Thread.sleep(30000)
 
         //we should expect 5 headers have been announced to us via
         //the send headers message.
-        spvNode.chainApi.getBlockCount.map(count => assert(count == 5))
+        spvNode.chainApi.getBlockCount.map(count => assert(count == 6))
       }
   }
 

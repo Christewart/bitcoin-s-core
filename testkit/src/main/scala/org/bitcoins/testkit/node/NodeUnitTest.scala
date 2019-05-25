@@ -153,11 +153,11 @@ object NodeUnitTest {
     val spvNode = spvNodeConnectedWithBitcoind.spvNode
     val bitcoind = spvNodeConnectedWithBitcoind.bitcoind
     val spvNodeDestroyF = destroySpvNode(spvNode)
-    val bitcoindDestroyF = ChainUnitTest.destroyBitcoind(bitcoind)
+    //val bitcoindDestroyF = ChainUnitTest.destroyBitcoind(bitcoind)
 
     for {
       _ <- spvNodeDestroyF
-      _ <- bitcoindDestroyF
+      //_ <- bitcoindDestroyF
     } yield ()
   }
 }
