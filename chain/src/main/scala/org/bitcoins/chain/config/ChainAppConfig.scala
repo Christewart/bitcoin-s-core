@@ -20,7 +20,7 @@ case object ChainAppConfig extends AppConfig {
     isDefinedOptF.onComplete {
       case Success(bool) => p.success(bool)
       case Failure(err) =>
-        logger.info(s"Failed to init chain app err=${err.getMessage}")
+        logger.error(s"Failed to init chain app err=${err.getMessage}")
         p.success(false)
     }
 
