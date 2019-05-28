@@ -53,7 +53,7 @@ trait ChainUnitTest
   lazy val mainnetAppConfig: ChainAppConfig = {
     val defaultConfig = ChainAppConfig()
     val mainnet = ConfigValueFactory.fromAnyRef("mainnet")
-    val newConfig = defaultConfig.config.withValue("network", mainnet)
+    val newConfig = ??? // defaultConfig.config.withValue("network", mainnet)
     ChainAppConfig(newConfig)
   }
 

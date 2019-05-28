@@ -34,6 +34,15 @@ import scala.util.matching.Regex
   */
 abstract class AppConfig extends BitcoinSLogger {
 
+  /** Sub members of AppConfig should override this type with
+    * the type of themselves, ensuring `withOverrides` return
+    * the correct type
+    */
+  protected type ConfigType <: AppConfig
+
+  /** Constructor to make a new instance of this config type */
+  protected def newConfigOfType(configOverrides: List[Config]): ConfigType
+
   /** List of user-provided configs that should
     * override defaults
     */
@@ -49,11 +58,10 @@ abstract class AppConfig extends BitcoinSLogger {
     * `bitcoin-s.network`), the latter config overrides the
     * first.
     */
-  /*  def withOverrides(config: Config, configs: Config*): AppConfig = {
+  def withOverrides(config: Config, configs: Config*): ConfigType = {
     // the two val assignments below are workarounds
     // for awkward name resolution in the block below
     val firstOverride = config
-    val moduleName = this.moduleConfigName
 
     val numOverrides = configs.length + 1
 
@@ -67,10 +75,9 @@ abstract class AppConfig extends BitcoinSLogger {
       logger.debug(oldConfStr)
     }
 
-    val newConf = new AppConfig {
-      override val configOverrides = List(firstOverride) ++ configs
-      override val moduleConfigName: String = moduleName
-    }
+    val newConf = newConfigOfType(
+      configOverrides = List(firstOverride) ++ configs
+    )
 
     // to avoid non-necessary lazy load
     if (logger.isDebugEnabled()) {
@@ -82,7 +89,7 @@ abstract class AppConfig extends BitcoinSLogger {
     }
 
     newConf
-  }*/
+  }
 
   /**
     * Name of module specific
@@ -164,7 +171,67 @@ abstract class AppConfig extends BitcoinSLogger {
     * The underlying config that we derive the
     * rest of the fields in this class from
     */
-  protected val config: Config
+  protected lazy val config: Config = {
+    val moduleConfig =
+      ConfigFactory.load(moduleConfigName)
+
+    logger.debug(
+      s"Module config: ${moduleConfig.getConfig("bitcoin-s").asReadableJson}")
+
+    // `load` tries to resolve substitions,
+    // `parseResources` does not
+    val dbConfig = ConfigFactory
+      .parseResources("db.conf")
+
+    logger.trace(
+      s"DB config: ${dbConfig.getConfig("bitcoin-s").asReadableJson}")
+
+    val classPathConfig =
+      ConfigFactory
+        .load()
+
+    logger.trace(
+      s"Classpath config: ${classPathConfig.getConfig("bitcoin-s").asReadableJson}")
+
+    // loads reference.conf as well as application.conf,
+    // if the user has made one
+    val unresolvedConfig = classPathConfig
+      .withFallback(moduleConfig)
+      .withFallback(dbConfig)
+
+    logger.trace(s"Unresolved bitcoin-s config:")
+    logger.trace(unresolvedConfig.getConfig("bitcoin-s").asReadableJson)
+
+    val withOverrides =
+      if (configOverrides.nonEmpty) {
+        val overrides =
+          configOverrides
+          // we reverse to make the configs specified last take precedent
+          .reverse
+            .reduce(_.withFallback(_))
+
+        val interestingOverrides = overrides.getConfig("bitcoin-s")
+        logger.trace(s"User-overrides for bitcoin-s config:")
+        logger.trace(interestingOverrides.asReadableJson)
+
+        // to make the overrides actually override
+        // the default setings we have to do it
+        // in this order
+        overrides.withFallback(unresolvedConfig)
+      } else {
+        unresolvedConfig
+      }
+
+    val config = withOverrides
+      .resolve()
+      .getConfig("bitcoin-s")
+
+    logger.debug(s"Resolved bitcoin-s config:")
+    logger.debug(config.asReadableJson)
+
+    config
+
+  }
 
   /** The data directory used by bitcoin-s apps */
   lazy val datadir: Path = {
