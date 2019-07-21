@@ -1,15 +1,19 @@
 package org.bitcoins.server
 
+import java.net.InetSocketAddress
+
 import org.bitcoins.rpc.config.BitcoindInstance
 import org.bitcoins.node.models.Peer
 import org.bitcoins.core.util.BitcoinSLogger
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import akka.actor.ActorSystem
+
 import scala.concurrent.Await
 import scala.concurrent.duration._
 import org.bitcoins.wallet.config.WalletAppConfig
 import org.bitcoins.node.config.NodeAppConfig
 import java.nio.file.Files
+
 import scala.concurrent.Future
 import org.bitcoins.wallet.LockedWallet
 import org.bitcoins.wallet.Wallet
@@ -31,6 +35,7 @@ object Main
     // TODO we want to log to user data directory
     // how do we do this?
     with BitcoinSLogger {
+  logger.trace(s"Running wallet server main!")
   implicit val conf = {
     // val custom = ConfigFactory.parseString("bitcoin-s.network = testnet3")
     BitcoinSAppConfig()
@@ -46,16 +51,6 @@ object Main
   sys.addShutdownHook {
     logger.error(s"Exiting process")
     system.terminate().foreach(_ => logger.info(s"Actor system terminated"))
-  }
-
-  /** Log the given message, shut down the actor system and quit. */
-  def error(message: Any): Nothing = {
-    logger.error(s"FATAL: $message")
-    logger.error(s"Shutting down actor system")
-    Await.result(system.terminate(), 10.seconds)
-    logger.error("Actor system terminated")
-    logger.error(s"Exiting")
-    sys.error(message.toString())
   }
 
   /** Checks if the user already has a wallet */
@@ -81,20 +76,10 @@ object Main
     }
   }
 
-  val bitcoind = BitcoindInstance.fromDatadir()
-  val bitcoindCli = new BitcoindRpcClient(bitcoind)
-  val peer = Peer.fromBitcoind(bitcoind)
+  val socket = new InetSocketAddress("localhost", conf.network.port)
+  val peer = Peer.fromSocket(socket)
 
   val startFut = for {
-    _ <- bitcoindCli.isStartedF.map { started =>
-      if (!started) error("Local bitcoind is not started!")
-    }
-    _ <- bitcoindCli.getBlockChainInfo.map { bitcoindInfo =>
-      if (bitcoindInfo.chain != nodeConf.network)
-        error(
-          s"bitcoind and Bitcoin-S node are on different chains! Bitcoind: ${bitcoindInfo.chain}. Bitcoin-S node: ${nodeConf.network}")
-    }
-
     _ <- conf.initialize()
     wallet <- walletInitF
 
@@ -128,5 +113,15 @@ object Main
 
   startFut.failed.foreach { err =>
     logger.info(s"Error on server startup!", err)
+  }
+
+  /** Log the given message, shut down the actor system and quit. */
+  def error(message: Any): Nothing = {
+    logger.error(s"FATAL: $message")
+    logger.error(s"Shutting down actor system")
+    Await.result(system.terminate(), 10.seconds)
+    logger.error("Actor system terminated")
+    logger.error(s"Exiting")
+    sys.error(message.toString())
   }
 }

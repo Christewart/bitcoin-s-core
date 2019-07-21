@@ -4,6 +4,8 @@ import com.typesafe.config.Config
 import org.bitcoins.wallet.config.WalletAppConfig
 import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.chain.config.ChainAppConfig
+import org.bitcoins.core.config.NetworkParameters
+
 import scala.concurrent.ExecutionContext
 import scala.concurrent.Future
 
@@ -18,6 +20,8 @@ case class BitcoinSAppConfig(private val confs: Config*) {
   val walletConf = WalletAppConfig(confs: _*)
   val nodeConf = NodeAppConfig(confs: _*)
   val chainConf = ChainAppConfig(confs: _*)
+
+  lazy val network: NetworkParameters = nodeConf.network
 
   /** Initializes the wallet, node and chain projects */
   def initialize()(implicit ec: ExecutionContext): Future[Unit] = {
