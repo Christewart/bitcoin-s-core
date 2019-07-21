@@ -14,7 +14,7 @@
         </encoder>
     </appender>
 
-    <root level="DEBUG">
+    <root level="INFO">
         <appender-ref ref="FILE" />
         <appender-ref ref="STDOUT" />
     </root>
@@ -59,10 +59,10 @@
 
     <!-- See queries received by chain handler, as well as result of  -->
     <!-- connecting new block headers to chain -->
-    <logger name="org.bitcoins.chain.blockchain.ChainHandler" level="INFO" />
+    <logger name="org.bitcoins.chain.blockchain.ChainHandler" level="DEBUG" />
 
     <!-- Set to TRACE to inspect details of chain vaidation -->
-    <logger name="org.bitcoins.chain.validation" level="TRACE" />
+    <logger name="org.bitcoins.chain.validation" level="INFO" />
 
     <!-- ╔═════════════════════╗ -->
     <!-- ║   Wallet module     ║ -->

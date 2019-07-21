@@ -46,6 +46,8 @@ sealed abstract class TipValidation extends BitcoinSLogger {
             s"Failed to connect tip=${header.hashBE.hex} to current chain")
           TipUpdateResult.BadPreviousBlockHash(newPotentialTip)
         } else if (header.nBits != expectedWork) {
+          logger.warn(
+            s"header.nBits=${header.nBits} expectedWork=${expectedWork}")
           //https://github.com/bitcoin/bitcoin/blob/eb7daf4d600eeb631427c018a984a77a34aca66e/src/pow.cpp#L19
           TipUpdateResult.BadPOW(newPotentialTip)
         } else if (isBadNonce(newPotentialTip)) {
