@@ -1,7 +1,4 @@
 <included>
-    <!-- Stop output INFO at start -->
-    <statusListener class="ch.qos.logback.core.status.NopStatusListener" />
-
 
     <appender name="FILE" class="ch.qos.logback.core.FileAppender">
         <file>logs/application.log</file>
@@ -17,7 +14,7 @@
         </encoder>
     </appender>
 
-    <root level="INFO">
+    <root level="DEBUG">
         <appender-ref ref="FILE" />
         <appender-ref ref="STDOUT" />
     </root>
@@ -32,6 +29,8 @@
 
     <!-- inspect resolved DB connection -->
     <logger name="org.bitcoins.db.SafeDatabase" level="INFO" />
+
+    <logger name="org.bitcoins.db" level="INFO"/>
 
     <!-- inspect resolved config -->
     <logger name="org.bitcoins.chain.config" level="INFO" />
@@ -52,7 +51,7 @@
     <logger name="org.bitcoins.node.networking.peer.DataMessageHandler" level="INFO" /> 
 
     <!-- inspect TCP details -->
-    <logger name="org.bitcoins.node.networking.Client" level="INFO" />
+    <logger name="org.bitcoins.node.networking.Client" level="DEBUG" />
 
     <!-- ╔════════════════════╗ -->
     <!-- ║   Chain module     ║ -->
@@ -63,12 +62,13 @@
     <logger name="org.bitcoins.chain.blockchain.ChainHandler" level="INFO" />
 
     <!-- Set to TRACE to inspect details of chain vaidation -->
-    <logger name="org.bitcoins.chain.validation" level="INFO" />
+    <logger name="org.bitcoins.chain.validation" level="TRACE" />
 
     <!-- ╔═════════════════════╗ -->
     <!-- ║   Wallet module     ║ -->
     <!-- ╚═════════════════════╝ -->
 
+    <logger name="org.bitcoins.wallet" level="INFO"/>
     <!-- ╔═══════════════════════════╗ -->
     <!-- ║   Bitcoin-S logging end   ║-->
     <!-- ╚═══════════════════════════╝ -->
@@ -85,6 +85,8 @@
 
     <!-- see what slick is compiling to in sql -->
     <logger name="slick.compiler" level="INFO"/>
+
+    <logger name="slick.relational" level="INFO"/>
 
     <!-- see what's returned by Slick -->
     <logger name="slick.jdbc.StatementInvoker.result" level="INFO" />
