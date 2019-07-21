@@ -45,6 +45,7 @@ sealed abstract class Pow extends BitcoinSLogger {
           val nonMinDiffF = blockHeaderDAO.find { h =>
             h.nBits != powLimit || h.height % chainParams.difficultyChangeInterval == 0
           }
+
           nonMinDiffF.map {
             case Some(bh) => bh.nBits
             case None     =>
