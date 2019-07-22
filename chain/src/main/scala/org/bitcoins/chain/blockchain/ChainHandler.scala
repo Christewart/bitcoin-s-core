@@ -16,7 +16,8 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 case class ChainHandler(
     blockHeaderDAO: BlockHeaderDAO,
-    chainConfig: ChainAppConfig)
+    chainConfig: ChainAppConfig,
+    blockchains: Vector[Blockchain])
     extends ChainApi
     with BitcoinSLogger {
 
@@ -43,17 +44,22 @@ case class ChainHandler(
   override def processHeader(header: BlockHeader)(
       implicit ec: ExecutionContext): Future[ChainHandler] = {
 
-    val blockchainUpdateF = Blockchain.connectTip(header, blockHeaderDAO)
+    val blockchainUpdateF = Blockchain.connectTip(header = header,
+                                                  blockHeaderDAO =
+                                                    blockHeaderDAO,
+                                                  blockchains = blockchains)
 
     val newHandlerF = blockchainUpdateF.flatMap {
-      case BlockchainUpdate.Successful(_, updatedHeader) =>
+      case BlockchainUpdate.Successful(newChain, updatedHeader) =>
         //now we have successfully connected the header, we need to insert
         //it into the database
         val createdF = blockHeaderDAO.create(updatedHeader)
         createdF.map { header =>
           logger.debug(
             s"Connected new header to blockchain, height=${header.height} hash=${header.hashBE}")
-          ChainHandler(blockHeaderDAO, chainConfig)
+
+          //what about old chain? The returned chain is _not_ necessarily the best chain I think
+          ChainHandler(blockHeaderDAO, chainConfig, Vector(newChain))
         }
       case BlockchainUpdate.Failed(_, _, reason) =>
         val errMsg =
@@ -87,5 +93,26 @@ case class ChainHandler(
       logger.debug(s"getBestBlockHash result: hash=$hash")
       hash
     }
+  }
+}
+
+object ChainHandler {
+
+  def apply(blockHeaderDAO: BlockHeaderDAO, chainConfig: ChainAppConfig)(
+      implicit ec: ExecutionContext): Future[ChainHandler] = {
+    val bestChainsF = blockHeaderDAO.getBlockchains()
+
+    bestChainsF.map(
+      chains =>
+        new ChainHandler(blockHeaderDAO = blockHeaderDAO,
+                         chainConfig = chainConfig,
+                         blockchains = chains))
+  }
+
+  def apply(
+      blockHeaderDAO: BlockHeaderDAO,
+      chainConfig: ChainAppConfig,
+      blockchains: Blockchain): ChainHandler = {
+    new ChainHandler(blockHeaderDAO, chainConfig, Vector(blockchains))
   }
 }

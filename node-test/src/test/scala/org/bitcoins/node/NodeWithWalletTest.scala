@@ -102,13 +102,12 @@ class NodeWithWalletTest extends BitcoinSWalletTest {
 
         address <- wallet.getNewAddress()
         bloom <- wallet.getBloomFilter()
-
+        chainHandler <- {
+          val bhDao = BlockHeaderDAO()
+          ChainHandler(bhDao, config)
+        }
         spv <- {
           val peer = Peer.fromBitcoind(rpc.instance)
-          val chainHandler = {
-            val bhDao = BlockHeaderDAO()
-            ChainHandler(bhDao, config)
-          }
 
           val spv =
             SpvNode(peer,

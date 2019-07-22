@@ -76,11 +76,11 @@ class DataMessageHandler(callbacks: SpvNodeCallbacks)(
         logger.trace(
           s"Received headers message with ${headersMsg.count.toInt} headers")
         val headers = headersMsg.headers
-        val chainApi: ChainApi =
+        val chainApiF: Future[ChainApi] =
           ChainHandler(blockHeaderDAO, chainConfig = chainConf)
-        val chainApiF = chainApi.processHeaders(headers)
+        val processedHeadersF = chainApiF.flatMap(_.processHeaders(headers))
 
-        chainApiF.map { newApi =>
+        processedHeadersF.map { newApi =>
           val lastHeader = headers.last
           val lastHash = lastHeader.hash
           newApi.getBlockCount.map { count =>

@@ -113,8 +113,8 @@ object Main
         SpvNodeCallbacks(onTxReceived = Seq(onTX))
       }
       val blockheaderDAO = BlockHeaderDAO()
-      val chain = ChainHandler(blockheaderDAO, conf)
-      SpvNode(peer, chain, bloom, callbacks).start()
+      val chainF = ChainHandler(blockheaderDAO, conf)
+      chainF.flatMap(chain => SpvNode(peer, chain, bloom, callbacks).start())
     }
     _ = logger.info(s"Starting SPV node sync")
     _ <- node.sync()
