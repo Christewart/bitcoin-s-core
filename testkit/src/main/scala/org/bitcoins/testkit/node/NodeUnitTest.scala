@@ -3,19 +3,22 @@ package org.bitcoins.testkit.node
 import java.net.InetSocketAddress
 
 import akka.actor.ActorSystem
+import org.bitcoins.chain.api.ChainApi
 import org.bitcoins.core.config.NetworkParameters
 import org.bitcoins.core.util.BitcoinSLogger
 import org.bitcoins.db.AppConfig
-import org.bitcoins.node.SpvNode
 import org.bitcoins.node.models.Peer
 import org.bitcoins.node.networking.peer.{
   PeerHandler,
   PeerMessageReceiver,
+  PeerMessageReceiverState,
   PeerMessageSender
 }
+import org.bitcoins.node.{SpvNode, SpvNodeCallbacks}
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.server.BitcoinSAppConfig
 import org.bitcoins.server.BitcoinSAppConfig._
+import org.bitcoins.testkit.BitcoinSTestAppConfig
 import org.bitcoins.testkit.chain.ChainUnitTest
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.node.fixture.SpvNodeConnectedWithBitcoind
@@ -29,7 +32,6 @@ import org.scalatest.{
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import org.bitcoins.testkit.BitcoinSTestAppConfig
 
 trait NodeUnitTest
     extends BitcoinSFixture
@@ -66,23 +68,31 @@ trait NodeUnitTest
 
   lazy val bitcoindPeerF = startedBitcoindF.map(NodeTestUtil.getBitcoindPeer)
 
-  def buildPeerMessageReceiver(): PeerMessageReceiver = {
+  def buildPeerMessageReceiver(
+      chainApi: ChainApi,
+      peer: Peer): Future[PeerMessageReceiver] = {
     val receiver =
-      PeerMessageReceiver.newReceiver()
-    receiver
+      PeerMessageReceiver(state = PeerMessageReceiverState.fresh(),
+                          chainApi = chainApi,
+                          peer = peer,
+                          callbacks = SpvNodeCallbacks.empty)
+    Future.successful(receiver)
   }
 
   def buildPeerHandler(): Future[PeerHandler] = {
-    bitcoindPeerF.map { peer =>
-      val peerMsgReceiver = buildPeerMessageReceiver()
+    bitcoindPeerF.flatMap { peer =>
+      val chainApiF = ChainUnitTest.createChainHandler()
+      val peerMsgReceiverF = chainApiF.map(c =>
+        PeerMessageReceiver.newReceiver(c, peer, SpvNodeCallbacks.empty))
       //the problem here is the 'self', this needs to be an ordinary peer message handler
       //that can handle the handshake
-      val peerMsgSender: PeerMessageSender = {
-        val client = NodeTestUtil.client(peer, peerMsgReceiver)
-        PeerMessageSender(client)
-      }
+      val peerHandlerF = for {
+        peerMsgReceiver <- peerMsgReceiverF
+        client = NodeTestUtil.client(peer, peerMsgReceiver)
+        peerMsgSender = PeerMessageSender(client)
+      } yield PeerHandler(peerMsgReceiver, peerMsgSender)
 
-      PeerHandler(peerMsgReceiver, peerMsgSender)
+      peerHandlerF
     }
 
   }
@@ -144,7 +154,7 @@ trait NodeUnitTest
 
 }
 
-object NodeUnitTest {
+object NodeUnitTest extends BitcoinSLogger {
 
   def destroySpvNode(spvNode: SpvNode)(
       implicit config: BitcoinSAppConfig,
@@ -157,6 +167,7 @@ object NodeUnitTest {
       spvNodeConnectedWithBitcoind: SpvNodeConnectedWithBitcoind)(
       implicit system: ActorSystem,
       appConfig: BitcoinSAppConfig): Future[Unit] = {
+    logger.warn(s"Beggining tear down!!!!!!!")
     import system.dispatcher
     val spvNode = spvNodeConnectedWithBitcoind.spvNode
     val bitcoind = spvNodeConnectedWithBitcoind.bitcoind
@@ -166,6 +177,9 @@ object NodeUnitTest {
     for {
       _ <- spvNodeDestroyF
       _ <- bitcoindDestroyF
-    } yield ()
+    } yield {
+      logger.warn(s"Done with teardown!")
+      ()
+    }
   }
 }

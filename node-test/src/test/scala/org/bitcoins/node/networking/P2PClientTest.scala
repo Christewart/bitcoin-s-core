@@ -2,6 +2,8 @@ package org.bitcoins.node.networking
 
 import akka.io.Tcp
 import akka.testkit.{TestActorRef, TestProbe}
+import org.bitcoins.chain.db.ChainDbManagement
+import org.bitcoins.node.SpvNodeCallbacks
 import org.bitcoins.node.models.Peer
 import org.bitcoins.node.networking.peer.PeerMessageReceiver
 import org.bitcoins.node.networking.peer.PeerMessageReceiverState.Preconnection
@@ -29,6 +31,7 @@ class ClientTest
     BitcoinSTestAppConfig.getTestConfig()
   implicit private val chainConf = config.chainConf
   implicit private val nodeConf = config.nodeConf
+  implicit private val timeout = akka.util.Timeout(10.seconds)
 
   implicit val np = config.chainConf.network
 
@@ -44,6 +47,15 @@ class ClientTest
 
   lazy val bitcoindPeer2F = bitcoindRpcF.map { bitcoind =>
     NodeTestUtil.getBitcoindPeer(bitcoind)
+  }
+
+  override def beforeAll(): Unit = {
+    ChainDbManagement.createHeaderTable()
+  }
+
+  override def afterAll(): Unit = {
+    ChainDbManagement.dropHeaderTable()
+    super.afterAll()
   }
 
   behavior of "Client"
@@ -74,22 +86,32 @@ class ClientTest
   def connectAndDisconnect(peer: Peer): Future[Assertion] = {
     val probe = TestProbe()
     val remote = peer.socket
-    val peerMessageReceiver =
-      PeerMessageReceiver(state = Preconnection)
-    val client =
-      TestActorRef(P2PClient.props(peer, peerMessageReceiver), probe.ref)
+    val peerMessageReceiverF =
+      PeerMessageReceiver.preConnection(peer, SpvNodeCallbacks.empty)
+    val clientActorF: Future[TestActorRef[P2PClientActor]] =
+      peerMessageReceiverF.map { peerMsgRecv =>
+        TestActorRef(P2PClient.props(peer, peerMsgRecv), probe.ref)
+      }
 
-    client ! Tcp.Connect(remote)
+    val p2pClientF: Future[P2PClient] = clientActorF.map {
+      client: TestActorRef[P2PClientActor] =>
+        P2PClient(client, peer)
+    }
 
-    val isConnectedF =
-      TestAsyncUtil.retryUntilSatisfied(peerMessageReceiver.isInitialized)
+    val isConnectedF = for {
+      p2pClient <- p2pClientF
+      _ <- p2pClientF.map(p2pClient => p2pClient.actor ! Tcp.Connect(remote))
+      isConnected <- TestAsyncUtil.retryUntilSatisfiedF(p2pClient.isConnected)
+    } yield isConnected
 
     isConnectedF.flatMap { _ =>
-      //disconnect here
-      client ! Tcp.Abort
-      val isDisconnectedF =
-        TestAsyncUtil.retryUntilSatisfied(peerMessageReceiver.isDisconnected,
-                                          duration = 1.seconds)
+      val isDisconnectedF = for {
+        p2pClient <- p2pClientF
+        _ = p2pClient.actor ! Tcp.Abort
+        isDisconnected <- TestAsyncUtil.retryUntilSatisfiedF(
+          p2pClient.isDisconnected,
+          duration = 1.seconds)
+      } yield isDisconnected
 
       isDisconnectedF.map { _ =>
         succeed

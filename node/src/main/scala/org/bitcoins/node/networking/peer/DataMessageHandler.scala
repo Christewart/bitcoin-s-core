@@ -26,7 +26,7 @@ import org.bitcoins.core.p2p.MsgUnassigned
   * that a peer to sent to us on the p2p network, for instance, if we a receive a
   * [[org.bitcoins.core.p2p.HeadersMessage HeadersMessage]] we should store those headers in our database
   */
-class DataMessageHandler(callbacks: SpvNodeCallbacks)(
+class DataMessageHandler(chainApi: ChainApi, callbacks: SpvNodeCallbacks)(
     implicit ec: ExecutionContext,
     chainConf: ChainAppConfig,
     nodeConf: NodeAppConfig)
@@ -40,7 +40,7 @@ class DataMessageHandler(callbacks: SpvNodeCallbacks)(
 
   def handleDataPayload(
       payload: DataPayload,
-      peerMsgSender: PeerMessageSender): Future[Unit] = {
+      peerMsgSender: PeerMessageSender): Future[DataMessageHandler] = {
 
     payload match {
       case getData: GetDataMessage =>
@@ -71,31 +71,39 @@ class DataMessageHandler(callbacks: SpvNodeCallbacks)(
           }
 
         }
-        FutureUtil.unit
+        Future.successful(this)
       case headersMsg: HeadersMessage =>
         logger.trace(
           s"Received headers message with ${headersMsg.count.toInt} headers")
         val headers = headersMsg.headers
-        val chainApiF: Future[ChainApi] =
-          ChainHandler(blockHeaderDAO, chainConfig = chainConf)
-        val processedHeadersF = chainApiF.flatMap(_.processHeaders(headers))
+        val processedHeadersF = chainApi.processHeaders(headers)
 
-        processedHeadersF.map { newApi =>
-          val lastHeader = headers.last
-          val lastHash = lastHeader.hash
-          newApi.getBlockCount.map { count =>
-            logger.trace(
-              s"Processed headers, most recent has height=$count and hash=$lastHash.")
+        processedHeadersF.flatMap { newApi =>
+          val sendHeadersMsgF = for {
+            bestHash <- newApi.getBestBlockHash
+          } yield {
+            newApi.getBlockCount.map { count =>
+              logger.trace(
+                s"Processed headers, most recent has height=$count and hash=$bestHash.")
+            }
+            peerMsgSender.sendGetHeadersMessage(bestHash.flip)
           }
-          peerMsgSender.sendGetHeadersMessage(lastHash)
+          sendHeadersMsgF.map(_ => new DataMessageHandler(newApi, callbacks))
         }
       case msg: BlockMessage =>
-        Future { callbacks.onBlockReceived.foreach(_.apply(msg.block)) }
+        Future {
+          callbacks.onBlockReceived.foreach(_.apply(msg.block))
+          this
+        }
       case msg: TransactionMessage =>
-        Future { callbacks.onTxReceived.foreach(_.apply(msg.transaction)) }
+        Future {
+          callbacks.onTxReceived.foreach(_.apply(msg.transaction))
+          this
+        }
       case msg: MerkleBlockMessage =>
         Future {
           callbacks.onMerkleBlockReceived.foreach(_.apply(msg.merkleBlock))
+          this
         }
       case invMsg: InventoryMessage =>
         handleInventoryMsg(invMsg = invMsg, peerMsgSender = peerMsgSender)
@@ -104,11 +112,11 @@ class DataMessageHandler(callbacks: SpvNodeCallbacks)(
 
   private def handleInventoryMsg(
       invMsg: InventoryMessage,
-      peerMsgSender: PeerMessageSender): Future[Unit] = {
+      peerMsgSender: PeerMessageSender): Future[DataMessageHandler] = {
     logger.info(s"Received inv=${invMsg}")
     val getData = GetDataMessage(invMsg.inventories)
     peerMsgSender.sendMsg(getData)
-    FutureUtil.unit
+    Future.successful(this)
 
   }
 }

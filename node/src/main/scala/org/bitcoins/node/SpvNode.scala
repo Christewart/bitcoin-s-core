@@ -14,6 +14,7 @@ import org.bitcoins.node.networking.peer.{
 import org.bitcoins.rpc.util.AsyncUtil
 
 import scala.concurrent.Future
+import scala.concurrent.duration.DurationInt
 import org.bitcoins.core.bloom.BloomFilter
 import org.bitcoins.core.p2p.FilterLoadMessage
 import org.bitcoins.core.p2p.NetworkPayload
@@ -36,16 +37,25 @@ case class SpvNode(
     extends BitcoinSLogger {
   import system.dispatcher
 
+  implicit private val timeout = akka.util.Timeout(10.seconds)
   private val txDAO = BroadcastAbleTransactionDAO(SQLiteProfile)
 
-  private val peerMsgRecv =
-    PeerMessageReceiver.newReceiver(callbacks)
+  private val clientF: Future[P2PClient] = {
+    val peerMsgRecv: PeerMessageReceiver =
+      PeerMessageReceiver.newReceiver(chainApi = chainApi,
+                                      peer = peer,
+                                      callbacks = callbacks)
+    val p2p = P2PClient(context = system,
+                        peer = peer,
+                        peerMessageReceiver = peerMsgRecv)
 
-  private val client: P2PClient =
-    P2PClient(context = system, peer = peer, peerMessageReceiver = peerMsgRecv)
+    Future.successful(p2p)
+  }
 
-  private val peerMsgSender: PeerMessageSender = {
-    PeerMessageSender(client)
+  private val peerMsgSenderF: Future[PeerMessageSender] = {
+    clientF.map { client =>
+      PeerMessageSender(client)
+    }
   }
 
   /**
@@ -54,8 +64,8 @@ case class SpvNode(
     * with P2P messages, therefore marked as
     * `private[node]`.
     */
-  private[node] def send(msg: NetworkPayload): Unit = {
-    peerMsgSender.sendMsg(msg)
+  private[node] def send(msg: NetworkPayload): Future[Unit] = {
+    peerMsgSenderF.map(_.sendMsg(msg))
   }
 
   /** Starts our spv node */
@@ -63,10 +73,12 @@ case class SpvNode(
     for {
       _ <- nodeAppConfig.initialize()
       node <- {
-        peerMsgSender.connect()
+        val connectedF = peerMsgSenderF.map(_.connect())
 
-        val isInitializedF =
-          AsyncUtil.retryUntilSatisfied(peerMsgRecv.isInitialized)
+        val isInitializedF = for {
+          _ <- connectedF
+          _ <- AsyncUtil.retryUntilSatisfiedF(() => isInitialized)
+        } yield ()
 
         isInitializedF.failed.foreach(err =>
           logger.error(s"Failed to connect with peer=$peer with err=${err}"))
@@ -86,15 +98,21 @@ case class SpvNode(
 
   /** Stops our spv node */
   def stop(): Future[SpvNode] = {
-    peerMsgSender.disconnect()
+    val disconnectF = peerMsgSenderF.map(_.disconnect())
 
-    val isStoppedF = AsyncUtil.retryUntilSatisfied(peerMsgRecv.isDisconnected)
+    val isStoppedF = disconnectF.flatMap { _ =>
+      logger.info(s"Awaiting disconnect")
+      AsyncUtil.retryUntilSatisfiedF(() => isDisconnected)
+    }
 
-    isStoppedF.map(_ => this)
+    isStoppedF.map { _ =>
+      logger.info(s"Spv node stopped!")
+      this
+    }
   }
 
   /** Broadcasts the given transaction over the P2P network */
-  def broadcastTransaction(transaction: Transaction): Unit = {
+  def broadcastTransaction(transaction: Transaction): Future[Unit] = {
     val broadcastTx = BroadcastAbleTransaction(transaction)
 
     txDAO.create(broadcastTx).onComplete {
@@ -106,17 +124,19 @@ case class SpvNode(
     }
 
     logger.info(s"Sending out inv for tx=${transaction.txIdBE}")
-    peerMsgSender.sendInventoryMessage(transaction)
+    peerMsgSenderF.map(_.sendInventoryMessage(transaction))
   }
 
   /** Checks if we have a tcp connection with our peer */
-  def isConnected: Boolean = peerMsgRecv.isConnected
+  def isConnected: Future[Boolean] = clientF.flatMap(_.isConnected)
 
   /** Checks if we are fully initialized with our peer and have executed the handshake
     * This means we can now send arbitrary messages to our peer
     * @return
     */
-  def isInitialized: Boolean = peerMsgRecv.isInitialized
+  def isInitialized: Future[Boolean] = clientF.flatMap(_.isInitialized)
+
+  def isDisconnected: Future[Boolean] = clientF.flatMap(_.isDisconnected)
 
   /** Starts to sync our spv node with our peer
     * If our local best block hash is the same as our peers
@@ -131,7 +151,7 @@ case class SpvNode(
         .getHeader(hash)
         .map(_.get) // .get is safe since this is an internal call
     } yield {
-      peerMsgSender.sendGetHeadersMessage(hash.flip)
+      peerMsgSenderF.map(_.sendGetHeadersMessage(hash.flip))
       logger.info(s"Starting sync node, height=${header.height} hash=$hash")
     }
   }

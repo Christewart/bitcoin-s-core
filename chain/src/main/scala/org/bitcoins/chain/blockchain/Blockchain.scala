@@ -25,6 +25,9 @@ case class Blockchain(headers: Vector[BlockHeaderDb])
     with BitcoinSLogger {
   val tip: BlockHeaderDb = headers.head
 
+  //this could throw if all we have is the genesis
+  lazy val secondTip: BlockHeaderDb = headers(1)
+
   /** @inheritdoc */
   override def newBuilder: mutable.Builder[
     BlockHeaderDb,
@@ -44,6 +47,7 @@ case class Blockchain(headers: Vector[BlockHeaderDb])
 object Blockchain extends BitcoinSLogger {
 
   def fromHeaders(headers: Vector[BlockHeaderDb]): Blockchain = {
+
     Blockchain(headers)
   }
 
@@ -73,9 +77,12 @@ object Blockchain extends BitcoinSLogger {
     val tipResultF: Future[BlockchainUpdate] = {
       val nested: Vector[Future[BlockchainUpdate]] = blockchains.map {
         blockchain =>
-          val prevBlockHeaderOpt =
-            blockchain.find(_.hashBE == header.previousBlockHashBE)
-          prevBlockHeaderOpt match {
+          val prevBlockHeaderIdxOpt =
+            blockchain.headers.zipWithIndex.find {
+              case (headerDb, _) =>
+                headerDb.hashBE == header.previousBlockHashBE
+            }
+          prevBlockHeaderIdxOpt match {
             case None =>
               logger.debug(
                 s"No common ancestor found in the chain to connect to ${header.hashBE}")
@@ -85,7 +92,7 @@ object Blockchain extends BitcoinSLogger {
                                                    tipUpdateFailure = err)
               Future.successful(failed)
 
-            case Some(prevBlockHeader) =>
+            case Some((prevBlockHeader, prevHeaderIdx)) =>
               //found a header to connect to!
               logger.debug(
                 s"Attempting to add new tip=${header.hashBE.hex} with prevhash=${header.previousBlockHashBE.hex} to chain")
@@ -97,8 +104,10 @@ object Blockchain extends BitcoinSLogger {
               tipResultF.map { tipResult =>
                 tipResult match {
                   case TipUpdateResult.Success(headerDb) =>
+                    val oldChain =
+                      blockchain.takeRight(blockchain.length - prevHeaderIdx)
                     val newChain =
-                      Blockchain.fromHeaders(headerDb +: blockchain.headers)
+                      Blockchain.fromHeaders(headerDb +: oldChain)
                     BlockchainUpdate.Successful(newChain, headerDb)
                   case fail: TipUpdateResult.Failure =>
                     BlockchainUpdate.Failed(blockchain, header, fail)

@@ -57,9 +57,27 @@ case class ChainHandler(
         createdF.map { header =>
           logger.debug(
             s"Connected new header to blockchain, height=${header.height} hash=${header.hashBE}")
+          val chainIdxOpt = blockchains.zipWithIndex.find {
+            case (chain, _) =>
+              newChain.secondTip == chain.tip && blockchains.length == 1
+          }
 
-          //what about old chain? The returned chain is _not_ necessarily the best chain I think
-          ChainHandler(blockHeaderDAO, chainConfig, Vector(newChain))
+          val updatedChains = {
+            chainIdxOpt match {
+              case Some((_, idx)) =>
+                logger.info(
+                  s"Updating chain at idx=${idx} out of ${blockchains.length} with new tip=${header.hashBE.hex}")
+                blockchains.updated(idx, newChain)
+
+              case None =>
+                logger.info(
+                  s"New competing blockchain with tip=${newChain.tip}")
+                blockchains.:+(newChain)
+            }
+          }
+
+          ChainHandler(blockHeaderDAO, chainConfig, updatedChains)
+
         }
       case BlockchainUpdate.Failed(_, _, reason) =>
         val errMsg =
@@ -87,12 +105,12 @@ case class ChainHandler(
     //this does _not_ mean that it is on the chain that has the most work
     //TODO: Enhance this in the future to return the "heaviest" header
     //https://bitcoin.org/en/glossary/block-chain
-    blockHeaderDAO.chainTips.map { tips =>
-      val sorted = tips.sortBy(header => header.blockHeader.difficulty)
-      val hash = sorted.head.hashBE
-      logger.debug(s"getBestBlockHash result: hash=$hash")
-      hash
-    }
+    val groupedChains = blockchains.groupBy(_.tip.height)
+    val maxHeight = groupedChains.keys.max
+    val chains = groupedChains(maxHeight)
+    logger.info(s"Chains=${chains.map(_.tip.hashBE.hex)}")
+    val hashBE: DoubleSha256DigestBE = groupedChains(maxHeight).head.tip.hashBE
+    Future.successful(hashBE)
   }
 }
 
