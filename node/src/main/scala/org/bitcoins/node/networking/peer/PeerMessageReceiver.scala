@@ -269,7 +269,8 @@ object PeerMessageReceiver {
   ): Future[PeerMessageReceiver] = {
     import ref.dispatcher
     val blockHeaderDAO = BlockHeaderDAO()
-    val chainHandlerF = ChainHandler(blockHeaderDAO, chainAppConfig)
+    val chainHandlerF =
+      ChainHandler.fromDatabase(blockHeaderDAO, chainAppConfig)
     for {
       chainHandler <- chainHandlerF
     } yield {

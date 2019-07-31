@@ -56,14 +56,10 @@ class BroadcastTransactionTest extends BitcoinSWalletTest {
 
       address <- rpc.getNewAddress
       bloom <- wallet.getBloomFilter()
-      chainHandler <- {
-        val bhDao = BlockHeaderDAO()
-        ChainHandler(bhDao, config)
-      }
       spv <- {
         val peer = Peer.fromBitcoind(rpc.instance)
 
-        val spv = SpvNode(peer, chainHandler, bloomFilter = bloom)
+        val spv = SpvNode(peer, bloomFilter = bloom)
         spv.start()
       }
       _ <- spv.sync()

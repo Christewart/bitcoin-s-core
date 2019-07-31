@@ -17,7 +17,7 @@ class PeerMessageHandlerTest extends NodeUnitTest {
     test(())
   }
 
-  private implicit val akkaTimeout = Timeout(timeout)
+  implicit private val akkaTimeout = Timeout(timeout)
 
   behavior of "PeerHandler"
 
@@ -30,24 +30,13 @@ class PeerMessageHandlerTest extends NodeUnitTest {
       bitcoindPeerF.flatMap(p => peerHandlerF.map(_.peerMsgSender.connect()))
 
     val isConnectedF = TestAsyncUtil.retryUntilSatisfiedF(
-      () => peerMsgRecvF.map(_.isConnected),
+      () => peerMsgRecvF.flatMap(_.isConnected),
       duration = 500.millis
     )
 
-    val hasVersionMsgF = isConnectedF.flatMap { _ =>
-      TestAsyncUtil.retryUntilSatisfiedF(
-        conditionF = () => peerMsgRecvF.map(_.hasReceivedVersionMsg)
-      )
-    }
-
-    val hasVerackMsg = hasVersionMsgF.flatMap { _ =>
-      TestAsyncUtil.retryUntilSatisfiedF(
-        conditionF = () => peerMsgRecvF.map(_.hasReceivedVerackMsg)
-      )
-    }
-
-    val isInitF = hasVerackMsg.flatMap { _ =>
-      peerMsgRecvF.map(p => assert(p.isInitialized))
+    val isInitF = isConnectedF.flatMap { _ =>
+      TestAsyncUtil.retryUntilSatisfiedF(() =>
+        peerMsgRecvF.flatMap(_.isInitialized()))
     }
 
     val disconnectF = isInitF.flatMap { _ =>
@@ -56,7 +45,7 @@ class PeerMessageHandlerTest extends NodeUnitTest {
 
     val isDisconnectedF = disconnectF.flatMap { _ =>
       TestAsyncUtil.retryUntilSatisfiedF(() =>
-        peerMsgRecvF.map(_.isDisconnected))
+        peerMsgRecvF.flatMap(_.isDisconnected()))
 
     }
 

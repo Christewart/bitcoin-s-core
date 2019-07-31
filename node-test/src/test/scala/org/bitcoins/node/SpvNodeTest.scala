@@ -50,7 +50,7 @@ class SpvNodeTest extends NodeUnitTest {
       }
   }
 
-  /* it must "stay in sync with a bitcoind instance" in {
+  it must "stay in sync with a bitcoind instance" in {
     spvNodeConnectedWithBitcoind: SpvNodeConnectedWithBitcoind =>
       val spvNode = spvNodeConnectedWithBitcoind.spvNode
       val bitcoind = spvNodeConnectedWithBitcoind.bitcoind
@@ -64,7 +64,9 @@ class SpvNodeTest extends NodeUnitTest {
       //as they happen with the 'sendheaders' message
       //both our spv node and our bitcoind node _should_ both be at the genesis block (regtest)
       //at this point so no actual syncing is happening
-      val initSyncF = gen1F.flatMap(_ => spvNode.sync())
+      val initSyncF = gen1F.flatMap { hashes =>
+        spvNode.sync()
+      }
 
       //start generating a block every 10 seconds with bitcoind
       //this should result in 5 blocks
@@ -78,12 +80,13 @@ class SpvNodeTest extends NodeUnitTest {
         //we should expect 5 headers have been announced to us via
         //the send headers message.
         val has6BlocksF = RpcUtil.retryUntilSatisfiedF(
-          conditionF = () => spvNode.chainApi.getBlockCount.map(_ == 6),
+          conditionF =
+            () => spvNode.chainApiF.flatMap(_.getBlockCount.map(_ == 6)),
           duration = 1.seconds)
 
         has6BlocksF.map(_ => succeed)
       }
-  }*/
+  }
 
   /** Helper method to generate blocks every interval */
   private def genBlockInterval(bitcoind: BitcoindRpcClient)(

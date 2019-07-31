@@ -2,7 +2,9 @@ package org.bitcoins.node
 
 import akka.actor.ActorSystem
 import org.bitcoins.chain.api.ChainApi
+import org.bitcoins.chain.blockchain.ChainHandler
 import org.bitcoins.chain.config.ChainAppConfig
+import org.bitcoins.chain.models.BlockHeaderDAO
 import org.bitcoins.core.util.BitcoinSLogger
 import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.node.models.Peer
@@ -18,16 +20,17 @@ import scala.concurrent.duration.DurationInt
 import org.bitcoins.core.bloom.BloomFilter
 import org.bitcoins.core.p2p.FilterLoadMessage
 import org.bitcoins.core.p2p.NetworkPayload
+import org.bitcoins.core.protocol.blockchain.BlockHeader
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.node.models.BroadcastAbleTransaction
 import org.bitcoins.node.models.BroadcastAbleTransactionDAO
 import slick.jdbc.SQLiteProfile
+
 import scala.util.Failure
 import scala.util.Success
 
 case class SpvNode(
     peer: Peer,
-    chainApi: ChainApi,
     bloomFilter: BloomFilter,
     callbacks: SpvNodeCallbacks = SpvNodeCallbacks.empty
 )(
@@ -40,16 +43,22 @@ case class SpvNode(
   implicit private val timeout = akka.util.Timeout(10.seconds)
   private val txDAO = BroadcastAbleTransactionDAO(SQLiteProfile)
 
+  def chainApiF: Future[ChainApi] = {
+    ChainHandler.fromDatabase(BlockHeaderDAO(), chainAppConfig)
+  }
   private val clientF: Future[P2PClient] = {
-    val peerMsgRecv: PeerMessageReceiver =
-      PeerMessageReceiver.newReceiver(chainApi = chainApi,
-                                      peer = peer,
-                                      callbacks = callbacks)
-    val p2p = P2PClient(context = system,
-                        peer = peer,
-                        peerMessageReceiver = peerMsgRecv)
-
-    Future.successful(p2p)
+    for {
+      chainApi <- chainApiF
+    } yield {
+      val peerMsgRecv: PeerMessageReceiver =
+        PeerMessageReceiver.newReceiver(chainApi = chainApi,
+                                        peer = peer,
+                                        callbacks = callbacks)
+      val p2p = P2PClient(context = system,
+                          peer = peer,
+                          peerMessageReceiver = peerMsgRecv)
+      p2p
+    }
   }
 
   private val peerMsgSenderF: Future[PeerMessageSender] = {
@@ -146,6 +155,7 @@ case class SpvNode(
     */
   def sync(): Future[Unit] = {
     for {
+      chainApi <- chainApiF
       hash <- chainApi.getBestBlockHash
       header <- chainApi
         .getHeader(hash)

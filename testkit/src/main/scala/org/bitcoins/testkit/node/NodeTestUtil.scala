@@ -107,9 +107,9 @@ abstract class NodeTestUtil extends BitcoinSLogger {
   def isSameBestHash(node: SpvNode, rpc: BitcoindRpcClient)(
       implicit ec: ExecutionContext): Future[Boolean] = {
     val hashF = rpc.getBestBlockHash
-    val spvHashF = node.chainApi.getBestBlockHash
     for {
-      spvBestHash <- spvHashF
+      chainApi <- node.chainApiF
+      spvBestHash <- chainApi.getBestBlockHash
       hash <- hashF
     } yield {
       spvBestHash == hash

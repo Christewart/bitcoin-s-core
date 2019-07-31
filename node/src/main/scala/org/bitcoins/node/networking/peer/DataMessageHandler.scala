@@ -35,7 +35,6 @@ class DataMessageHandler(chainApi: ChainApi, callbacks: SpvNodeCallbacks)(
   private val callbackNum = callbacks.onBlockReceived.length + callbacks.onMerkleBlockReceived.length + callbacks.onTxReceived.length
   logger.debug(s"Given $callbackNum of callback(s)")
 
-  private val blockHeaderDAO: BlockHeaderDAO = BlockHeaderDAO()
   private val txDAO = BroadcastAbleTransactionDAO(SQLiteProfile)
 
   def handleDataPayload(
@@ -86,7 +85,6 @@ class DataMessageHandler(chainApi: ChainApi, callbacks: SpvNodeCallbacks)(
               logger.trace(
                 s"Processed headers, most recent has height=$count and hash=$bestHash.")
             }
-            peerMsgSender.sendGetHeadersMessage(bestHash.flip)
           }
           sendHeadersMsgF.map(_ => new DataMessageHandler(newApi, callbacks))
         }

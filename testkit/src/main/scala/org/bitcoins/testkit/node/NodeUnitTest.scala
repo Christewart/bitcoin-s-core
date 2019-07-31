@@ -82,15 +82,16 @@ trait NodeUnitTest
   def buildPeerHandler(): Future[PeerHandler] = {
     bitcoindPeerF.flatMap { peer =>
       val chainApiF = ChainUnitTest.createChainHandler()
-      val peerMsgReceiverF = chainApiF.map(c =>
-        PeerMessageReceiver.newReceiver(c, peer, SpvNodeCallbacks.empty))
+      val peerMsgReceiverF = chainApiF.flatMap { _ =>
+        PeerMessageReceiver.preConnection(peer, SpvNodeCallbacks.empty)
+      }
       //the problem here is the 'self', this needs to be an ordinary peer message handler
       //that can handle the handshake
       val peerHandlerF = for {
         peerMsgReceiver <- peerMsgReceiverF
         client = NodeTestUtil.client(peer, peerMsgReceiver)
         peerMsgSender = PeerMessageSender(client)
-      } yield PeerHandler(peerMsgReceiver, peerMsgSender)
+      } yield PeerHandler(client, peerMsgSender)
 
       peerHandlerF
     }
@@ -110,12 +111,9 @@ trait NodeUnitTest
   def createSpvNode(bitcoind: BitcoindRpcClient): Future[SpvNode] = {
     val chainApiF = ChainUnitTest.createChainHandler()
     val peer = createPeer(bitcoind)
-    for {
-      chainApi <- chainApiF
-    } yield
-      SpvNode(peer = peer,
-              chainApi = chainApi,
-              bloomFilter = NodeTestUtil.emptyBloomFilter)
+    chainApiF.map { _ =>
+      SpvNode(peer = peer, bloomFilter = NodeTestUtil.emptyBloomFilter)
+    }
   }
 
   def withSpvNode(test: OneArgAsyncTest)(
@@ -167,7 +165,7 @@ object NodeUnitTest extends BitcoinSLogger {
       spvNodeConnectedWithBitcoind: SpvNodeConnectedWithBitcoind)(
       implicit system: ActorSystem,
       appConfig: BitcoinSAppConfig): Future[Unit] = {
-    logger.warn(s"Beggining tear down!!!!!!!")
+    logger.debug(s"Beggining tear down of spv node connected with bitcoind")
     import system.dispatcher
     val spvNode = spvNodeConnectedWithBitcoind.spvNode
     val bitcoind = spvNodeConnectedWithBitcoind.bitcoind
@@ -178,7 +176,7 @@ object NodeUnitTest extends BitcoinSLogger {
       _ <- spvNodeDestroyF
       _ <- bitcoindDestroyF
     } yield {
-      logger.warn(s"Done with teardown!")
+      logger.debug(s"Done with teardown of spv node connected with bitcoind!")
       ()
     }
   }

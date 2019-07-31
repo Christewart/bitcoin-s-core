@@ -108,7 +108,7 @@ case class ChainHandler(
     val groupedChains = blockchains.groupBy(_.tip.height)
     val maxHeight = groupedChains.keys.max
     val chains = groupedChains(maxHeight)
-    logger.info(s"Chains=${chains.map(_.tip.hashBE.hex)}")
+    logger.debug(s"tips for besthash=${chains.map(_.tip.hashBE.hex)}")
     val hashBE: DoubleSha256DigestBE = groupedChains(maxHeight).head.tip.hashBE
     Future.successful(hashBE)
   }
@@ -116,7 +116,7 @@ case class ChainHandler(
 
 object ChainHandler {
 
-  def apply(blockHeaderDAO: BlockHeaderDAO, chainConfig: ChainAppConfig)(
+  def fromDatabase(blockHeaderDAO: BlockHeaderDAO, chainConfig: ChainAppConfig)(
       implicit ec: ExecutionContext): Future[ChainHandler] = {
     val bestChainsF = blockHeaderDAO.getBlockchains()
 

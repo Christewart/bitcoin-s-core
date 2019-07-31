@@ -184,7 +184,8 @@ trait ChainUnitTest
   def createPopulatedChainHandler(): Future[ChainHandler] = {
     for {
       blockHeaderDAO <- ChainUnitTest.createPopulatedBlockHeaderDAO()
-      chainHandler <- ChainHandler(blockHeaderDAO = blockHeaderDAO, appConfig)
+      chainHandler <- ChainHandler.fromDatabase(blockHeaderDAO = blockHeaderDAO,
+                                                appConfig)
     } yield chainHandler
   }
 
@@ -437,7 +438,7 @@ object ChainUnitTest extends BitcoinSLogger {
       ec: ExecutionContext): Future[ChainHandler] = {
     lazy val blockHeaderDAO = BlockHeaderDAO()
 
-    ChainHandler(blockHeaderDAO = blockHeaderDAO, appConfig)
+    ChainHandler.fromDatabase(blockHeaderDAO = blockHeaderDAO, appConfig)
   }
 
 }

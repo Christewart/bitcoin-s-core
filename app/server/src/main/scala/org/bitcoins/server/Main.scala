@@ -112,17 +112,15 @@ object Main
 
         SpvNodeCallbacks(onTxReceived = Seq(onTX))
       }
-      val blockheaderDAO = BlockHeaderDAO()
-      val chainF = ChainHandler(blockheaderDAO, conf)
-      chainF.flatMap(chain => SpvNode(peer, chain, bloom, callbacks).start())
+      SpvNode(peer, bloom, callbacks).start()
     }
     _ = logger.info(s"Starting SPV node sync")
     _ <- node.sync()
-
+    chainApi <- node.chainApiF
     start <- {
       val walletRoutes = WalletRoutes(wallet, node)
       val nodeRoutes = NodeRoutes(node)
-      val chainRoutes = ChainRoutes(node.chainApi)
+      val chainRoutes = ChainRoutes(chainApi)
       val server = Server(Seq(walletRoutes, nodeRoutes, chainRoutes))
       server.start()
     }

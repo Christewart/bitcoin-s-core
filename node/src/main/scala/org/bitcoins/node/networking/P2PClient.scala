@@ -105,7 +105,6 @@ case class P2PClientActor(
     case connected: Tcp.Connected =>
       Await.result(handleEvent(connected, unalignedBytes = ByteVector.empty),
                    timeout)
-
     case msg: NetworkMessage =>
       self.forward(msg.payload)
     case payload: NetworkPayload =>
@@ -214,21 +213,16 @@ case class P2PClientActor(
           logger.trace(s"Unaligned bytes: ${newUnalignedBytes.toHex}")
         }
 
-        //for the messages we successfully parsed above
-        //send them to 'context.parent' -- this is the
-        //PeerMessageHandler that is responsible for
-        //creating this Client Actor
         val newMsgReceiverF: Future[PeerMessageReceiver] = {
           val currentF = Future.successful(currentPeerMsgHandlerRecv)
+          logger.trace(s"About to process ${messages.length} messages")
           messages.foldLeft(currentF) {
             case (peerMsgRecvF, m) =>
               peerMsgRecvF.flatMap { peerMsgRecv: PeerMessageReceiver =>
-                logger.info(s"Processing message=${m}")
+                logger.trace(s"Processing message=${m}")
                 val msg = NetworkMessageReceived(m, P2PClient(self, peer))
                 val doneF = peerMsgRecv.handleNetworkMessageReceived(msg)
                 doneF.flatMap { newMsgReceiver =>
-                  logger.trace(
-                    s"newMsgReceiver with state=${newMsgReceiver.state}")
                   currentPeerMsgHandlerRecv = newMsgReceiver
                   doneF
                 }
@@ -290,7 +284,7 @@ case class P2PClient(actor: ActorRef, peer: Peer) {
   def isConnected()(
       implicit timeout: Timeout,
       ec: ExecutionContext): Future[Boolean] = {
-    val isConnectedF = (actor.ask(P2PClient.IsConnected)).mapTo[Boolean]
+    val isConnectedF = actor.ask(P2PClient.IsConnected).mapTo[Boolean]
     isConnectedF.recoverWith { case _: Throwable => Future.successful(false) }
   }
 
