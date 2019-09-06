@@ -102,7 +102,10 @@ object CommonSettings {
       "off"
     ) ++ commonCompilerOpts ++ {
       if (scalaVersion.startsWith("2.13")) scala2_13CompilerOpts
-      else nonScala2_13CompilerOpts
+      else if (scalaVersion.startsWith("0")) {
+        //dotty
+        Nil
+      } else nonScala2_13CompilerOpts
     }
 
   def testCompilerOpts(scalaVersion: String): Seq[String] = {
