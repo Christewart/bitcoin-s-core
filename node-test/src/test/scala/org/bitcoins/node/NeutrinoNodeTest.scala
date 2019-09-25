@@ -12,7 +12,6 @@ import org.scalatest.{DoNotDiscover, FutureOutcome}
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-@DoNotDiscover
 class NeutrinoNodeTest extends NodeUnitTest {
 
   /** Wallet config with data directory set to user temp directory */
@@ -86,6 +85,8 @@ class NeutrinoNodeTest extends NodeUnitTest {
         genBlockInterval(bitcoind)
       }
 
+      val interval = 500.millis
+
       startGenF.flatMap { _ =>
         //we should expect 5 headers have been announced to us via
         //the send headers message.
@@ -94,21 +95,21 @@ class NeutrinoNodeTest extends NodeUnitTest {
             node
               .chainApiFromDb()
               .flatMap(_.getBlockCount.map(_ == 6))
-          }, duration = 1000.millis)
+          }, duration = interval)
 
         def has6FilterHeadersF =
           RpcUtil.retryUntilSatisfiedF(conditionF = () => {
             node
               .chainApiFromDb()
               .flatMap(_.getFilterHeaderCount.map(_ == 6))
-          }, duration = 1000.millis)
+          }, duration = interval)
 
         def has6FiltersF =
           RpcUtil.retryUntilSatisfiedF(conditionF = () => {
             node
               .chainApiFromDb()
               .flatMap(_.getFilterCount.map(_ == 6))
-          }, duration = 1000.millis)
+          }, duration = interval)
 
         for {
           _ <- has6BlocksF

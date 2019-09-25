@@ -168,8 +168,9 @@ case class PeerMessageSender(client: P2PClient)(implicit conf: NodeAppConfig)
 
   private[node] def sendMsg(msg: NetworkPayload)(
       implicit ec: ExecutionContext): Future[Unit] = {
+    logger.info(s"Want to send msg=${msg.commandName}")
     isInitialized().map { _ =>
-      logger.debug(s"Sending msg=${msg.commandName} to peer=${socket}")
+      logger.info(s"Sending msg=${msg.commandName} to peer=${socket}")
       val newtworkMsg = NetworkMessage(conf.network, msg)
       client.actor ! newtworkMsg
     }
