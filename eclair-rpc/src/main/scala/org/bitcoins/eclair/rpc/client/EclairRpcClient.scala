@@ -22,7 +22,7 @@ import org.bitcoins.core.protocol.ln.{
   ShortChannelId
 }
 import org.bitcoins.core.protocol.script.ScriptPubKey
-import org.bitcoins.core.util.BitcoinSUtil
+import org.bitcoins.core.util.{BitcoinSUtil, FutureUtil}
 import org.bitcoins.core.wallet.fee.SatoshisPerByte
 import org.bitcoins.eclair.rpc.api.EclairApi
 import org.bitcoins.eclair.rpc.config.EclairInstance
@@ -36,9 +36,7 @@ import play.api.libs.json._
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.sys.process._
-import scala.util.{Failure, Properties, Success}
-import java.nio.file.NoSuchFileException
-import org.bitcoins.core.util.FutureUtil
+import scala.util.{Failure, Success}
 
 /**
   * @param binary Path to Eclair Jar. If not present, reads
@@ -639,34 +637,7 @@ class EclairRpcClient(val instance: EclairInstance, binary: Option[File] = None)
   }
 
   private def pathToEclairJar: String = {
-
-    (binary, Properties.envOrNone("ECLAIR_PATH")) match {
-      // default to provided binary
-      case (Some(binary), _) =>
-        if (binary.exists) {
-          binary.toString
-        } else {
-          throw new NoSuchFileException(
-            s"Given binary ($binary) does not exist!")
-        }
-      case (None, Some(path)) =>
-        val eclairV =
-          s"/eclair-node-${EclairRpcClient.version}-${EclairRpcClient.commit}.jar"
-        val fullPath = path + eclairV
-
-        val jar = new File(fullPath)
-        if (jar.exists) {
-          fullPath
-        } else {
-          throw new NoSuchFileException(
-            s"Could not Eclair Jar at location $fullPath")
-        }
-      case (None, None) =>
-        val msg = List(
-          "Environment variable ECLAIR_PATH is not set, and no binary is given!",
-          "Either needs to be set in order to start Eclair.")
-        throw new RuntimeException(msg.mkString(" "))
-    }
+    "/home/chris/dev/eclair/bin/eclair-native"
   }
 
   private var process: Option[Process] = None
@@ -686,7 +657,7 @@ class EclairRpcClient(val instance: EclairInstance, binary: Option[File] = None)
 
       if (process.isEmpty) {
         val p = Process(
-          s"java -jar -Declair.datadir=${instance.authCredentials.datadir.get} $pathToEclairJar &")
+          s"${pathToEclairJar} -Declair.datadir=${instance.authCredentials.datadir.get}")
         val result = p.run()
         logger.debug(
           s"Starting eclair with datadir ${instance.authCredentials.datadir.get}")
