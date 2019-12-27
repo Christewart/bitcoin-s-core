@@ -110,6 +110,7 @@ val syncF: Future[ChainApi] = configF.flatMap { _ =>
 }
 
 //initialize our key manager, where we store our keys
+import org.bitcoins.keymanager._
 import org.bitcoins.keymanager.bip39._
 val keyManager = BIP39KeyManager.initialize(walletConfig.kmParams).getOrElse {
   throw new RuntimeException(s"Failed to initalize key manager")
