@@ -56,6 +56,7 @@ case class BIP39KeyManager(
 object BIP39KeyManager
     extends KeyManagerCreateApi[BIP39KeyManager]
     with BitcoinSLogger {
+
   val badPassphrase = AesPassword.fromString("changeMe").get
 
   /** Initializes the mnemonic seed and saves it to file */

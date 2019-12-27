@@ -210,7 +210,7 @@ trait LockedWalletApi extends WalletApi {
   def listAccounts(purpose: HDPurpose): Future[Vector[AccountDb]] =
     listAccounts().map(_.filter(_.hdAccount.purpose == purpose))
 
-  /**
+ /**
     * Iterates over the block filters in order to find filters that match to the given addresses
     *
     * I queries the filter database for [[batchSize]] filters a time
