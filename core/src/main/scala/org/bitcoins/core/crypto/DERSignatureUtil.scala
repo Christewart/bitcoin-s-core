@@ -1,6 +1,5 @@
 package org.bitcoins.core.crypto
 
-import org.bouncycastle.asn1.{ASN1InputStream, ASN1Integer, DLSequence}
 import scodec.bits.ByteVector
 
 import scala.util.{Failure, Success, Try}
@@ -25,29 +24,65 @@ sealed abstract class DERSignatureUtil {
     * This will fail if this signature contains the hash type appended to the end of it
     * @return boolean representing if the signature is a valid
     */
-  def isDEREncoded(bytes: ByteVector): Boolean = {
-    //signature is trivially valid if the signature is empty
-    if (bytes.nonEmpty && bytes.size < 9) false
-    else if (bytes.nonEmpty) {
-      //first byte must be 0x30
-      val firstByteIs0x30 = bytes.head == 0x30
-      //second byte must indicate the length of the remaining byte array
-      val signatureSize = bytes(1).toLong
-      //checks to see if the signature length is the same as the signatureSize val
-      val signatureLengthIsCorrect = signatureSize == bytes
-        .slice(2, bytes.size)
-        .size
-      //third byte must be 0x02
-      val thirdByteIs0x02 = bytes(2) == 0x02
-      //this is the size of the r value in the signature
-      val rSize = bytes(3)
+  def isDEREncoded(
+      bytes: ByteVector,
+      withSighashByte: Boolean = false,
+      withStrictMode: Boolean = false): Boolean = {
+    // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S]
+    // min (non-zero) length is 8 bytes, 1 byte for R and S
+    // max length is 72 bytes, 33 bytes for R and S
+    val minLen = if (withSighashByte) 9 else 8
+    val maxLen = if (withSighashByte) 73 else 72
+    val maxIntLen = 33
+    val seqTag = 0x30
+    val lenWithoutSeqContents = bytes.size - (if (withSighashByte) 3 else 2)
+    val intTag = 0x02
 
-      //this 0x02 separates the r and s value )in the signature
-      val second0x02Exists = bytes(rSize + 4) == 0x02
+    if (bytes.isEmpty) true
+    else if (bytes.size < minLen || bytes.length > maxLen)
+      false // must be within size bounds
+    else if (bytes(0) != seqTag)
+      false // expected ASN.1 DER ‘Constructed’ SEQUENCE
+    else if (bytes(1) != lenWithoutSeqContents) false // invalid SEQUENCE length
+    else if (bytes(2) != intTag) false // expected ASN.1 INTEGER
+    else {
+      val rLen = bytes(3)
+      val minLenWithoutMinR = minLen - 1
 
-      firstByteIs0x30 && signatureLengthIsCorrect && thirdByteIs0x02 &&
-      second0x02Exists
-    } else true
+      if (rLen < 1 || rLen > maxIntLen || (minLenWithoutMinR + rLen) > bytes.size)
+        false // R length must be [1,33] bytes and not overrun
+      else {
+        val sTagOffset = 4 + rLen
+
+        if (bytes(sTagOffset) != intTag) false // expected ASN.1 INTEGER
+        else {
+          val sLenOffset = sTagOffset + 1
+          val sLen = bytes(sLenOffset)
+          val constantSize = if (withSighashByte) 7 else 6
+
+          if (sLen < 1 || (constantSize + rLen + sLen) != bytes.size)
+            false // S length must be [1,33] bytes and not overrun
+          else {
+            if (withStrictMode) {
+              val rOffset = 4
+              if (rLen > 1 && bytes(rOffset) == 0 && (bytes(rOffset + 1) & 0x80) == 0)
+                false // no null padding at start of R
+              else if ((bytes(rOffset) & 0x80) != 0)
+                false // no negative numbers for R
+              else {
+                val sOffset = sLenOffset + 1
+
+                if (sLen > 1 && bytes(sOffset) == 0 && (bytes(sOffset + 1) & 0x80) == 0)
+                  false // no null padding at start of S
+                else if ((bytes(sOffset) & 0x80) != 0)
+                  false // no negative numbers for S
+                else true
+              }
+            } else true
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -64,40 +99,98 @@ sealed abstract class DERSignatureUtil {
     * @param bytes
     * @return
     */
-  def decodeSignature(bytes: ByteVector): (BigInt, BigInt) = {
-    val asn1InputStream = new ASN1InputStream(bytes.toArray)
-    //TODO: this is nasty, is there any way to get rid of all this casting???
-    //TODO: Not 100% this is completely right for signatures that are incorrectly DER encoded
-    //the behavior right now is to return the defaults in the case the signature is not DER encoded
-    //https://stackoverflow.com/questions/2409618/how-do-i-decode-a-der-encoded-string-in-java
-    val seq: DLSequence = Try(
-      asn1InputStream.readObject.asInstanceOf[DLSequence]) match {
-      case Success(seq) => seq
-      case Failure(_)   => new DLSequence()
+  def decodeSignature(
+      bytes: ByteVector,
+      withStrictMode: Boolean = false): (BigInt, BigInt) = {
+
+    def hexStrForByte(ix: Int): String = {
+      s"0x${java.lang.Integer.toHexString(java.lang.Byte.toUnsignedInt(bytes(ix)))}"
     }
-    val default = new ASN1Integer(0)
-    val r: ASN1Integer = Try(seq.getObjectAt(0).asInstanceOf[ASN1Integer]) match {
-      case Success(r) =>
-        //this is needed for a bug inside of bouncy castle where zero length values throw an exception
-        //we need to treat these like zero
-        Try(r.getValue) match {
-          case Success(_) => r
-          case Failure(_) => default
+
+    val minLen = 8 // if (withSighashByte) 9 else 8
+    val maxLen = 73 // if (withSighashByte) 73 else 72
+    val maxIntLen = 33
+    val seqTag = 0x30
+    val intTag = 0x02
+
+    if (bytes.isEmpty) (BigInt(0), BigInt(0))
+    else if (bytes.size < minLen) {
+      throw new IllegalArgumentException(
+        s"Expected at least ${minLen} bytes, was: ${bytes.length}")
+    } else if (bytes.length > maxLen) {
+      throw new IllegalArgumentException(
+        s"Expected at most ${maxLen} bytes, was: ${bytes.length}")
+    } else if (bytes(0) != seqTag) {
+      throw new IllegalArgumentException(
+        s"Expected ASN.1 DER ‘Constructed’ SEQUENCE (0x30), was: ${hexStrForByte(0)}")
+    } else {
+      val seqLen = bytes(1)
+
+      if (bytes.size < seqLen + 2 || bytes.size > seqLen + 3) {
+        throw new IllegalArgumentException(
+          s"Invalid ASN.1 SEQUENCE length, was: ${hexStrForByte(1)}")
+      } else {
+        val withSighashByte = bytes.size == seqLen + 3
+
+        if (bytes(2) != intTag) {
+          throw new IllegalArgumentException(
+            s"Expected ASN.1 INTEGER (0x02), was: ${hexStrForByte(2)}")
+        } else {
+          val rLen = bytes(3)
+          val minLenWithoutMinR = minLen - 1
+
+          if (rLen < 1 || rLen > maxIntLen || (minLenWithoutMinR + rLen) > bytes.size) {
+            throw new IllegalArgumentException(
+              s"Length of ASN.1 INTEGER for R must be [1,33] bytes and not overrun, was: ${rLen}")
+          } else {
+            val sTagOffset = 4 + rLen
+
+            if (bytes(sTagOffset) != intTag) {
+              throw new IllegalArgumentException(
+                s"Expected ASN.1 INTEGER (0x02), was: ${hexStrForByte(sTagOffset)}")
+            } else {
+              val sLenOffset = sTagOffset + 1
+              val sLen = bytes(sLenOffset)
+              val constantSize = if (withSighashByte) 7 else 6
+
+              if (sLen < 1 || (constantSize + rLen + sLen) != bytes.size) {
+                throw new IllegalArgumentException(
+                  s"Length of ASN.1 INTEGER for S must be [1,33] bytes and not overrun, was: ${sLen}")
+              } else {
+                val rOffset = 4
+                val sOffset = sLenOffset + 1
+                def extractRS = {
+                  // force positive integers, even if ASN.1 integer was technically negative
+                  // this has an impact only when strict mode is turned off, as negative ASN.1 Integers are rejected
+                  val r =
+                    BigInt(1, bytes.slice(rOffset, rOffset + rLen).toArray)
+                  val s =
+                    BigInt(1, bytes.slice(sOffset, sOffset + sLen).toArray)
+                  (r, s)
+                }
+
+                if (withStrictMode) {
+                  if (rLen > 1 && bytes(rOffset) == 0 && (bytes(rOffset + 1) & 0x80) == 0) {
+                    throw new IllegalArgumentException(
+                      s"ASN.1 INTEGER for R has a leading null byte")
+                  } else if ((bytes(rOffset) & 0x80) != 0) {
+                    throw new IllegalArgumentException(
+                      s"R value in ECDSA must be non-negative in strict mode")
+                  } else if (sLen > 1 && bytes(sOffset) == 0 && (bytes(
+                               sOffset + 1) & 0x80) == 0) {
+                    throw new IllegalArgumentException(
+                      s"ASN.1 INTEGER for S has a leading null byte")
+                  } else if ((bytes(sOffset) & 0x80) != 0) {
+                    throw new IllegalArgumentException(
+                      s"S value in ECDSA must be non-negative in strict mode")
+                  } else extractRS
+                } else extractRS
+              }
+            }
+          }
         }
-      case Failure(_) => default
+      }
     }
-    val s: ASN1Integer = Try(seq.getObjectAt(1).asInstanceOf[ASN1Integer]) match {
-      case Success(s) =>
-        //this is needed for a bug inside of bouncy castle where zero length values throw an exception
-        //we need to treat these like zero
-        Try(s.getValue) match {
-          case Success(_) => s
-          case Failure(_) => default
-        }
-      case Failure(_) => default
-    }
-    asn1InputStream.close()
-    (r.getPositiveValue, s.getPositiveValue)
   }
 
   /**
@@ -123,86 +216,7 @@ sealed abstract class DERSignatureUtil {
     * @return boolean indicating whether the bytes were der encoded or not
     */
   def isValidSignatureEncoding(bytes: ByteVector): Boolean = {
-    // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S] [sighash]
-    // * total-length: 1-byte length descriptor of everything that follows,
-    //   excluding the sighash byte.
-    // * R-length: 1-byte length descriptor of the R value that follows.
-    // * R: arbitrary-length big-endian encoded R value. It must use the shortest
-    //   possible encoding for a positive integers (which means no null bytes at
-    //   the start, except a single one when the next byte has its highest bit set).
-    // * S-length: 1-byte length descriptor of the S value that follows.
-    // * S: arbitrary-length big-endian encoded S value. The same rules apply.
-    // * sighash: 1-byte value indicating what data is hashed (not part of the DER
-    //   signature)
-
-    //there is a caveat here that this function is trivially true if the
-    //empty signature is given to us, aka 0 bytes.
-    if (bytes.size == 0) return true
-
-    if (bytes.size < 9) return false
-    //logger.debug("signature is the minimum size for strict der encoding")
-    if (bytes.size > 73) return false
-    //logger.debug("signature is under the maximum size for strict der encoding")
-
-    // A signature is of type 0x30 (compound)
-    if (bytes.head != 0x30) return false
-    //logger.debug("First  byte is 0x30")
-
-    // Make sure the length covers the entire signature.
-    if (bytes(1) != bytes.size - 3) return false
-    //logger.debug("Signature length covers the entire signature")
-
-    val rSize = bytes(3)
-    //logger.debug("rSize: " + rSize)
-
-    // Make sure the length of the S element is still inside the signature.
-    if (5 + rSize >= bytes.size) return false
-    //logger.debug("Length of S element is contained in the signature")
-
-    // Extract the length of the S element.
-    val sSize = bytes(5 + rSize)
-    //logger.debug("sSize: " + sSize)
-
-    // Verify that the length of the signature matches the sum of the length
-    // of the elements.
-    if ((rSize + sSize + 7) != bytes.size) return false
-    //logger.debug("Verify that the length of the signature matches the sum of the length of the elements.")
-
-    // Check whether the R element is an integer.
-    if (bytes(2) != 0x02) return false
-    //logger.debug("R element is an integer")
-
-    // Zero-length integers are not allowed for R.
-    if (rSize == 0) return false
-    //logger.debug("r is not a zero length integer")
-
-    // Negative numbers are not allowed for R.
-    if ((bytes(4) & 0x80) != 0) return false
-    //logger.debug("r is not a negative number")
-
-    // Null bytes at the start of R are not allowed, unless R would
-    // otherwise be interpreted as a negative number.
-    if (rSize > 1 && (bytes(4) == 0x00) && !((bytes(5) & 0x80) != 0))
-      return false
-    //logger.debug("There were not any null bytes at the start of R")
-    // Check whether the S element is an integer.
-    if (bytes(rSize + 4) != 0x02) return false
-    //logger.debug("The S element is an integer")
-
-    // Zero-length integers are not allowed for S.
-    if (sSize == 0) return false
-    //logger.debug("S was not a zero length integer")
-
-    // Negative numbers are not allowed for S.
-    if ((bytes(rSize + 6) & 0x80) != 0) return false
-    //logger.debug("s was not a negative number")
-    // Null bytes at the start of S are not allowed, unless S would otherwise be
-    // interpreted as a negative number.
-    if (sSize > 1 && (bytes(rSize + 6) == 0x00) && !((bytes(rSize + 7) & 0x80) != 0))
-      return false
-    //logger.debug("There were not any null bytes at the start of S")
-    //if we made it to this point without returning false this must be a valid strictly encoded der sig
-    true
+    isDEREncoded(bytes, withSighashByte = true, withStrictMode = true)
   }
 
   /**
