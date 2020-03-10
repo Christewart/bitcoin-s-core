@@ -148,23 +148,25 @@ class TransactionTest extends BitcoinSUnitTest {
     val source = Source.fromURL(getClass.getResource("/tx_valid.json"))
 
     //use this to represent a single test case from script_valid.json
-    /*    val lines =
+        val lines =
       """
-          |[[[["0000000000000000000000000000000000000000000000000000000000000100", 0, "0x51", 1000],
-          |["0000000000000000000000000000000000000000000000000000000000000100", 1, "0x00 0x20 0x4d6c2a32c87821d68fc016fca70797abdb80df6cd84651d40a9300c6bad79e62", 1000]],
-          |"0100000000010200010000000000000000000000000000000000000000000000000000000000000000000000ffffffff00010000000000000000000000000000000000000000000000000000000000000100000000ffffffff01d00700000000000001510003483045022100e078de4e96a0e05dcdc0a414124dd8475782b5f3f0ed3f607919e9a5eeeb22bf02201de309b3a3109adb3de8074b3610d4cf454c49b61247a2779a0bcbf31c889333032103596d3451025c19dbbdeb932d6bf8bfb4ad499b95b6f88db8899efac102e5fc711976a9144c9c3dfac4207d5d8cb89df5722cb3d712385e3f88ac00000000", "P2SH,WITNESS"]
-          |]
-          |""".stripMargin*/
+        | [
+        |[[["60a20bd93aa49ab4b28d514ec10b06e1829ce6818ec06cd3aabd013ebcdc4bb1", 0, "1 0x41 0x04cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a1dfef58bbfbfaff7d8a473e7e2e6d317b87bafe8bde97e3cf8f065dec022b51d11fcdd0d348ac4 0x41 0x0461cbdcc5409fb4b4d42b51d33381354d80e550078cb532a34bfa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540911abe3e7854a26f39f58b25c15342af 2 OP_CHECKMULTISIG"]],
+        |"0100000001b14bdcbc3e01bdaad36cc08e81e69c82e1060bc14e518db2b49aa43ad90ba260000000004a01ff47304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2b01ffffffff0140420f00000000001976a914660d4ef3a743e3e696ad990364e555c271ad504b88ac00000000", "P2SH"]
+        |
+        |]
+          |""".stripMargin
 
-    val lines =
+/*    val lines =
       try source.getLines.filterNot(_.isEmpty).map(_.trim) mkString "\n"
-      finally source.close()
+      finally source.close()*/
     val json = lines.parseJson
     val testCasesOpt: Seq[Option[CoreTransactionTestCase]] =
       json.convertTo[Seq[Option[CoreTransactionTestCase]]]
     val testCases: Seq[CoreTransactionTestCase] = testCasesOpt.flatten
     for {
       testCase <- testCases
+      _ = println(s"test case =${testCase}")
       (outPoint, scriptPubKey, amountOpt) <- testCase.creditingTxsInfo
       tx = testCase.spendingTx
       (input, inputIndex) = findInput(tx, outPoint).getOrElse(
@@ -225,12 +227,17 @@ class TransactionTest extends BitcoinSUnitTest {
             output = TransactionOutput(CurrencyUnits.zero, scriptPubKey),
             flags = testCase.flags)
       }
+
       val program = PreExecutionScriptProgram(txSigComponent)
+
       withClue(s"${testCase.raw} input index: $inputIndex") {
         try {
-          ScriptInterpreter.run(program) must equal(ScriptOk)
+          val result = ScriptInterpreter.run(program)
+          result must be (ScriptOk)
         } catch {
-          case scala.util.control.NonFatal(cause) => fail(cause)
+          case scala.util.control.NonFatal(cause) =>
+            println(s"testcase=${testCase}")
+            fail(cause)
         }
       }
     }
