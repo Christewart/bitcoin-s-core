@@ -2,6 +2,7 @@ package org.bitcoins.core.crypto
 
 import org.bitcoins.core.util.NumberUtil
 import org.bitcoins.testkit.util.BitcoinSUnitTest
+import scodec.bits._
 
 /**
   * Created by chris on 3/23/16.
@@ -85,9 +86,9 @@ class DERSignatureUtilTest extends BitcoinSUnitTest {
   }
 
   it must "say that an overly long signature is NOT strict der encoded" in {
-    val sig = ECDigitalSignature(
-      "0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000")
-    DERSignatureUtil.isValidSignatureEncoding(sig) must be(false)
+    DERSignatureUtil.isValidSignatureEncoding(
+      hex"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+    ) must be(false)
   }
 
   it must "determine if a signature is encoded with a low s value" in {

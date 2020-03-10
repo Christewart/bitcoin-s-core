@@ -39,11 +39,13 @@ sealed abstract class DERSignatureUtil {
     val intTag = 0x02
 
     if (bytes.isEmpty) true
-    else if (bytes.size < minLen || bytes.length > maxLen)
+    else if (bytes.size < minLen)
       false // must be within size bounds
+    else if (withStrictMode && bytes.length > maxLen)
+      false
     else if (bytes(0) != seqTag)
       false // expected ASN.1 DER ‘Constructed’ SEQUENCE
-    else if (bytes(1) != lenWithoutSeqContents) false // invalid SEQUENCE length
+    else if (if (withStrictMode) bytes(1) != lenWithoutSeqContents else bytes(1) < lenWithoutSeqContents) false // invalid SEQUENCE length
     else if (bytes(2) != intTag) false // expected ASN.1 INTEGER
     else {
       val rLen = bytes(3)
@@ -60,8 +62,10 @@ sealed abstract class DERSignatureUtil {
           val sLen = bytes(sLenOffset)
           val constantSize = if (withSighashByte) 7 else 6
 
-          if (sLen < 1 || (constantSize + rLen + sLen) != bytes.size)
-            false // S length must be [1,33] bytes and not overrun
+          if (sLen < 1 || sLen > maxIntLen)
+            false // S length must be [1,33] bytes
+          else if (if (withStrictMode) (constantSize + rLen + sLen) != bytes.size else (constantSize + rLen + sLen) > bytes.size)
+            false // S length must not overrun
           else {
             if (withStrictMode) {
               val rOffset = 4
@@ -117,7 +121,7 @@ sealed abstract class DERSignatureUtil {
     else if (bytes.size < minLen) {
       throw new IllegalArgumentException(
         s"Expected at least ${minLen} bytes, was: ${bytes.length}")
-    } else if (bytes.length > maxLen) {
+    } else if (withStrictMode && bytes.length > maxLen) {
       throw new IllegalArgumentException(
         s"Expected at most ${maxLen} bytes, was: ${bytes.length}")
     } else if (bytes(0) != seqTag) {
@@ -126,7 +130,10 @@ sealed abstract class DERSignatureUtil {
     } else {
       val seqLen = bytes(1)
 
-      if (bytes.size < seqLen + 2 || bytes.size > seqLen + 3) {
+      if (bytes.size < seqLen + 2) {
+        throw new IllegalArgumentException(
+          s"Invalid ASN.1 SEQUENCE length, was: ${hexStrForByte(1)}")
+      } else if (withStrictMode && bytes.size > seqLen + 3) {
         throw new IllegalArgumentException(
           s"Invalid ASN.1 SEQUENCE length, was: ${hexStrForByte(1)}")
       } else {
@@ -153,9 +160,12 @@ sealed abstract class DERSignatureUtil {
               val sLen = bytes(sLenOffset)
               val constantSize = if (withSighashByte) 7 else 6
 
-              if (sLen < 1 || (constantSize + rLen + sLen) != bytes.size) {
+              if (sLen < 1 || sLen > maxIntLen) {
                 throw new IllegalArgumentException(
-                  s"Length of ASN.1 INTEGER for S must be [1,33] bytes and not overrun, was: ${sLen}")
+                  s"Length of ASN.1 INTEGER for S must be [1,33] bytes, was: ${sLen}")
+              } else if (if (withStrictMode) (constantSize + rLen + sLen) != bytes.size else (constantSize + rLen + sLen) > bytes.size) {
+                throw new IllegalArgumentException(
+                  s"Length of ASN.1 INTEGER for S must not overrun, was: ${sLen}")
               } else {
                 val rOffset = 4
                 val sOffset = sLenOffset + 1

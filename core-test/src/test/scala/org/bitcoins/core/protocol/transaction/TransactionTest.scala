@@ -227,7 +227,11 @@ class TransactionTest extends BitcoinSUnitTest {
       }
       val program = PreExecutionScriptProgram(txSigComponent)
       withClue(s"${testCase.raw} input index: $inputIndex") {
-        ScriptInterpreter.run(program) must equal(ScriptOk)
+        try {
+          ScriptInterpreter.run(program) must equal(ScriptOk)
+        } catch {
+          case scala.util.control.NonFatal(cause) => fail(cause)
+        }
       }
     }
   }
@@ -310,7 +314,14 @@ class TransactionTest extends BitcoinSUnitTest {
                 flags = testCase.flags)
           }
           val program = PreExecutionScriptProgram(txSigComponent)
-          ScriptInterpreter.run(program) == ScriptOk
+
+          withClue(testCase.raw) {
+            try {
+              ScriptInterpreter.run(program) == ScriptOk
+            } catch {
+              case scala.util.control.NonFatal(cause) => fail(cause)
+            }
+          }
         } else {
           logger.error("Transaction does not pass CheckTransaction()")
           isValidTx
