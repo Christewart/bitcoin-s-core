@@ -21,7 +21,6 @@ sealed abstract class DERSignatureUtil {
   /**
     * Checks if the bytes are encoded to DER correctly
     * https://crypto.stackexchange.com/questions/1795/how-can-i-convert-a-der-ecdsa-signature-to-asn-1
-    * This will fail if this signature contains the hash type appended to the end of it
     * @return boolean representing if the signature is a valid
     */
   def isDEREncoded(

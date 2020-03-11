@@ -1,6 +1,6 @@
 package org.bitcoins.core.protocol.script
 
-import org.bitcoins.core.crypto.{ECDigitalSignature, ECPublicKey}
+import org.bitcoins.core.crypto.{DERSignatureUtil, ECDigitalSignature, ECPublicKey}
 import org.bitcoins.core.script.constant._
 import org.bitcoins.core.serializers.script.ScriptParser
 import org.bitcoins.core.util._
@@ -122,11 +122,10 @@ object P2PKHScriptSignature extends ScriptFactory[P2PKHScriptSignature] {
   /** Determines if the given asm matches a [[P2PKHScriptSignature]] */
   def isP2PKHScriptSig(asm: Seq[ScriptToken]): Boolean = asm match {
     case Seq(_: BytesToPushOntoStack,
-             _: ScriptConstant,
+             sig: ScriptConstant,
              _: BytesToPushOntoStack,
-             z: ScriptConstant) =>
-      if (ECPublicKey.isFullyValid(z.bytes)) true
-      else !P2SHScriptSignature.isRedeemScript(z)
+             pubkey: ScriptConstant) =>
+      ECPublicKey.isFullyValid(pubkey.bytes) && DERSignatureUtil.isDEREncoded(bytes = sig.bytes)
     case _ => false
   }
 }
@@ -325,13 +324,19 @@ object MultiSignatureScriptSignature
       case false =>
         val firstTokenIsScriptNumberOperation =
           asm.head.isInstanceOf[ScriptNumberOperation]
-        val restOfScriptIsPushOpsOrScriptConstants = asm.tail
-          .map(
-            token =>
-              token.isInstanceOf[ScriptConstant] || StackPushOperationFactory
-                .isPushOperation(token))
-          .exists(_ == false)
-        firstTokenIsScriptNumberOperation && !restOfScriptIsPushOpsOrScriptConstants
+        //every element of this group should be
+        //PUSH_OP & SIG
+        val groups = asm.tail.grouped(2)
+        val restOfScriptIsPushOpsOrScriptConstants = groups.forall { g =>
+          if (g.length != 2) {
+            false
+          } else {
+            val pushop = g.head
+            val sig = g(1)
+            pushop.isInstanceOf[BytesToPushOntoStack] && DERSignatureUtil.isDEREncoded(sig.bytes)
+          }
+        }
+        firstTokenIsScriptNumberOperation && restOfScriptIsPushOpsOrScriptConstants
     }
 }
 
@@ -374,7 +379,8 @@ object P2PKScriptSignature extends ScriptFactory[P2PKScriptSignature] {
 
   /** P2PK scriptSigs always have the pattern [pushop, digitalSignature] */
   def isP2PKScriptSignature(asm: Seq[ScriptToken]): Boolean = asm match {
-    case Seq(_: BytesToPushOntoStack, _: ScriptConstant) => true
+    case Seq(_: BytesToPushOntoStack, sig: ScriptConstant) =>
+      DERSignatureUtil.isDEREncoded(sig.bytes)
     case _                                               => false
   }
 }
