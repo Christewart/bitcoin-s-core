@@ -100,6 +100,8 @@ class ScriptInterpreterTest extends BitcoinSUnitTest {
         val runAttemptT = Try(ScriptInterpreter.run(program))
 
         if (runAttemptT.isFailure) {
+          println(s"testCase.raw=${testCase.raw}")
+          println(s"Failed test case=${program}")
           throw runAttemptT.failed.get
         } else {
           runAttemptT.get must equal(testCase.expectedResult)
