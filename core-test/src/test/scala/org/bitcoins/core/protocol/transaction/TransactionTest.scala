@@ -148,7 +148,7 @@ class TransactionTest extends BitcoinSUnitTest {
     val source = Source.fromURL(getClass.getResource("/tx_valid.json"))
 
     //use this to represent a single test case from script_valid.json
-/*        val lines =
+    /*        val lines =
       """
         | [
         |  [[["60a20bd93aa49ab4b28d514ec10b06e1829ce6818ec06cd3aabd013ebcdc4bb1", 0, "1 0x41 0x04cc71eb30d653c0c3163990c47b976f3fb3f37cccdcbedb169a1dfef58bbfbfaff7d8a473e7e2e6d317b87bafe8bde97e3cf8f065dec022b51d11fcdd0d348ac4 0x41 0x0461cbdcc5409fb4b4d42b51d33381354d80e550078cb532a34bfa2fcfdeb7d76519aecc62770f5b0e4ef8551946d8a540911abe3e7854a26f39f58b25c15342af 2 OP_CHECKMULTISIG"]],
@@ -232,7 +232,7 @@ class TransactionTest extends BitcoinSUnitTest {
       withClue(s"${testCase.raw} input index: $inputIndex") {
         try {
           val result = ScriptInterpreter.run(program)
-          result must be (ScriptOk)
+          result must be(ScriptOk)
         } catch {
           case scala.util.control.NonFatal(cause) =>
             println(s"testcase=${testCase}")

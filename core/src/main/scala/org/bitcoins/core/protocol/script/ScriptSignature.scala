@@ -1,6 +1,10 @@
 package org.bitcoins.core.protocol.script
 
-import org.bitcoins.core.crypto.{DERSignatureUtil, ECDigitalSignature, ECPublicKey}
+import org.bitcoins.core.crypto.{
+  DERSignatureUtil,
+  ECDigitalSignature,
+  ECPublicKey
+}
 import org.bitcoins.core.script.constant._
 import org.bitcoins.core.serializers.script.ScriptParser
 import org.bitcoins.core.util._
@@ -125,7 +129,8 @@ object P2PKHScriptSignature extends ScriptFactory[P2PKHScriptSignature] {
              sig: ScriptConstant,
              _: BytesToPushOntoStack,
              pubkey: ScriptConstant) =>
-      ECPublicKey.isFullyValid(pubkey.bytes) && DERSignatureUtil.isDEREncoded(bytes = sig.bytes, true)
+      ECPublicKey.isFullyValid(pubkey.bytes) && DERSignatureUtil
+        .isDEREncoded(bytes = sig.bytes, true)
     case _ => false
   }
 }
@@ -333,7 +338,8 @@ object MultiSignatureScriptSignature
           } else {
             val pushop = g.head
             val sig = g(1)
-            pushop.isInstanceOf[BytesToPushOntoStack] && DERSignatureUtil.isDEREncoded(sig.bytes, true)
+            pushop.isInstanceOf[BytesToPushOntoStack] && DERSignatureUtil
+              .isDEREncoded(sig.bytes, true)
           }
         }
         firstTokenIsScriptNumberOperation && restOfScriptIsPushOpsOrScriptConstants
@@ -381,7 +387,7 @@ object P2PKScriptSignature extends ScriptFactory[P2PKScriptSignature] {
   def isP2PKScriptSignature(asm: Seq[ScriptToken]): Boolean = asm match {
     case Seq(_: BytesToPushOntoStack, sig: ScriptConstant) =>
       DERSignatureUtil.isDEREncoded(sig.bytes, true)
-    case _                                               => false
+    case _ => false
   }
 }
 

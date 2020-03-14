@@ -27,6 +27,11 @@ sealed abstract class DERSignatureUtil {
       bytes: ByteVector,
       withSighashByte: Boolean = false,
       withStrictMode: Boolean = false): Boolean = {
+    if (bytes == DummyECDigitalSignature.bytes) {
+      //skip validation since this is useful for building
+      //dummy txs for fee estimation
+      return true
+    }
     // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S]
     // min (non-zero) length is 8 bytes, 1 byte for R and S
     // max length is 72 bytes, 33 bytes for R and S
@@ -44,7 +49,9 @@ sealed abstract class DERSignatureUtil {
       false
     else if (bytes(0) != seqTag)
       false // expected ASN.1 DER ‘Constructed’ SEQUENCE
-    else if (if (withStrictMode) bytes(1) != lenWithoutSeqContents else bytes(1) < lenWithoutSeqContents) false // invalid SEQUENCE length
+    else if (if (withStrictMode) bytes(1) != lenWithoutSeqContents
+             else bytes(1) < lenWithoutSeqContents)
+      false // invalid SEQUENCE length
     else if (bytes(2) != intTag) false // expected ASN.1 INTEGER
     else {
       val rLen = bytes(3)
@@ -63,7 +70,9 @@ sealed abstract class DERSignatureUtil {
 
           if (sLen < 1 || sLen > maxIntLen)
             false // S length must be [1,33] bytes
-          else if (if (withStrictMode) (constantSize + rLen + sLen) != bytes.size else (constantSize + rLen + sLen) > bytes.size)
+          else if (if (withStrictMode)
+                     (constantSize + rLen + sLen) != bytes.size
+                   else (constantSize + rLen + sLen) > bytes.size)
             false // S length must not overrun
           else {
             if (withStrictMode) {
@@ -116,7 +125,8 @@ sealed abstract class DERSignatureUtil {
     val seqTag = 0x30
     val intTag = 0x02
 
-    if (bytes.isEmpty) (BigInt(0), BigInt(0))
+    if (bytes.isEmpty || bytes == DummyECDigitalSignature.bytes)
+      (BigInt(0), BigInt(0))
     else if (bytes.size < minLen) {
       throw new IllegalArgumentException(
         s"Expected at least ${minLen} bytes, was: ${bytes.length}")
@@ -162,7 +172,9 @@ sealed abstract class DERSignatureUtil {
               if (sLen < 1 || sLen > maxIntLen) {
                 throw new IllegalArgumentException(
                   s"Length of ASN.1 INTEGER for S must be [1,33] bytes, was: ${sLen}")
-              } else if (if (withStrictMode) (constantSize + rLen + sLen) != bytes.size else (constantSize + rLen + sLen) > bytes.size) {
+              } else if (if (withStrictMode)
+                           (constantSize + rLen + sLen) != bytes.size
+                         else (constantSize + rLen + sLen) > bytes.size) {
                 throw new IllegalArgumentException(
                   s"Length of ASN.1 INTEGER for S must not overrun, was: ${sLen}")
               } else {

@@ -1,5 +1,6 @@
 package org.bitcoins.core.crypto
 
+import org.bitcoins.core.script.crypto.HashType
 import org.bitcoins.core.util.{BitcoinSLogger, BitcoinSUtil, Factory}
 import scodec.bits.ByteVector
 
@@ -93,7 +94,8 @@ final case object EmptyDigitalSignature extends ECDigitalSignature {
   * https://en.bitcoin.it/wiki/Elliptic_Curve_Digital_Signature_Algorithm
   */
 final case object DummyECDigitalSignature extends ECDigitalSignature {
-  override val bytes = ByteVector(Array.fill(72)(0.toByte))
+  override val bytes =
+    ByteVector(Array.fill(71)(0.toByte)).:+(HashType.sigHashAllByte)
   override def r = EmptyDigitalSignature.r
   override def s = r
 }

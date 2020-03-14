@@ -2,6 +2,7 @@ package org.bitcoins.core.protocol.transaction
 
 import org.bitcoins.core.protocol.script.{
   EmptyScriptSignature,
+  NonStandardScriptSignature,
   P2PKScriptSignature
 }
 import org.bitcoins.testkit.util.{BitcoinSUnitTest, TestUtil}
@@ -41,7 +42,7 @@ class TransactionInputTest extends BitcoinSUnitTest {
 
   it must "serialize and deserialize a coinbase input" in {
     val c = CoinbaseInput(
-      P2PKScriptSignature(
+      NonStandardScriptSignature.fromHex(
         "4847304502210092d4e6183970b5e082d87563afbcfb3e1f38e801d89f036fd2935c394d6cc364022032b2a419e19f00b6f32f88c4427cf5e2a97f298b7d4e45efb5f723d84257ca03"),
       TransactionConstants.sequence
     )
