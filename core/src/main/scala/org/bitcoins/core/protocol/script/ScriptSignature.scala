@@ -125,7 +125,7 @@ object P2PKHScriptSignature extends ScriptFactory[P2PKHScriptSignature] {
              sig: ScriptConstant,
              _: BytesToPushOntoStack,
              pubkey: ScriptConstant) =>
-      ECPublicKey.isFullyValid(pubkey.bytes) && DERSignatureUtil.isDEREncoded(bytes = sig.bytes)
+      ECPublicKey.isFullyValid(pubkey.bytes) && DERSignatureUtil.isDEREncoded(bytes = sig.bytes, true)
     case _ => false
   }
 }
@@ -333,7 +333,7 @@ object MultiSignatureScriptSignature
           } else {
             val pushop = g.head
             val sig = g(1)
-            pushop.isInstanceOf[BytesToPushOntoStack] && DERSignatureUtil.isDEREncoded(sig.bytes)
+            pushop.isInstanceOf[BytesToPushOntoStack] && DERSignatureUtil.isDEREncoded(sig.bytes, true)
           }
         }
         firstTokenIsScriptNumberOperation && restOfScriptIsPushOpsOrScriptConstants
@@ -380,7 +380,7 @@ object P2PKScriptSignature extends ScriptFactory[P2PKScriptSignature] {
   /** P2PK scriptSigs always have the pattern [pushop, digitalSignature] */
   def isP2PKScriptSignature(asm: Seq[ScriptToken]): Boolean = asm match {
     case Seq(_: BytesToPushOntoStack, sig: ScriptConstant) =>
-      DERSignatureUtil.isDEREncoded(sig.bytes)
+      DERSignatureUtil.isDEREncoded(sig.bytes, true)
     case _                                               => false
   }
 }
