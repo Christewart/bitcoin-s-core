@@ -555,6 +555,10 @@ sealed abstract class ECPublicKey extends BaseECKey {
   def tweakMultiplyWithBouncyCastle(tweak: FieldElement): ECPublicKey = {
     BouncyCastleUtil.pubKeyTweakMul(this, tweak.bytes)
   }
+
+  def toBigInteger: java.math.BigInteger = {
+    new BigInteger(1,bytes.toArray)
+  }
 }
 
 object ECPublicKey extends Factory[ECPublicKey] {

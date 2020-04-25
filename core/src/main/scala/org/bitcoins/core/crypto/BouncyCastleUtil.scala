@@ -18,6 +18,7 @@ object BouncyCastleUtil {
 
   private val curve: ECCurve = CryptoParams.curve.getCurve
   private val G: ECPoint = CryptoParams.curve.getG
+  private val n: java.math.BigInteger = curve.getOrder
 
   private def getBigInteger(bytes: ByteVector): BigInteger = {
     new BigInteger(1, bytes.toArray)
@@ -156,9 +157,17 @@ object BouncyCastleUtil {
         val sigPoint = s.publicKey
         val challengePoint = schnorrPubKey.publicKey.tweakMultiply(negE)
         val computedR = challengePoint.add(sigPoint)
-        val yCoord = computedR.toPoint.getRawYCoord
+        if (computedR.toBigInteger.compareTo(challengePoint.toBigInteger) >= 0) {
+          //r must not be >= p
+          false
+        } else if (sigPoint.toBigInteger.compareTo(n) >= 0) {
+          //s must not be >= n
+          false
+        } else {
+          val yCoord = computedR.toPoint.getRawYCoord
 
-        yCoord != null && yCoord.sqrt() != null && computedR.schnorrNonce == rx
+          yCoord != null && yCoord.sqrt() != null && computedR.schnorrNonce == rx
+        }
       case Failure(_) => false
     }
   }
