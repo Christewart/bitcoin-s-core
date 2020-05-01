@@ -27,4 +27,11 @@ class AddressTagTest extends BitcoinSUnitTest {
     InternalAddressTagName.fromString("DeepColdStorage") must be(
       StorageLocationTag.DeepColdStorageName)
   }
+
+  it must "not be able to wrap an internal tag with ExternalAddressTagWrapper" in { _=>
+    //why even allow this to run when you can just get a compiler error?
+    assertThrows[IllegalArgumentException] {
+      ExternalAddressTagWrapper(StorageLocationTag.ColdStorage.tagName,StorageLocationTag.tagType)
+    }
+  }
 }
