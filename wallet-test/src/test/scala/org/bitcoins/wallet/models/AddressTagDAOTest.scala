@@ -180,4 +180,8 @@ class AddressTagDAOTest extends BitcoinSWalletTest with WalletDAOFixture {
       assert(addressTags == ExternalExampleTag.all)
     }
   }
+
+  it must "create a wrapped tag from an external tag" in {
+    val wrapped = ExternalAddressTagWrapper(ExternalExampleTag.ExampleA)
+  }
 }

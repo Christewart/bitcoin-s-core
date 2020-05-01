@@ -21,4 +21,6 @@ trait ExternalAddressTagType extends AddressTagType {
   */
 trait ExternalAddressTag extends AddressTag {
   override def tagType: ExternalAddressTagType
+
+  override def tagName: ExternalAddressTagName
 }
