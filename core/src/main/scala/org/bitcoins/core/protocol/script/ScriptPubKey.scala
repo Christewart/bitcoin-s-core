@@ -22,6 +22,7 @@ import org.bitcoins.core.wallet.utxo.{
   ConditionalPath,
   InputInfo,
   P2SHInputInfo,
+  P2WPKHV0InputInfo,
   P2WSHV0InputInfo
 }
 import org.bitcoins.crypto.{
@@ -1218,8 +1219,9 @@ sealed abstract class P2WPKHWitnessSPKV0 extends WitnessScriptPubKeyV0 {
   }
 }
 
-object P2WPKHWitnessSPKV0 extends ScriptFactory[P2WPKHWitnessSPKV0] {
-
+object P2WPKHWitnessSPKV0
+    extends ScriptFactory[P2WPKHWitnessSPKV0]
+    with PubKeyForUseFactory[P2WPKHV0InputInfo] {
   private case class P2WPKHWitnessSPKV0Impl(
       override val asm: Vector[ScriptToken])
       extends P2WPKHWitnessSPKV0
@@ -1251,6 +1253,11 @@ object P2WPKHWitnessSPKV0 extends ScriptFactory[P2WPKHWitnessSPKV0] {
     val hash = CryptoUtil.sha256Hash160(pubKey.bytes)
     val pushop = BitcoinScriptUtil.calculatePushOp(hash.bytes)
     fromAsm(Seq(OP_0) ++ pushop ++ Seq(ScriptConstant(hash.bytes)))
+  }
+
+  override def pubKeyForUse(
+      inputInfo: P2WPKHV0InputInfo): Vector[ECPublicKey] = {
+    Vector(inputInfo.pubKey)
   }
 }
 

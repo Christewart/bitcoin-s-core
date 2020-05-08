@@ -3,7 +3,8 @@ package org.bitcoins.core.protocol.script
 import org.bitcoins.core.protocol.CompactSizeUInt
 import org.bitcoins.core.script.constant.ScriptToken
 import org.bitcoins.core.util.BitcoinScriptUtil
-import org.bitcoins.crypto.{BytesUtil, Factory}
+import org.bitcoins.core.wallet.utxo.InputInfo
+import org.bitcoins.crypto.{BytesUtil, ECPublicKey, Factory}
 import scodec.bits.ByteVector
 
 /**
@@ -50,4 +51,8 @@ trait ScriptFactory[T <: Script] extends Factory[T] {
   def fromAsmHex(hex: String): T = {
     fromAsmBytes(BytesUtil.decodeHex(hex))
   }
+}
+
+trait PubKeyForUseFactory[I <: InputInfo] {
+  def pubKeyForUse(inputInfo: I): Vector[ECPublicKey]
 }
