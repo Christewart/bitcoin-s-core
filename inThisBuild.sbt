@@ -7,7 +7,7 @@ val scala2_13 = "2.13.4"
 
 scalafmtOnCompile in ThisBuild := !Properties.envOrNone("CI").contains("true")
 
-scalaVersion in ThisBuild := "0.18.1-RC1"
+scalaVersion in ThisBuild := "0.24.0-RC1"
 
 crossScalaVersions in ThisBuild := List(scala2_13, scala2_12)
 
