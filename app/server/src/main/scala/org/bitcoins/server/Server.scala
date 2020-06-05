@@ -59,7 +59,7 @@ case class Server(
     }
   }
 
-  val route =
+  val route : Route = {
     // TODO implement better logging
     DebuggingDirectives.logRequestResult("http-rpc-server", Logging.InfoLevel) {
       withErrorHandling {
@@ -76,8 +76,10 @@ case class Server(
         }
       }
     }
+  }
 
   def start(): Future[Http.ServerBinding] = {
+    logger.info(s"Starting Bitcoin-S HTTP server")
     val httpFut =
       Http().bindAndHandle(route, "localhost", rpcport)
     httpFut.foreach { http =>
