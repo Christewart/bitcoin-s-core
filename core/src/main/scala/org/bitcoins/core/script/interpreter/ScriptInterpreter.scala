@@ -160,7 +160,9 @@ sealed abstract class ScriptInterpreter extends BitcoinSLogger {
     * return if that script was valid or not
     */
   def runVerify(p: PreExecutionScriptProgram): Boolean = {
-    ScriptInterpreter.run(p) == ScriptOk
+    val result = ScriptInterpreter.run(p)
+    logger.info(s"runVerify.result=${result}")
+    result == ScriptOk
   }
 
   /**
@@ -201,7 +203,9 @@ sealed abstract class ScriptInterpreter extends BitcoinSLogger {
 
     prevOuts.zipWithIndex.forall {
       case (prevOut, index) =>
-        verifyInputScript(transaction, index, prevOut)
+        val result = verifyInputScript(transaction, index, prevOut)
+        logger.debug(s"Result script verification result for index=${index} with prevout=${prevOut} ${result}")
+        result
     }
   }
 

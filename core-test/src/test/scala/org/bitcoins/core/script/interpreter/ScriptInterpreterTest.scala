@@ -1,21 +1,18 @@
 package org.bitcoins.core.script.interpreter
 
-import org.bitcoins.core.crypto.{
-  BaseTxSigComponent,
-  WitnessTxSigComponentP2SH,
-  WitnessTxSigComponentRaw
-}
-import org.bitcoins.core.currency.CurrencyUnits
+import org.bitcoins.core.crypto.{BaseTxSigComponent, SignatureValidationSuccess, TransactionSignatureChecker, TransactionSignatureCreator, WitnessTxSigComponentP2SH, WitnessTxSigComponentRaw}
+import org.bitcoins.core.currency.{Bitcoins, CurrencyUnits, Satoshis}
+import org.bitcoins.core.number.UInt32
+import org.bitcoins.core.policy.Policy
+import org.bitcoins.core.protocol.script
 import org.bitcoins.core.protocol.script._
-import org.bitcoins.core.protocol.transaction.{
-  Transaction,
-  TransactionOutput,
-  WitnessTransaction
-}
+import org.bitcoins.core.protocol.transaction.{Transaction, TransactionConstants, TransactionInput, TransactionOutPoint, TransactionOutput, TransactionWitness, WitnessTransaction}
 import org.bitcoins.core.script.PreExecutionScriptProgram
+import org.bitcoins.core.script.crypto.HashType
 import org.bitcoins.core.script.flag.ScriptFlagFactory
 import org.bitcoins.core.script.interpreter.testprotocol.CoreTestCase
 import org.bitcoins.core.script.interpreter.testprotocol.CoreTestCaseProtocol._
+import org.bitcoins.crypto.ECPrivateKey
 import org.bitcoins.testkit.util.{BitcoinSUnitTest, TransactionTestUtil}
 import spray.json._
 
@@ -136,4 +133,210 @@ class ScriptInterpreterTest extends BitcoinSUnitTest {
 
     ScriptInterpreter.verifyTransaction(tx, Vector(prevOut))
   }
+
+  it must "proof the tx fee attack on segwit" in {
+    //https://blog.trezor.io/details-of-firmware-updates-for-trezor-one-version-1-9-1-and-trezor-model-t-version-2-3-1-1eba8f60f2dd
+
+    //setup
+    val privKey1 = ECPrivateKey.freshPrivateKey
+    val privKey2 = ECPrivateKey.freshPrivateKey
+    val pubKey1 = privKey1.publicKey
+    val pubKey2 = privKey2.publicKey
+
+    val p2wpkh1 = P2WPKHWitnessSPKV0(pubKey1)
+    val p2wpkh2 = P2WPKHWitnessSPKV0(pubKey2)
+
+    //real utxos
+    val utxo15BTC = TransactionOutput(Bitcoins(15), p2wpkh1)
+    val (fundingTx15BTC,fundingTx15BTCOutputIndex) = TransactionTestUtil
+      .buildCreditingTransaction(utxo15BTC)
+
+
+    val utxo5BTC1Sat = TransactionOutput(Bitcoins(5.00000001), p2wpkh2)
+
+    val (fundingTx5BTC1Sat, fundingTx5BTC1SatOutputIndex) = {
+      TransactionTestUtil.buildCreditingTransaction(utxo5BTC1Sat)
+    }
+
+    val utxo20BTC = TransactionOutput(Bitcoins(20), p2wpkh2)
+    val utxo1Sat = utxo5BTC1Sat.copy(value = Satoshis.one)
+
+    val (fundingTx20BTC,fundingTx20BTCOutputIdx) = TransactionTestUtil.buildCreditingTransaction(
+      utxo20BTC
+    )
+
+    val (fundingTx1Sat, fundingTx1SatOutputIdx) = TransactionTestUtil.buildCreditingTransaction(
+      utxo1Sat
+    )
+
+    val destination20BTC = TransactionOutput(Bitcoins(20), EmptyScriptPubKey)
+
+    val unsignedInputs: Vector[TransactionInput] = {
+      Vector(
+        TransactionInput(
+          outPoint = TransactionOutPoint(fundingTx15BTC.txId, fundingTx15BTCOutputIndex),
+          scriptSignature = EmptyScriptSignature,
+          sequenceNumber = TransactionConstants.sequence),
+        TransactionInput(
+          outPoint = TransactionOutPoint(fundingTx20BTC.txId, fundingTx20BTCOutputIdx),
+          scriptSignature = EmptyScriptSignature,
+          sequenceNumber = TransactionConstants.sequence),
+      )
+    }
+
+    val unsignedWitness1 = {
+      TransactionWitness(Vector(
+        P2WPKHWitnessV0(pubKey1),
+        EmptyScriptWitness))
+    }
+
+    val unsignedTx1: WitnessTransaction = {
+      WitnessTransaction(
+        TransactionConstants.version,
+        unsignedInputs,
+        Vector(destination20BTC),
+        TransactionConstants.lockTime,
+        unsignedWitness1)
+    }
+
+    val txSigComponent1 = {
+      WitnessTxSigComponentRaw(
+        unsignedTx1,
+        UInt32.zero,
+        utxo15BTC,
+        Policy.standardScriptVerifyFlags
+      )
+    }
+
+    //produce the signature
+    val signature1 = TransactionSignatureCreator.createSig(txSignatureComponent = txSigComponent1,
+      privateKey = privKey1,
+      hashType = HashType.sigHashAll)
+
+    val checkSig1 = TransactionSignatureChecker.checkSignature(txSigComponent1,pubKey1,signature1)
+    assert(checkSig1 == SignatureValidationSuccess)
+
+    val signedInputs1 = {
+      unsignedInputs
+    }
+
+    val signedWitness1: TransactionWitness = {
+      unsignedWitness1.updated(UInt32.zero.toInt,
+        P2WPKHWitnessV0(pubKey1,signature1))
+    }
+
+    val signedTx1 = {
+      WitnessTransaction(
+        version = TransactionConstants.version,
+        inputs = signedInputs1,
+        outputs = Vector(destination20BTC),
+        lockTime = TransactionConstants.lockTime,
+        witness = signedWitness1
+      )
+    }
+
+    logger.info(s"===================Verifying script result for fee attack tx===================")
+    val scriptResult1 = ScriptInterpreter.verifyTransaction(signedTx1,Vector(utxo15BTC, utxo20BTC))
+
+//    assert(scriptResult1)
+
+    //ok, time for signing number two
+    //we want outpoint 1 to be 0.000000001
+    //and outpoint 2 to be 20BTC
+    //this will appear to be the same transaction from a GUI perspective
+
+    val unsignedInputs2: Vector[TransactionInput] = {
+      Vector(
+        TransactionInput(
+          outPoint = TransactionOutPoint(fundingTx15BTC.txId, fundingTx15BTCOutputIndex),
+          scriptSignature = EmptyScriptSignature,
+          sequenceNumber = TransactionConstants.sequence
+        ),
+        TransactionInput(
+          outPoint = TransactionOutPoint(fundingTx20BTC.txId, fundingTx20BTCOutputIdx),
+          scriptSignature = EmptyScriptSignature,
+          TransactionConstants.sequence
+        )
+      )
+    }
+
+    val unsignedWitness2 = {
+      TransactionWitness(Vector(
+        EmptyScriptWitness,
+        P2WPKHWitnessV0(pubKey2)))
+    }
+
+    val unsignedTx2 = {
+      WitnessTransaction(
+        TransactionConstants.version,
+        unsignedInputs2,
+        Vector(destination20BTC),
+        TransactionConstants.lockTime,
+        unsignedWitness2
+      )
+    }
+
+    val txSigComponent2 = {
+      WitnessTxSigComponentRaw(
+        transaction = unsignedTx2,
+        inputIndex = UInt32.one,
+        output = utxo20BTC,
+        flags = Policy.standardScriptVerifyFlags
+      )
+    }
+
+
+    val signature2 = TransactionSignatureCreator.createSig(txSignatureComponent = txSigComponent2,
+      privateKey = privKey2,
+      hashType = HashType.sigHashAll)
+
+    val checkSig2 = TransactionSignatureChecker.checkSignature(txSigComponent2,pubKey2,signature2)
+
+    assert(checkSig2 == SignatureValidationSuccess)
+
+
+    //yay we now have everything setup
+    //we want to use valid signature1 and signature2
+    //to spend the tx with a large fee of 15BTC
+    val signedInputs = {
+      Vector(
+        TransactionInput(
+          outPoint = TransactionOutPoint(fundingTx15BTC.txId, fundingTx15BTCOutputIndex),
+          scriptSignature = EmptyScriptSignature,
+          sequenceNumber = TransactionConstants.sequence),
+        TransactionInput(
+          outPoint = TransactionOutPoint(fundingTx20BTC.txId, fundingTx20BTCOutputIdx),
+          scriptSignature = EmptyScriptSignature,
+          TransactionConstants.sequence
+        )
+      )
+    }
+
+    val signedWitness: TransactionWitness = {
+      TransactionWitness.fromWitOpt(
+        Vector(
+          Some(P2WPKHWitnessV0(pubKey1, signature1)),
+          Some(P2WPKHWitnessV0(pubKey2, signature2))
+        )
+      )
+    }
+
+    val feeAttackTx = {
+      WitnessTransaction(
+        version = TransactionConstants.version,
+        inputs = signedInputs,
+        outputs = Vector(destination20BTC),
+        lockTime = TransactionConstants.lockTime,
+        witness = signedWitness
+      )
+    }
+
+
+    logger.info(s"===================Verifying script result for fee attack tx===================")
+    val scriptResult = ScriptInterpreter.verifyTransaction(feeAttackTx,Vector(utxo15BTC, utxo20BTC))
+
+    assert(scriptResult)
+  }
+
+
 }

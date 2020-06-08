@@ -62,6 +62,10 @@ trait TransactionTestUtil extends BitcoinSLogger {
     (tx, UInt32.zero)
   }
 
+  def buildCreditingTransaction(output: TransactionOutput): (Transaction,UInt32) = {
+    buildCreditingTransaction(output.scriptPubKey, Some(output.value))
+  }
+
   /**
     * Builds a spending transaction according to bitcoin core
     * @param creditingTx
