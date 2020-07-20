@@ -102,7 +102,10 @@ object Main extends App with BitcoinSLogger {
       uninitializedNode <- uninitializedNodeF
       wallet <- walletF
       initNode <- addCallbacksAndBloomFilterToNode(uninitializedNode, wallet)
-    } yield initNode
+    } yield {
+      logger.info(s"initNode.callbacks=${initNode.nodeCallbacks.length}")
+      initNode
+    }
 
     //start and sync our node
     val startedNodeF = for {
@@ -116,7 +119,7 @@ object Main extends App with BitcoinSLogger {
       wallet <- walletF
       binding <- startHttpServer(node, wallet, rpcPortOpt)
 
-      _ =
+      _ = {
         if (nodeConf.isSPVEnabled) {
           logger.info(s"Starting SPV node sync")
         } else if (nodeConf.isNeutrinoEnabled) {
@@ -124,9 +127,23 @@ object Main extends App with BitcoinSLogger {
         } else {
           logger.info(s"Starting unknown type of node sync")
         }
+      }
+      _ = logger.info(s"Before startedFP")
       _ = BitcoinSServer.startedFP.success(Future.successful(binding))
-
-      _ <- node.sync()
+      _ = logger.info(s"After startedFP")
+      _ <- {
+        logger.info(s"node.sync block")
+        val fut =
+          try {
+            node.sync()
+          } catch {
+            case scala.util.control.NonFatal(exn) =>
+              logger.error(s"Failed to sync@@@@@")
+              Future.failed(exn)
+          }
+        fut.onComplete(u => logger.info(s"sync.fut.onComplete=${u}"))
+        fut
+      }
     } yield {
       logger.info(s"Done starting Main!")
       sys.addShutdownHook {
@@ -208,7 +225,10 @@ object Main extends App with BitcoinSLogger {
       }
       callbacks <- createCallbacks(wallet)
     } yield {
-      nodeWithBloomFilter.addCallbacks(callbacks)
+      val n = nodeWithBloomFilter.addCallbacks(callbacks)
+      println(
+        s"nodeWithBloomFilter.callbacks=${nodeWithBloomFilter.nodeCallbacks}")
+      n
     }
   }
 

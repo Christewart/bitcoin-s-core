@@ -76,7 +76,7 @@ case class PeerMessageSender(client: P2PClient)(implicit conf: NodeAppConfig)
 
   def sendGetHeadersMessage(lastHash: DoubleSha256Digest): Future[Unit] = {
     val headersMsg = GetHeadersMessage(lastHash)
-    logger.trace(s"Sending getheaders=$headersMsg to peer=${client.peer}")
+    logger.debug(s"Sending getheaders=$headersMsg to peer=${client.peer}")
     sendMsg(headersMsg)
   }
 

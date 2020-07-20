@@ -154,7 +154,10 @@ trait Node extends NodeApi with ChainQueryApi with P2PLogger {
       filterHeaderCount <- chainApi.getFilterHeaderCount
     } yield {
       logger.info(
-        s"Started node, best block hash ${bestHash.hex} at height $bestHeight, with $filterHeaderCount filter headers and $filterCount filters")
+        s"Started node, best block hash ${bestHash.hex} at height $bestHeight, with $filterHeaderCount filter headers and $filterCount filters callbacks=${nodeCallbacks.length}")
+      println(
+        s"Started node, best block hash ${bestHash.hex} at height $bestHeight, " +
+          s"with $filterHeaderCount filter headers and $filterCount filters callbacks=${nodeCallbacks.length}")
       node
     }
   }
@@ -193,20 +196,27 @@ trait Node extends NodeApi with ChainQueryApi with P2PLogger {
     *
     * @return
     */
-  def sync(): Future[Unit] = {
-    for {
-      chainApi <- chainApiFromDb()
-      hash <- chainApi.getBestBlockHash()
-      header <-
-        chainApi
-          .getHeader(hash)
-          .map(_.get) // .get is safe since this is an internal call
+  def sync(): Future[Unit] =
+    try {
+      println(s"Starting sync")
+      logger.info(s"Starting sync")
+      for {
+        chainApi <- chainApiFromDb()
+        hash <- chainApi.getBestBlockHash()
+        header <-
+          chainApi
+            .getHeader(hash)
+            .map(_.get) // .get is safe since this is an internal call
 
-    } yield {
-      peerMsgSenderF.map(_.sendGetHeadersMessage(hash.flip))
-      logger.info(s"Starting sync node, height=${header.height} hash=$hash")
+      } yield {
+        peerMsgSenderF.map(_.sendGetHeadersMessage(hash.flip))
+        logger.info(s"Starting sync node, height=${header.height} hash=$hash")
+      }
+    } catch {
+      case scala.util.control.NonFatal(exn) =>
+        logger.error(s"failed to sync!!!!!!!!")
+        Future.failed(exn)
     }
-  }
 
   /** Broadcasts the given transaction over the P2P network */
   override def broadcastTransaction(transaction: Transaction): Future[Unit] = {

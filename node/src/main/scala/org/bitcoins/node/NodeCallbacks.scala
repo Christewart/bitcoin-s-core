@@ -64,6 +64,15 @@ trait NodeCallbacks {
       ec: ExecutionContext): Future[Unit] = {
     onBlockHeadersReceived.execute(logger, headers)
   }
+
+  /** The number of callbacks registered */
+  def length: Int = {
+    onBlockHeadersReceived.length +
+      onBlockReceived.length +
+      onTxReceived.length +
+      onMerkleBlockReceived.length +
+      onCompactFiltersReceived.length
+  }
 }
 
 /** Callback for handling a received block */
