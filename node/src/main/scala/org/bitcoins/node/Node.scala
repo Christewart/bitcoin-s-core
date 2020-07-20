@@ -202,15 +202,18 @@ trait Node extends NodeApi with ChainQueryApi with P2PLogger {
       logger.info(s"Starting sync")
       for {
         chainApi <- chainApiFromDb()
+        _ = println(s"got chainApi")
         hash <- chainApi.getBestBlockHash()
+        _ = println(s"got best hash=$hash")
         header <-
           chainApi
             .getHeader(hash)
             .map(_.get) // .get is safe since this is an internal call
-
+        _ = println(s"got best header=$header")
       } yield {
         peerMsgSenderF.map(_.sendGetHeadersMessage(hash.flip))
         logger.info(s"Starting sync node, height=${header.height} hash=$hash")
+        println(s"Starting sync node, height=${header.height} hash=$hash")
       }
     } catch {
       case scala.util.control.NonFatal(exn) =>
