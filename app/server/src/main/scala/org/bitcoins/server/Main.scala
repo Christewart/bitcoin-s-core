@@ -103,7 +103,7 @@ object Main extends App with BitcoinSLogger {
       wallet <- walletF
       initNode <- addCallbacksAndBloomFilterToNode(uninitializedNode, wallet)
     } yield {
-      logger.info(s"initNode.callbacks=${initNode.nodeCallbacks.length}")
+      println(s"initNode.callbacks=${initNode.nodeCallbacks.length}")
       initNode
     }
 
@@ -111,7 +111,10 @@ object Main extends App with BitcoinSLogger {
     val startedNodeF = for {
       node <- nodeWithCallbacksF
       _ <- node.start()
-    } yield node
+    } yield {
+      println(s"startedNodeF.callbacks=${node.nodeCallbacks.length}")
+      node
+    }
 
     //start our http server now that we are synced
     val startFut = for {
@@ -135,7 +138,8 @@ object Main extends App with BitcoinSLogger {
         logger.info(s"node.sync block")
         val fut =
           try {
-            node.sync()
+            //node.sync()
+            Future.successful(())
           } catch {
             case scala.util.control.NonFatal(exn) =>
               logger.error(s"Failed to sync@@@@@")

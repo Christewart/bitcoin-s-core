@@ -119,6 +119,14 @@ object NodeCallbacks {
         onBlockHeadersReceived =
           onBlockHeadersReceived ++ other.onBlockHeadersReceived
       )
+
+    override def toString: String = {
+      s"NodeCallbacks(onCompactFiltersReceived=${onCompactFiltersReceived}" +
+        s"onTxReceived=${onTxReceived}" +
+        s"onBlockReceived=$onBlockReceived" +
+        s"onMerkleBlockReceived=$onMerkleBlockReceived" +
+        s"onBlockHeadersReceived=$onBlockHeadersReceived)"
+    }
   }
 
   /** Constructs a set of callbacks that only acts on TX received */
