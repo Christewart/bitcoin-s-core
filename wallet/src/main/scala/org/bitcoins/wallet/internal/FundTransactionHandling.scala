@@ -31,7 +31,9 @@ trait FundTransactionHandling extends WalletLogger { self: Wallet =>
       fromTagOpt: Option[AddressTag],
       markAsReserved: Boolean): Future[Transaction] = {
     for {
+      _ <- Future.successful(println(s"Starting to fund"))
       account <- getDefaultAccount()
+      _ <- Future.successful(println(s"Found default account=$account"))
       funded <- fundRawTransaction(destinations = destinations,
                                    feeRate = feeRate,
                                    fromAccount = account,
@@ -76,7 +78,7 @@ trait FundTransactionHandling extends WalletLogger { self: Wallet =>
       markAsReserved: Boolean = false): Future[(
       RawTxBuilderWithFinalizer[ShufflingNonInteractiveFinalizer],
       Vector[ScriptSignatureParams[InputInfo]])] = {
-    def utxosF: Future[Vector[SpendingInfoDb]] =
+    def utxosF: Future[Vector[SpendingInfoDb]] = {
       for {
         utxos <- fromTagOpt match {
           case None =>
@@ -100,9 +102,11 @@ trait FundTransactionHandling extends WalletLogger { self: Wallet =>
             }
             .map(_._1)
       } yield utxos.diff(immatureCoinbases)
+    }
 
     def selectedUtxosF: Future[Vector[SpendingInfoDb]] =
       for {
+        _ <- Future.successful(println("starting selected utxos"))
         walletUtxos <- utxosF
         //currently just grab the biggest utxos
         utxos = CoinSelector.selectByAlgo(coinSelectionAlgo = coinSelectionAlgo,
@@ -112,12 +116,16 @@ trait FundTransactionHandling extends WalletLogger { self: Wallet =>
         selectedUtxos <-
           if (markAsReserved) markUTXOsAsReserved(utxos)
           else Future.successful(utxos)
-      } yield selectedUtxos
+      } yield {
+        println(s"Done selecting utxos")
+        selectedUtxos
+      }
 
     val addrInfosWithUtxoF: Future[
       Vector[(SpendingInfoDb, Transaction, AddressInfo)]] =
       for {
         selectedUtxos <- selectedUtxosF
+        //WE GET HERE JUST FINE
         _ = selectedUtxosF.failed.foreach(err =>
           logger.error("Error selecting utxos to fund transaction ", err))
         addrInfoOptF = selectedUtxos.map { utxo =>
@@ -132,6 +140,9 @@ trait FundTransactionHandling extends WalletLogger { self: Wallet =>
         }
         vec <- FutureUtil.collect(addrInfoOptF).map(_.toVector)
       } yield vec
+
+    addrInfosWithUtxoF.failed.foreach(err =>
+      logger.error(s"Failed to fetch addrInfosWithUtxoF", err))
 
     for {
       addrInfosWithUtxo <- addrInfosWithUtxoF
