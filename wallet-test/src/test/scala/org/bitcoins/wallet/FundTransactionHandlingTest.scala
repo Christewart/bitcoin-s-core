@@ -28,6 +28,14 @@ class FundTransactionHandlingTest extends BitcoinSWalletTest {
     TransactionOutput(Bitcoins(0.5), TestUtil.p2pkhScriptPubKey)
   val feeRate: SatoshisPerVirtualByte = SatoshisPerVirtualByte.one
 
+  //[info] - must fund a simple raw transaction that requires one utxo (5 seconds, 924 milliseconds)
+  //[info] - must fund a transaction that requires all utxos in our wallet (3 seconds, 901 milliseconds)
+  //[info] - must not care about the number of destinations (3 seconds, 721 milliseconds)
+  //[info] - must fail to fund a raw transaction if we don't have enough money in our wallet (3 seconds, 665 milliseconds)
+  //[info] - must fail to fund a raw transaction if we have the _exact_ amount of money in the wallet because of the fee (3 seconds, 803 milliseconds)
+  //[info] - must fund from a specific account (3 seconds, 654 milliseconds)
+  //[info] - must fail to fund from an account that does not have the funds (3 seconds, 558 milliseconds)
+  //[info] - must fail to fund from an account with only immature coinbases (3 seconds, 599 milliseconds)
   it must "fund a simple raw transaction that requires one utxo" in {
     fundedWallet: WalletWithBitcoind =>
       val wallet = fundedWallet.wallet
@@ -201,9 +209,12 @@ class FundTransactionHandlingTest extends BitcoinSWalletTest {
                                                 fromTagOpt = None,
                                                 markAsReserved = true)
       for {
+        _ <- Future.successful(println(s"Before fundTxF"))
         fundedTx <- fundedTxF
+        _ = println(s"After fundedTxF")
         spendingInfos <- wallet.spendingInfoDAO.findOutputsBeingSpent(fundedTx)
       } yield {
+        println(s"Done with marking utxo as reserved")
         assert(spendingInfos.exists(_.state == TxoState.Reserved))
       }
   }
