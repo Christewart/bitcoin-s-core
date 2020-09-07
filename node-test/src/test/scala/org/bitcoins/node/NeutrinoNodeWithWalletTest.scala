@@ -127,6 +127,8 @@ class NeutrinoNodeWithWalletTest extends NodeUnitTest {
 
       for {
         _ <- node.sync()
+        _ = println(s"Started, sync awaiting completed sync")
+        _ = logger.error(s"Started, sync awaiting completed sync")
         _ <- NodeTestUtil.awaitSync(node, bitcoind)
         _ <- NodeTestUtil.awaitCompactFiltersSync(node, bitcoind)
 
@@ -201,7 +203,7 @@ class NeutrinoNodeWithWalletTest extends NodeUnitTest {
       } yield assert(txs.exists(_.txIdBE == txSent.txIdBE))
   }
 
-  it must "rescan and receive information about received payments" taggedAs UsesExperimentalBitcoind in {
+  it must "rescan information about received payments" taggedAs UsesExperimentalBitcoind in {
     param =>
       val NeutrinoNodeFundedWalletBitcoind(node, wallet, bitcoind, _) = param
 
