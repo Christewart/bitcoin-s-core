@@ -3,14 +3,20 @@ package org.bitcoins.core.protocol.ln
 import java.nio.charset.Charset
 
 import org.bitcoins.core.config.{MainNet, NetworkParameters}
-import org.bitcoins.core.number.{UInt32, UInt5, UInt8}
+import org.bitcoins.core.number.{UInt32, UInt5, UInt64, UInt8}
 import org.bitcoins.core.protocol._
 import org.bitcoins.core.protocol.ln.node.NodeId
 import org.bitcoins.core.protocol.ln.routing.LnRoute
 import org.bitcoins.core.protocol.ln.util.LnUtil
 import org.bitcoins.core.protocol.script.{P2WPKHWitnessSPKV0, P2WSHWitnessSPKV0}
 import org.bitcoins.core.util.{Bech32, SeqWrapper}
-import org.bitcoins.crypto.{CryptoUtil, Sha256Digest, Sha256Hash160Digest}
+import org.bitcoins.crypto.{
+  CryptoUtil,
+  SchnorrNonce,
+  SchnorrPublicKey,
+  Sha256Digest,
+  Sha256Hash160Digest
+}
 import scodec.bits.ByteVector
 
 import scala.annotation.tailrec
@@ -24,8 +30,7 @@ sealed trait LnTag {
   def prefix: LnTagPrefix
 
   def prefixUInt5: UInt5 = {
-    val char = Bech32.charset.indexOf(prefix.value)
-    UInt5(char.toByte)
+    prefix.prefixUInt5
   }
 
   /** The payload for the tag without any meta information encoded with it */
@@ -238,6 +243,44 @@ object LnTag {
     }
   }
 
+  /** An outcome for a DLC, this can be a string such as
+    * 'sunny', 'cloudy', 'rainy'
+    * @see https://github.com/discreetlogcontracts/dlcspecs/blob/ac046f44f610bc7335a2853178d58e7a8b90423d/Oracle.md#event-descriptor
+    */
+  case class DLCOutcome(string: String) extends LnTag {
+    override val prefix: LnTagPrefix = LnTagPrefix.DLCOutcome
+
+    override val encoded: Vector[UInt5] = {
+      val bytes = string.getBytes(Charset.forName("UTF-8"))
+      val u5s = Bech32.from8bitTo5bit(bytes)
+      u5s
+    }
+  }
+
+  case class DLCPubKey(pubKey: SchnorrPublicKey) extends LnTag {
+    override val prefix: LnTagPrefix = LnTagPrefix.DLCPubKey
+
+    override val encoded: Vector[UInt5] = {
+      Bech32.from8bitTo5bit(pubKey.bytes)
+    }
+  }
+
+  case class DLCNonce(nonce: SchnorrNonce) extends LnTag {
+    override val prefix: LnTagPrefix = LnTagPrefix.DLCNonce
+
+    override val encoded: Vector[UInt5] = {
+      Bech32.from8bitTo5bit(nonce.bytes)
+    }
+  }
+
+  case class DLCMaturation(seconds: UInt64) extends LnTag {
+    override val prefix: LnTagPrefix = LnTagPrefix.DLCMaturation
+
+    override val encoded: Vector[UInt5] = {
+      Bech32.from8bitTo5bit(seconds.bytes)
+    }
+  }
+
   object RoutingInfo {
 
     def fromU5s(u5s: Vector[UInt5]): RoutingInfo = {
@@ -264,7 +307,6 @@ object LnTag {
   }
 
   def fromLnTagPrefix(prefix: LnTagPrefix, payload: Vector[UInt5]): LnTag = {
-
     val u8s = Bech32.from5bitTo8bit(payload)
     val bytes = UInt8.toBytes(u8s)
 
@@ -279,7 +321,18 @@ object LnTag {
       case LnTagPrefix.Description =>
         val description = new String(bytes.toArray, Charset.forName("UTF-8"))
         LnTag.DescriptionTag(description)
-
+      case LnTagPrefix.DLCOutcome =>
+        val outcome = new String(bytes.toArray, Charset.forName("UTF-8"))
+        LnTag.DLCOutcome(outcome)
+      case LnTagPrefix.DLCPubKey =>
+        val pubKey = SchnorrPublicKey.fromBytes(bytes)
+        LnTag.DLCPubKey(pubKey)
+      case LnTagPrefix.DLCNonce =>
+        val nonce = SchnorrNonce.fromBytes(bytes)
+        LnTag.DLCNonce(nonce)
+      case LnTagPrefix.DLCMaturation =>
+        val u64 = UInt64.fromBytes(bytes)
+        LnTag.DLCMaturation(u64)
       case LnTagPrefix.DescriptionHash =>
         val hash = Sha256Digest.fromBytes(bytes)
         LnTag.DescriptionHashTag(hash)

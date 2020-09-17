@@ -1,5 +1,6 @@
 package org.bitcoins.core.util
 
+import org.bitcoins.core.number.UInt8.toByte
 import org.bitcoins.core.number.{UInt5, UInt8}
 import org.bitcoins.crypto.StringFactory
 import scodec.bits.ByteVector
@@ -192,6 +193,10 @@ sealed abstract class Bech32 {
     u5s
   }
 
+  def from8bitTo5bit(bytes: Array[Byte]): Vector[UInt5] = {
+    from8bitTo5bit(ByteVector(bytes))
+  }
+
   /** Converts a byte array from 8bits to base 5 bits */
   def from8bitTo5bit(u8s: Vector[UInt8]): Vector[UInt5] = {
     val bytes = UInt8.toBytes(u8s)
@@ -201,6 +206,14 @@ sealed abstract class Bech32 {
   /** Decodes a byte array from 5bits to base 8bits */
   def from5bitTo8bit(b: Vector[UInt5], pad: Boolean = false): Vector[UInt8] = {
     NumberUtil.convertUInt5sToUInt8(b, pad)
+  }
+
+  def from5bitToByteVector(
+      b: Vector[UInt5],
+      pad: Boolean = false): ByteVector = {
+    val u8s = from5bitTo8bit(b, pad)
+    val bytes = u8s.map(toByte(_))
+    ByteVector(bytes)
   }
 
   /**

@@ -17,6 +17,7 @@ sealed abstract class LnTaggedFields
     extends SeqWrapper[LnTag]
     with NetworkElement {
 
+  /*
   require(tag[LnTag.PaymentHashTag].nonEmpty, "You must supply a payment hash")
   require(
     (description.nonEmpty && description.get.string.length < 640) ||
@@ -25,6 +26,7 @@ sealed abstract class LnTaggedFields
   )
   require(!(description.nonEmpty && descriptionHash.nonEmpty),
           "Cannot have both description and description hash")
+   */
 
   def tags: Vector[LnTag]
 

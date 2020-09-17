@@ -7,7 +7,7 @@ import scala.annotation.tailrec
 import scala.util.Try
 
 case class SchnorrPublicKey(bytes: ByteVector) extends NetworkElement {
-  require(bytes.length == 32,
+  require(bytes.length == SchnorrPublicKey.LENGTH,
           s"Schnorr public keys must be 32 bytes, got $bytes")
   require(Try(publicKey).isSuccess,
           s"Schnorr public key must be a valid x coordinate, got $bytes")
@@ -104,6 +104,8 @@ case class SchnorrPublicKey(bytes: ByteVector) extends NetworkElement {
 }
 
 object SchnorrPublicKey extends Factory[SchnorrPublicKey] {
+
+  final val LENGTH: Int = 32
 
   @tailrec
   def fromBytes(bytes: ByteVector): SchnorrPublicKey = {

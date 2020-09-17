@@ -3,7 +3,8 @@ package org.bitcoins.crypto
 import scodec.bits.ByteVector
 
 case class SchnorrNonce(bytes: ByteVector) extends NetworkElement {
-  require(bytes.length == 32, s"Schnorr nonce must be 32 bytes, get $bytes")
+  require(bytes.length == SchnorrNonce.LENGTH,
+          s"Schnorr nonce must be 32 bytes, get $bytes")
 
   private val schnorrPublicKey: SchnorrPublicKey = new SchnorrPublicKey(bytes)
 
@@ -15,6 +16,8 @@ case class SchnorrNonce(bytes: ByteVector) extends NetworkElement {
 }
 
 object SchnorrNonce extends Factory[SchnorrNonce] {
+
+  final val LENGTH: Int = 32
 
   def fromBytes(bytes: ByteVector): SchnorrNonce = {
     new SchnorrNonce(SchnorrPublicKey.fromBytes(bytes).bytes)

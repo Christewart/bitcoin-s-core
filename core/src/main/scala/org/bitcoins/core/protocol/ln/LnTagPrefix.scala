@@ -7,6 +7,11 @@ import org.bitcoins.crypto.StringFactory
 sealed abstract class LnTagPrefix {
   val value: Char
 
+  def prefixUInt5: UInt5 = {
+    val char = Bech32.charset.indexOf(value)
+    UInt5(char.toByte)
+  }
+
   override def toString: String = value.toString
 }
 
@@ -59,17 +64,39 @@ object LnTagPrefix extends StringFactory[LnTagPrefix] {
     override val value: Char = '9'
   }
 
+  case object DLCPubKey extends LnTagPrefix {
+    override val value: Char = 'g'
+  }
+
+  case object DLCNonce extends LnTagPrefix {
+    override val value = 'e'
+  }
+
+  case object DLCOutcome extends LnTagPrefix {
+    override val value: Char = '0'
+  }
+
+  case object DLCMaturation extends LnTagPrefix {
+    override val value: Char = 'm'
+  }
+
   private lazy val allKnown: Map[Char, LnTagPrefix] =
-    List(PaymentHash,
-         Description,
-         NodeId,
-         DescriptionHash,
-         ExpiryTime,
-         CltvExpiry,
-         FallbackAddress,
-         RoutingInfo,
-         Features,
-         Secret)
+    List(
+      PaymentHash,
+      Description,
+      NodeId,
+      DescriptionHash,
+      ExpiryTime,
+      CltvExpiry,
+      FallbackAddress,
+      RoutingInfo,
+      Features,
+      Secret,
+      DLCPubKey,
+      DLCNonce,
+      DLCOutcome,
+      DLCMaturation
+    )
       .map(prefix => prefix.value -> prefix)
       .toMap
 
