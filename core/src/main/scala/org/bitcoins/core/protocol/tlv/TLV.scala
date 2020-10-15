@@ -323,7 +323,9 @@ object RangeEventDescriptorV0TLV extends TLVFactory[RangeEventDescriptorV0TLV] {
   }
 }
 
-sealed trait OracleEventTLV extends TLV
+sealed trait OracleEventTLV extends TLV {
+  def eventDescriptor: EventDescriptorTLV
+}
 
 case class OracleEventV0TLV(
     publicKey: SchnorrPublicKey,

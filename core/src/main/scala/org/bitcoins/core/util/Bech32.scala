@@ -208,6 +208,15 @@ sealed abstract class Bech32 {
     NumberUtil.convertUInt5sToUInt8(b, pad)
   }
 
+  def from5BitToByteVector(
+      b: Vector[UInt5],
+      pad: Boolean = false): ByteVector = {
+    val u8s = Bech32
+      .from5bitTo8bit(b, pad)
+      .map(UInt8.toByte(_))
+    ByteVector(u8s)
+  }
+
   def from5bitToByteVector(
       b: Vector[UInt5],
       pad: Boolean = false): ByteVector = {

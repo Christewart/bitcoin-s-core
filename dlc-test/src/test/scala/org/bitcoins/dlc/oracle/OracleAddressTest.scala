@@ -2,15 +2,28 @@ package org.bitcoins.dlc.oracle
 
 import java.util.Date
 
-import org.bitcoins.core.number.{UInt32, UInt64}
+import org.bitcoins.core.number.{Int32, UInt16, UInt32, UInt64}
 import org.bitcoins.core.protocol.ln.{LnTag, LnTagPrefix}
 import org.bitcoins.core.util.Bech32
-import org.bitcoins.crypto.{ECPrivateKey, SchnorrNonce, SchnorrPublicKey}
+import org.bitcoins.crypto.{
+  ECPrivateKey,
+  FieldElement,
+  SchnorrDigitalSignature,
+  SchnorrNonce,
+  SchnorrPublicKey
+}
 import org.bitcoins.testkit.util.{BitcoinSAsyncTest, BitcoinSUnitTest}
 import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneOffset
+
+import org.bitcoins.core.protocol.tlv.{
+  EnumEventDescriptorV0TLV,
+  OracleAnnouncementV0TLV,
+  OracleEventV0TLV,
+  RangeEventDescriptorV0TLV
+}
 
 class OracleAddressTest extends BitcoinSUnitTest {
 
@@ -31,6 +44,7 @@ class OracleAddressTest extends BitcoinSUnitTest {
   val localDate: LocalDate = LocalDate.parse("2020-11-03")
   val localDateTime: LocalDateTime = localDate.atStartOfDay()
   val instant: Instant = localDateTime.toInstant(ZoneOffset.UTC)
+  val u32 = UInt32(instant.toEpochMilli / 1000)
   val u64 = UInt64(instant.toEpochMilli / 1000)
   val maturation = LnTag.DLCMaturation(seconds = u64)
 
@@ -76,6 +90,46 @@ class OracleAddressTest extends BitcoinSUnitTest {
     assert(Bech32.encode5bitToString(oracleAddress.checksum) == "ge9q2x")
     assert(oracleAddress == oracleAddress2)
 
+  }
+
+  val eventDescriptor = EnumEventDescriptorV0TLV(outcomes)
+  val uri: String = ""
+
+  val oracleEnumEventTLV: OracleEventV0TLV =
+    OracleEventV0TLV(publicKey = pubKey,
+                     nonce = nonce,
+                     eventMaturityEpoch = u32,
+                     eventDescriptor = eventDescriptor,
+                     eventURI = uri)
+
+  val signature: SchnorrDigitalSignature =
+    SchnorrDigitalSignature(nonce, FieldElement(0))
+
+  val announcement: OracleAnnouncementV0TLV =
+    OracleAnnouncementV0TLV(signature, oracleEnumEventTLV)
+
+  it must "read/write an oracle address based on a enum event tlv" in {
+    val address = OracleAddressTlv(hrp, announcement)
+    val expected =
+      "oracle1lhvzff9ljkptefed4s3sfnez30qtacxk6ult4vq4r2y64xumh3n6w2k0nsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqplwcyfs8kral5u3ahqszv2tsa4zlgcc98hrphmxrupf02xwvuqc7mshlf9aljkptefed4s3sfnez30qtacxk6ult4vq4r2y64xumh3n6w2k0n306p8vqlhvqvxqqqvqq2um4deh8jqqxvdkx7aty0yqq2unpd9h8jc2wt5l"
+    assert(address.toString == expected)
+  }
+
+  val rangeDescriptor: RangeEventDescriptorV0TLV = {
+    RangeEventDescriptorV0TLV(Int32.zero, Int32(10), UInt16.one)
+  }
+
+  val oracleRangeEventTLV: OracleEventV0TLV = {
+    oracleEnumEventTLV.copy(eventDescriptor = rangeDescriptor)
+  }
+
+  val rangeAnnoucement = announcement.copy(eventTLV = oracleRangeEventTLV)
+  it must "read/write an oracle address based on a range event tlv" in {
+    val address =
+      OracleAddressTlv(hrp = hrp, oracleAnnouncementTLV = rangeAnnoucement)
+
+    assert(
+      address.toString == "oracle1lhvzf94ljkptefed4s3sfnez30qtacxk6ult4vq4r2y64xumh3n6w2k0nsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqplwcyff8kral5u3ahqszv2tsa4zlgcc98hrphmxrupf02xwvuqc7mshlf9aljkptefed4s3sfnez30qtacxk6ult4vq4r2y64xumh3n6w2k0n306p8vqlhvqszsqqqqqqqqqqq9qqqghgle3x")
   }
 
 }
