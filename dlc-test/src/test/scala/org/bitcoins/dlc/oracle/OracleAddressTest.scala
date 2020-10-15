@@ -60,7 +60,6 @@ class OracleAddressTest extends BitcoinSUnitTest {
   it must "read/write an address to a string" in {
 
     val string = oracleAddress.toString
-    println(s"string=$string")
     val oracleAddress2 = OracleAddress.fromString(string)
     assert(
       string == "oracle1gp50v8mlfermwpqyc5hpm29733s20wxr0kv8czj75vuecp3ahp07jtsep5h72c90989kkzxpx0y29up0hq6mtnaw4sz5dgn25mnw7x0fe2e7wqmqdqqqqqqzl5zwcq0qgwd6kumne0q2vdkx7aty0y0qgwfskjmnege9q2x")
@@ -113,6 +112,10 @@ class OracleAddressTest extends BitcoinSUnitTest {
     val expected =
       "oracle1lhvzff9ljkptefed4s3sfnez30qtacxk6ult4vq4r2y64xumh3n6w2k0nsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqplwcyfs8kral5u3ahqszv2tsa4zlgcc98hrphmxrupf02xwvuqc7mshlf9aljkptefed4s3sfnez30qtacxk6ult4vq4r2y64xumh3n6w2k0n306p8vqlhvqvxqqqvqq2um4deh8jqqxvdkx7aty0yqq2unpd9h8jc2wt5l"
     assert(address.toString == expected)
+
+    val oracleAddress2 = OracleAddressTlv.fromString(address.toString)
+
+    assert(oracleAddress2 == address)
   }
 
   val rangeDescriptor: RangeEventDescriptorV0TLV = {
@@ -123,13 +126,16 @@ class OracleAddressTest extends BitcoinSUnitTest {
     oracleEnumEventTLV.copy(eventDescriptor = rangeDescriptor)
   }
 
-  val rangeAnnoucement = announcement.copy(eventTLV = oracleRangeEventTLV)
+  val rangeAnnouncement = announcement.copy(eventTLV = oracleRangeEventTLV)
   it must "read/write an oracle address based on a range event tlv" in {
     val address =
-      OracleAddressTlv(hrp = hrp, oracleAnnouncementTLV = rangeAnnoucement)
+      OracleAddressTlv(hrp = hrp, oracleAnnouncementTLV = rangeAnnouncement)
 
     assert(
       address.toString == "oracle1lhvzf94ljkptefed4s3sfnez30qtacxk6ult4vq4r2y64xumh3n6w2k0nsqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqplwcyff8kral5u3ahqszv2tsa4zlgcc98hrphmxrupf02xwvuqc7mshlf9aljkptefed4s3sfnez30qtacxk6ult4vq4r2y64xumh3n6w2k0n306p8vqlhvqszsqqqqqqqqqqq9qqqghgle3x")
-  }
 
+    val oracleAddress2 = OracleAddressTlv.fromString(address.toString)
+
+    assert(oracleAddress2 == address)
+  }
 }
