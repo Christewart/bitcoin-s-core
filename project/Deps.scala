@@ -125,11 +125,20 @@ object Deps {
                                javaFxSwing,
                                javaFxWeb)
 
+    // exclude("org.apache.httpcomponents", "httpclient")
     val breeze =
       "org.scalanlp" %% "breeze" % V.breezeV withSources () withJavadoc ()
 
+    //[info]   +-org.scalanlp:breeze-viz_2.13:1.1 [S]
+    //[info]     +-com.lowagie:itext:2.1.5
+    //[info]     | +-bouncycastle:bcmail-jdk14:138
+    //[info]     | +-bouncycastle:bcprov-jdk14:138
+
+    // +-org.bouncycastle:bcprov-jdk15on:1.67
     val breezeViz =
-      "org.scalanlp" %% "breeze-viz" % V.breezeV withSources () withJavadoc ()
+      ("org.scalanlp" %% "breeze-viz" % V.breezeV withSources () withJavadoc ())
+        .exclude("bouncycastle", "bcprov-jdk14")
+    //.exclude("org.boucycastle","bcmail-jdk14")
 
     val playJson =
       "com.typesafe.play" %% "play-json" % V.playv withSources () withJavadoc ()
