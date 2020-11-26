@@ -77,7 +77,8 @@ object CommonSettings {
     )
   }
 
-  private val scala2_13CompilerOpts = Seq("-Xlint:unused", "-Xfatal-warnings")
+  private val scala2_13CompilerOpts =
+    Seq("-Xlint:unused", "-Xfatal-warnings", "-Xlint:strict-unsealed-patmat")
 
   private val nonScala2_13CompilerOpts = Seq(
     "-Xmax-classfile-name",
