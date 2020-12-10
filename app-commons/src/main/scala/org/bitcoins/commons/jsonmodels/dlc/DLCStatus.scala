@@ -12,13 +12,15 @@ import org.bitcoins.core.protocol.tlv.{
   EnumOutcome,
   UnsignedNumericOutcome
 }
-import org.bitcoins.core.protocol.transaction.{Transaction, WitnessTransaction}
+import org.bitcoins.core.protocol.transaction.WitnessTransaction
 import org.bitcoins.core.wallet.fee.{FeeUnit, SatoshisPerVirtualByte}
 import org.bitcoins.crypto._
 import scodec.bits.ByteVector
 import ujson._
 
 sealed trait DLCStatus {
+
+  /** The sha256 hash of oracleInfo ++ contractInfo ++ timeouts */
   def paramHash: Sha256DigestBE
   def isInitiator: Boolean
   def state: DLCState
@@ -553,16 +555,71 @@ object DLCStatus {
     }
   }
 
-  def calculateOutcomeAndSig(
+  private def aggregateR(
+      numSigs: Int,
+      rVals: Vector[SchnorrNonce]): SchnorrNonce = {
+    rVals.take(numSigs).map(_.publicKey).reduce(_.add(_)).schnorrNonce
+  }
+
+  /**
+    * Completes the given adaptor signature for the given outcome
+    * @param outcome the outcome we are signing
+    * @param adaptorSig the adaptor signature given from the counterparty that we need to complete
+    * @param cetSig our local CET sig that we use
+    * @return
+    */
+  private def sigFromMsgAndSigs(
+      outcome: DLCOutcomeType,
+      adaptorSig: ECAdaptorSignature,
+      cetSig: ECDigitalSignature,
+      oraclePubKey: SchnorrPublicKey,
+      rVals: Vector[SchnorrNonce]): SchnorrDigitalSignature = {
+    val (sigPubKey, numSigs) = outcome match {
+      case EnumOutcome(outcome) =>
+        val sigPoint = oraclePubKey.computeSigPoint(
+          CryptoUtil.sha256(outcome).bytes,
+          aggregateR(1, rVals))
+
+        (sigPoint, 1)
+      case UnsignedNumericOutcome(digits) =>
+        val sigPoint = digits
+          .zip(rVals.take(digits.length))
+          .map {
+            case (digit, nonce) =>
+              oraclePubKey.computeSigPoint(
+                CryptoUtil.sha256(digit.toString).bytes,
+                nonce)
+          }
+          .reduce(_.add(_))
+
+        (sigPoint, digits.length)
+    }
+
+    val possibleOracleS =
+      sigPubKey
+        .extractAdaptorSecret(adaptorSig, ECDigitalSignature(cetSig.bytes.init))
+        .fieldElement
+    SchnorrDigitalSignature(aggregateR(numSigs, rVals), possibleOracleS)
+  }
+
+  /**
+    * This is used in the case where your counterparty has published a CET
+    * to the blockchain, and you want to recover the outcome and the
+    * signature that corresponds to that remote CET.
+    * @param isInitiator if we initated this DLC
+    * @param offer the offer message for the CET
+    * @param accept the accept message for the CET
+    * @param sign the sign message for the CET
+    * @param cet the CET that was published onchain
+    * @return the digital signature and the outcome contained in the signature
+    */
+  def recoverOutcomeFromCET(
       isInitiator: Boolean,
       offer: DLCOffer,
       accept: DLCAccept,
       sign: DLCSign,
-      cet: Transaction): (SchnorrDigitalSignature, DLCOutcomeType) = {
-    val cetSigs = cet
-      .asInstanceOf[WitnessTransaction]
-      .witness
-      .head
+      cet: WitnessTransaction): (SchnorrDigitalSignature, DLCOutcomeType) = {
+    val cetSigs = cet.witness.head
       .asInstanceOf[P2WSHWitnessV0]
       .signatures
 
@@ -572,69 +629,48 @@ object DLCStatus {
     val oraclePubKey = offer.oracleInfo.pubKey
     val rVals = offer.oracleInfo.nonces
 
-    def aggregateR(numSigs: Int): SchnorrNonce = {
-      rVals.take(numSigs).map(_.publicKey).reduce(_.add(_)).schnorrNonce
-    }
-
-    def sigFromMsgAndSigs(
-        outcome: DLCOutcomeType,
-        adaptorSig: ECAdaptorSignature,
-        cetSig: ECDigitalSignature): SchnorrDigitalSignature = {
-      val (sigPubKey, numSigs) = outcome match {
-        case EnumOutcome(outcome) =>
-          val sigPoint = oraclePubKey.computeSigPoint(
-            CryptoUtil.sha256(outcome).bytes,
-            aggregateR(1))
-
-          (sigPoint, 1)
-        case UnsignedNumericOutcome(digits) =>
-          val sigPoint = digits
-            .zip(rVals.take(digits.length))
-            .map {
-              case (digit, nonce) =>
-                oraclePubKey.computeSigPoint(
-                  CryptoUtil.sha256(digit.toString).bytes,
-                  nonce)
-            }
-            .reduce(_.add(_))
-
-          (sigPoint, digits.length)
-      }
-
-      val possibleOracleS =
-        sigPubKey
-          .extractAdaptorSecret(adaptorSig,
-                                ECDigitalSignature(cetSig.bytes.init))
-          .fieldElement
-      SchnorrDigitalSignature(aggregateR(numSigs), possibleOracleS)
-    }
-
-    val outcomeValues = cet.outputs.map(_.value).sorted
+    val outcomeValues: Seq[CurrencyUnit] = cet.outputs.map(_.value).sorted
     val totalCollateral = offer.totalCollateral + accept.totalCollateral
 
-    val possibleMessages = offer.contractInfo match {
-      case DLCMessage.SingleNonceContractInfo(outcomeValueMap) =>
-        outcomeValueMap
-          .filter {
-            case (_, amt) =>
-              Vector(amt, totalCollateral - amt)
-                .filter(_ >= Policy.dustThreshold)
-                .sorted == outcomeValues
-          }
-          .map(_._1)
-      case info: DLCMessage.MultiNonceContractInfo =>
-        info.outcomeVec
-          .filter {
-            case (_, amt) =>
-              val amts = Vector(amt, totalCollateral - amt)
-                .filter(_ >= Policy.dustThreshold)
-                .sorted
+    //filtering through all possible outcomes and then comparing
+    //to the amounts on the published CET found onchain
+    //and then using those amounts to determine which local
+    //CETs correspond to the remote CET
 
-              Math.abs(
-                (amts.head - outcomeValues.head).satoshis.toLong) <= 1 && Math
-                .abs((amts.last - outcomeValues.last).satoshis.toLong) <= 1
-          }
-          .map { case (digits, _) => UnsignedNumericOutcome(digits) }
+    //this is an optimization to keep us from having to look through
+    //the entire CET search space, now we have a "narrow" space
+    //that is easier to search through for finding the local
+    //CET that corresponds to the onchain one
+    //so we can determine what the outcome the remote executed
+    val possibleMessages: Vector[DLCOutcomeType] = {
+      //so maybe another dumb question, but why don't we use the outputs
+      //inside of the CET ? Here we are reading outputs from the
+      //DLCMessage.outcomeValueMap and then reconstructing the amounts?
+      offer.contractInfo match {
+        case DLCMessage.SingleNonceContractInfo(outcomeValueMap) =>
+          outcomeValueMap
+            .filter {
+              case (_, amt) =>
+                //
+                Vector(amt, totalCollateral - amt)
+                  .filter(_ >= Policy.dustThreshold)
+                  .sorted == outcomeValues
+            }
+            .map(_._1)
+        case info: DLCMessage.MultiNonceContractInfo =>
+          info.outcomeVec
+            .filter {
+              case (_, amt) =>
+                val amts = Vector(amt, totalCollateral - amt)
+                  .filter(_ >= Policy.dustThreshold)
+                  .sorted
+
+                Math.abs(
+                  (amts.head - outcomeValues.head).satoshis.toLong) <= 1 && Math
+                  .abs((amts.last - outcomeValues.last).satoshis.toLong) <= 1
+            }
+            .map { case (digits, _) => UnsignedNumericOutcome(digits) }
+      }
     }
 
     val (offerCETSig, acceptCETSig) =
@@ -661,14 +697,18 @@ object DLCStatus {
 
     val sigOpt = outcomeSigs.find {
       case (outcome, adaptorSig) =>
-        val possibleOracleSig = sigFromMsgAndSigs(outcome, adaptorSig, cetSig)
+        val possibleOracleSig = sigFromMsgAndSigs(outcome = outcome,
+                                                  adaptorSig = adaptorSig,
+                                                  cetSig = cetSig,
+                                                  oraclePubKey = oraclePubKey,
+                                                  rVals = rVals)
         val sigPoint = offer.oracleAndContractInfo.sigPointForOutcome(outcome)
         possibleOracleSig.sig.getPublicKey == sigPoint
     }
 
     sigOpt match {
       case Some((msg, adaptorSig)) =>
-        (sigFromMsgAndSigs(msg, adaptorSig, cetSig), msg)
+        (sigFromMsgAndSigs(msg, adaptorSig, cetSig, oraclePubKey, rVals), msg)
       case None =>
         throw new IllegalArgumentException("No Oracle Signature found from CET")
     }
