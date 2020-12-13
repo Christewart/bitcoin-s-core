@@ -277,6 +277,16 @@ lazy val oracleServer = project
     appServer
   )
 
+lazy val appCore = crossProject(JSPlatform)
+  .crossType(CrossType.Pure)
+  .in(file("app/core-cross"))
+  /*.settings(CommonSettings.prodSettings: _*)*/
+  .jsSettings(
+    scalaJSUseMainModuleInitializer := true,
+    mainClass in Compile := Some("org.bitcoins.corecross.CoreMain")
+  )
+  .dependsOn(coreCrossProject)
+
 lazy val appServer = project
   .in(file("app/server"))
   .settings(CommonSettings.prodSettings: _*)
