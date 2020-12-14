@@ -1,18 +1,24 @@
 package org.bitcoins.crypto
 
-import java.math.BigInteger
-import java.security.MessageDigest
+import org.bouncycastle.crypto.AsymmetricCipherKeyPair
 
+import java.math.BigInteger
+import java.security.{MessageDigest, SecureRandom}
 import org.bouncycastle.crypto.digests.{RIPEMD160Digest, SHA512Digest}
+import org.bouncycastle.crypto.generators.ECKeyPairGenerator
 import org.bouncycastle.crypto.macs.HMac
-import org.bouncycastle.crypto.params.KeyParameter
+import org.bouncycastle.crypto.params.{
+  ECKeyGenerationParameters,
+  ECPrivateKeyParameters,
+  KeyParameter
+}
 import org.bouncycastle.math.ec.ECPoint
 import scodec.bits.{BitVector, ByteVector}
 
 /**
   * Utility cryptographic functions
   */
-trait CryptoUtil {
+trait CryptoUtil extends CryptoRuntime {
 
   def normalize(str: String): String = {
     java.text.Normalizer.normalize(str, java.text.Normalizer.Form.NFC)
@@ -33,7 +39,7 @@ trait CryptoUtil {
   }
 
   /** Performs sha256(sha256(bytes)). */
-  def doubleSHA256(bytes: ByteVector): DoubleSha256Digest = {
+  override def doubleSHA256(bytes: ByteVector): DoubleSha256Digest = {
     val hash: ByteVector = sha256(sha256(bytes).bytes).bytes
     DoubleSha256Digest(hash)
   }
@@ -43,7 +49,7 @@ trait CryptoUtil {
   }
 
   /** Takes sha256(bytes). */
-  def sha256(bytes: ByteVector): Sha256Digest = {
+  override def sha256(bytes: ByteVector): Sha256Digest = {
     val hash = MessageDigest.getInstance("SHA-256").digest(bytes.toArray)
     Sha256Digest(ByteVector(hash))
   }
@@ -195,6 +201,23 @@ trait CryptoUtil {
     val pub1 = ECPublicKey.fromPoint(Q1)
     val pub2 = ECPublicKey.fromPoint(Q2)
     (pub1, pub2)
+  }
+
+  override def generatePrivateKey: BigInteger = {
+    val secureRandom = new SecureRandom
+    val generator: ECKeyPairGenerator = new ECKeyPairGenerator
+    val keyGenParams: ECKeyGenerationParameters =
+      new ECKeyGenerationParameters(CryptoParams.curve, secureRandom)
+    generator.init(keyGenParams)
+    val keypair: AsymmetricCipherKeyPair = generator.generateKeyPair
+    val privParams: ECPrivateKeyParameters =
+      keypair.getPrivate.asInstanceOf[ECPrivateKeyParameters]
+    val priv: BigInteger = privParams.getD
+    priv
+  }
+
+  override def toPublicKey(privateKey: ECPrivateKey): ECPublicKey = {
+    BouncyCastleUtil.computePublicKey(privateKey)
   }
 }
 

@@ -13,4 +13,6 @@ object CryptoContext {
     //val secpDisabled = System.getenv("DISABLE_SECP256K1")
     BouncyCastle
   }
+
+  lazy val runtime: CryptoRuntime = new JsCryptoRuntime
 }

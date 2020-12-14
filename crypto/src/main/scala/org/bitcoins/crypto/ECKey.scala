@@ -20,7 +20,9 @@ import scala.concurrent.{ExecutionContext, Future}
 /**
   * Created by chris on 2/16/16.
   */
-sealed abstract class BaseECKey extends NetworkElement
+sealed abstract class BaseECKey extends NetworkElement {
+  protected def cryptoRuntime: CryptoRuntime
+}
 
 /**
   * Created by chris on 2/16/16.
@@ -269,10 +271,7 @@ sealed abstract class ECPrivateKey
 
   /** Derives the public for a the private key */
   def publicKey(context: CryptoContext): ECPublicKey = {
-    context match {
-      //case CryptoContext.LibSecp256k1 => publicKeyWithSecp
-      case CryptoContext.BouncyCastle => publicKeyWithBouncyCastle
-    }
+    cryptoRuntime.toPublicKey(this)
   }
 
   /*  def publicKeyWithSecp: ECPublicKey = {
@@ -308,22 +307,24 @@ object ECPrivateKey extends Factory[ECPrivateKey] {
   private case class ECPrivateKeyImpl(
       override val bytes: ByteVector,
       isCompressed: Boolean,
-      ec: ExecutionContext)
+      ec: ExecutionContext,
+      override val cryptoRuntime: CryptoRuntime)
       extends ECPrivateKey {
     CryptoContext.default match {
       /*      case CryptoContext.LibSecp256k1 =>
         require(NativeSecp256k1.secKeyVerify(bytes.toArray),
                 s"Invalid key according to secp256k1, hex: ${bytes.toHex}")*/
       case CryptoContext.BouncyCastle =>
-        require(CryptoParams.curve.getCurve
+      /*        require(CryptoParams.curve.getCurve
                   .isValidFieldElement(new BigInteger(1, bytes.toArray)),
-                s"Invalid key according to Bouncy Castle, hex: ${bytes.toHex}")
+                s"Invalid key according to Bouncy Castle, hex: ${bytes.toHex}")*/
     }
   }
 
   def apply(bytes: ByteVector, isCompressed: Boolean)(implicit
       ec: ExecutionContext): ECPrivateKey = {
-    ECPrivateKeyImpl(bytes, isCompressed, ec)
+    val runtime = new JsCryptoRuntime
+    ECPrivateKeyImpl(bytes, isCompressed, ec, runtime)
   }
 
   override def fromBytes(bytes: ByteVector): ECPrivateKey =
@@ -333,7 +334,7 @@ object ECPrivateKey extends Factory[ECPrivateKey] {
   def fromBytes(bytes: ByteVector, isCompressed: Boolean): ECPrivateKey = {
 
     if (bytes.size == 32)
-      ECPrivateKeyImpl(bytes, isCompressed, Implicits.global)
+      ECPrivateKey(bytes, isCompressed)(Implicits.global)
     else if (bytes.size < 32) {
       //means we need to pad the private key with 0 bytes so we have 32 bytes
       ECPrivateKey.fromBytes(bytes.padLeft(32), isCompressed)
@@ -362,17 +363,13 @@ object ECPrivateKey extends Factory[ECPrivateKey] {
   def freshPrivateKey: ECPrivateKey = freshPrivateKey(true)
 
   def freshPrivateKey(isCompressed: Boolean): ECPrivateKey = {
-    val secureRandom = new SecureRandom
-    val generator: ECKeyPairGenerator = new ECKeyPairGenerator
-    val keyGenParams: ECKeyGenerationParameters =
-      new ECKeyGenerationParameters(CryptoParams.curve, secureRandom)
-    generator.init(keyGenParams)
-    val keypair: AsymmetricCipherKeyPair = generator.generateKeyPair
-    val privParams: ECPrivateKeyParameters =
-      keypair.getPrivate.asInstanceOf[ECPrivateKeyParameters]
-    val priv: BigInteger = privParams.getD
+    val priv = CryptoUtil.generatePrivateKey
     val bytes = ByteVector(priv.toByteArray)
     ECPrivateKey.fromBytes(bytes, isCompressed)
+  }
+
+  def fromBigInteger(bigInteger: BigInteger): ECPrivateKey = {
+    fromBytes(ByteVector(bigInteger.toByteArray))
   }
 }
 
@@ -584,7 +581,8 @@ object ECPublicKey extends Factory[ECPublicKey] {
 
   private case class ECPublicKeyImpl(
       override val bytes: ByteVector,
-      ec: ExecutionContext)
+      ec: ExecutionContext,
+      override val cryptoRuntime: CryptoRuntime)
       extends ECPublicKey {
     //unfortunately we cannot place ANY invariants here
     //because of old transactions on the blockchain that have weirdly formatted public keys. Look at example in script_tests.json
@@ -596,12 +594,14 @@ object ECPublicKey extends Factory[ECPublicKey] {
   }
 
   override def fromBytes(bytes: ByteVector): ECPublicKey = {
-    ECPublicKeyImpl(bytes, Implicits.global)
+    val runtime = new JsCryptoRuntime
+    ECPublicKeyImpl(bytes, Implicits.global, runtime)
   }
 
   def apply(): ECPublicKey = freshPublicKey
 
-  val dummy: ECPublicKey = FieldElement.one.getPublicKey
+  //lazy as this will cause linking errors if eagerly evaluated
+  lazy val dummy: ECPublicKey = FieldElement.one.getPublicKey
 
   /** Generates a fresh [[org.bitcoins.crypto.ECPublicKey ECPublicKey]] that has not been used before. */
   def freshPublicKey: ECPublicKey = ECPrivateKey.freshPrivateKey.publicKey

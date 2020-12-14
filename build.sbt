@@ -35,9 +35,18 @@ lazy val benchSettings: Seq[Def.SettingsDefinition] = {
 
 import Projects._
 
+lazy val commonJsSettings = {
+  Seq(
+    scalaJSLinkerConfig ~= {
+      _.withModuleKind(ModuleKind.CommonJSModule)
+    }
+  )
+}
+
 lazy val cryptoCrossProject = crossProject(JVMPlatform, JSPlatform)
   .crossType(CrossType.Pure)
   .settings(libraryDependencies ++= Deps.crypto.value)
+  .jsSettings(commonJsSettings)
   .in(file("crypto"))
 
 lazy val crypto = cryptoCrossProject.jvm
@@ -47,6 +56,7 @@ lazy val cryptoJS = cryptoCrossProject.js
 lazy val coreCrossProject = crossProject(JVMPlatform, JSPlatform)
   .crossType(CrossType.Pure)
   .settings(libraryDependencies ++= Deps.core.value)
+  .jsSettings(commonJsSettings)
   .in(file("core"))
   .dependsOn(cryptoCrossProject)
 
@@ -280,7 +290,7 @@ lazy val oracleServer = project
 lazy val appCore = crossProject(JSPlatform)
   .crossType(CrossType.Pure)
   .in(file("app/core-cross"))
-  /*.settings(CommonSettings.prodSettings: _*)*/
+  .jsSettings(commonJsSettings)
   .jsSettings(
     scalaJSUseMainModuleInitializer := true,
     mainClass in Compile := Some("org.bitcoins.corecross.CoreMain")

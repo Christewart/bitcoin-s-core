@@ -217,6 +217,9 @@ sealed trait Sha256Hash160Digest extends Any with HashDigest {
 
 object Sha256Hash160Digest extends Factory[Sha256Hash160Digest] {
 
+  val empty: Sha256Hash160Digest =
+    Sha256Hash160Digest.fromBytes(ByteVector.fill(20)(0.toByte))
+
   private case class Sha256Hash160DigestImpl(bytes: ByteVector)
       extends AnyVal
       with Sha256Hash160Digest {

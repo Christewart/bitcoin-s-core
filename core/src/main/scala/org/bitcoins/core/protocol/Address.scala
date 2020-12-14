@@ -45,7 +45,8 @@ sealed abstract class P2PKHAddress extends BitcoinAddress {
   override def value: String = {
     val versionByte = networkParameters.p2pkhNetworkByte
     val bytes = versionByte ++ hash.bytes
-    val checksum = CryptoUtil.doubleSHA256(bytes).bytes.take(4)
+    val cryptoRuntime = CryptoContext.runtime
+    val checksum = cryptoRuntime.doubleSHA256(bytes).bytes.take(4)
     Base58.encode(bytes ++ checksum)
   }
 
@@ -225,7 +226,8 @@ object P2PKHAddress extends AddressFactory[P2PKHAddress] {
   def apply(
       pubKey: ECPublicKey,
       networkParameters: NetworkParameters): P2PKHAddress = {
-    val hash = CryptoUtil.sha256Hash160(pubKey.bytes)
+    val cryptoRuntime = CryptoContext.runtime
+    val hash = cryptoRuntime.sha256Hash160(pubKey.bytes)
     P2PKHAddress(hash, networkParameters)
   }
 
