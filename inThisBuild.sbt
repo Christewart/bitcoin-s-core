@@ -4,12 +4,12 @@ import scala.util.Properties
 
 val scala2_12 = "2.12.12"
 val scala2_13 = "2.13.4"
-
+val scala3 = "3.0.0-M1"
 scalafmtOnCompile in ThisBuild := !Properties.envOrNone("CI").contains("true")
 
-scalaVersion in ThisBuild := "0.24.0-RC1"
+scalaVersion in ThisBuild := scala3
 
-crossScalaVersions in ThisBuild := List(scala2_13, scala2_12)
+//crossScalaVersions in ThisBuild := List(scala2_13, scala2_12)
 
 //https://github.com/sbt/sbt/pull/5153
 //https://github.com/bitcoin-s/bitcoin-s/pull/2194
