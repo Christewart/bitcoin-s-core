@@ -78,8 +78,6 @@ object CommonSettings {
   private val scala2_13CompilerOpts = Seq("-Xlint:unused", "-Xfatal-warnings")
 
   private val nonScala2_13CompilerOpts = Seq(
-    "-Xmax-classfile-name",
-    "128",
     "-Ywarn-unused",
     "-Ywarn-unused-import"
   )
@@ -98,8 +96,6 @@ object CommonSettings {
       "-unchecked",
       "-deprecation",
       "-feature",
-      "-Ypatmat-exhaust-depth",
-      "off"
     ) ++ commonCompilerOpts ++ {
       if (scalaVersion.startsWith("2.13")) scala2_13CompilerOpts
       else if (scalaVersion.startsWith("0")) {
