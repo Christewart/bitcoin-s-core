@@ -63,6 +63,9 @@ object CETCalculator {
     override def indexTo: Long = index
   }
 
+  /** Goes between from and to (inclusive) and evaluates function to split the
+    * interval [to, from] into CETRanges.
+    */
   def splitIntoRanges(
       from: Long,
       to: Long,
@@ -96,11 +99,8 @@ object CETCalculator {
     )
   }
 
-  /** Goes between from and to (inclusive) and evaluates function to split the
-    * interval [to, from] into CETRanges.
-    */
   @tailrec
-  def splitIntoRangesLoop(
+  private def splitIntoRangesLoop(
       currentOutcome: Long,
       to: Long,
       totalCollateral: Satoshis,
@@ -116,7 +116,12 @@ object CETCalculator {
     } else {
       val value = currentFunc(currentOutcome, rounding, totalCollateral)
 
-      /** Processes the constant range [currentOutcome, constantTo] */
+      /** Processes the constant range [currentOutcome, constantTo].
+        *
+        * Sadly the redundant call to splitIntoRangesLoop must be repeated
+        * in all places that call this function otherwise scala cannot tell
+        * that it is tail recursive.
+        */
       def processConstants(constantTo: Long): (
           Vector[CETRange],
           CETRange,
