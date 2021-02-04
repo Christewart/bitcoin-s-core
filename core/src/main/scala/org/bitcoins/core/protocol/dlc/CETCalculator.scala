@@ -116,62 +116,6 @@ object CETCalculator {
     } else {
       val value = currentFunc(currentOutcome, rounding, totalCollateral)
 
-      /** Processes the constant range [currentOutcome, constantTo].
-        *
-        * Sadly the redundant call to splitIntoRangesLoop must be repeated
-        * in all places that call this function otherwise scala cannot tell
-        * that it is tail recursive.
-        */
-      def processConstants(constantTo: Long): (
-          Vector[CETRange],
-          CETRange,
-          DLCPayoutCurvePiece,
-          Int) = {
-        val (nextCETRangesSoFar, nextCETRange) =
-          if (value == prevValue) {
-            currentCETRange match {
-              case VariablePayoutRange(indexFrom, indexTo) =>
-                val newCETRangesSoFar =
-                  cetRangesSoFar.:+(VariablePayoutRange(indexFrom, indexTo - 1))
-                val newCurrentCETRange =
-                  ConstantPayoutRange(indexTo, constantTo)
-                (newCETRangesSoFar, newCurrentCETRange)
-              case _: ConstantPayoutRange | _: SingletonPayoutRange =>
-                val newCurrentCETRange =
-                  ConstantPayoutRange(currentCETRange.indexFrom, constantTo)
-                (cetRangesSoFar, newCurrentCETRange)
-            }
-          } else if (constantTo > currentOutcome) {
-            val newCETRangesSoFar = cetRangesSoFar.:+(currentCETRange)
-            val newCurrentCETRange =
-              ConstantPayoutRange(currentOutcome, constantTo)
-            (newCETRangesSoFar, newCurrentCETRange)
-          } else {
-            currentCETRange match {
-              case _: VariablePayoutRange | _: SingletonPayoutRange =>
-                val newCurrentCETRange =
-                  VariablePayoutRange(currentCETRange.indexFrom, currentOutcome)
-                (cetRangesSoFar, newCurrentCETRange)
-              case _: ConstantPayoutRange =>
-                val newCETRangesSoFar = cetRangesSoFar.:+(currentCETRange)
-                val newCurrentCETRange = SingletonPayoutRange(currentOutcome)
-                (newCETRangesSoFar, newCurrentCETRange)
-            }
-          }
-
-        val (nextFunc, nextFuncIndex) =
-          if (
-            constantTo + 1 == currentFunc.rightEndpoint.outcome && constantTo + 1 != to
-          ) {
-            (function.functionComponents(currentFuncIndex + 1),
-             currentFuncIndex + 1)
-          } else {
-            (currentFunc, currentFuncIndex)
-          }
-
-        (nextCETRangesSoFar, nextCETRange, nextFunc, nextFuncIndex)
-      }
-
       currentFunc match {
         case constant: OutcomePayoutConstant =>
           val rightEndpoint = constant.rightEndpoint.outcome
@@ -181,8 +125,22 @@ object CETCalculator {
             math.min(rightEndpoint - 1, to)
           }
 
-          val (nextCETRangesSoFar, nextCETRange, nextFunc, nextFuncIndex) =
-            processConstants(constantTo = componentEnd)
+          val ConstantRangeAccumulator(nextCETRangesSoFar,
+                                       nextCETRange,
+                                       nextFunc,
+                                       nextFuncIndex) =
+            processConstants(
+              constantTo = componentEnd,
+              value = value,
+              prevValue = prevValue,
+              currentCETRange = currentCETRange,
+              cetRangesSoFar = cetRangesSoFar,
+              currentOutcome = currentOutcome,
+              function = function,
+              currentFunc = currentFunc,
+              to = to,
+              currentFuncIndex = currentFuncIndex
+            )
 
           splitIntoRangesLoop(
             currentOutcome = componentEnd + 1,
@@ -197,8 +155,22 @@ object CETCalculator {
             currentFuncIndex = nextFuncIndex
           )
         case _: DLCPayoutCurvePiece =>
-          val (nextCETRangesSoFar, nextCETRange, nextFunc, nextFuncIndex) =
-            processConstants(constantTo = currentOutcome)
+          val ConstantRangeAccumulator(nextCETRangesSoFar,
+                                       nextCETRange,
+                                       nextFunc,
+                                       nextFuncIndex) =
+            processConstants(
+              constantTo = currentOutcome,
+              value = value,
+              prevValue = prevValue,
+              currentCETRange = currentCETRange,
+              cetRangesSoFar = cetRangesSoFar,
+              currentOutcome = currentOutcome,
+              function = function,
+              currentFunc = currentFunc,
+              to = to,
+              currentFuncIndex = currentFuncIndex
+            )
 
           splitIntoRangesLoop(
             currentOutcome = currentOutcome + 1,
@@ -214,6 +186,78 @@ object CETCalculator {
           )
       }
     }
+  }
+
+  /** Helper case class to return information from [[processConstants()]] */
+  private case class ConstantRangeAccumulator(
+      nextCETRangesSoFar: Vector[CETRange],
+      nextCETRange: CETRange,
+      nextPiece: DLCPayoutCurvePiece,
+      nextFuncIndex: Int)
+
+  /** Processes the constant range [currentOutcome, constantTo].
+    *
+    * Sadly the redundant call to splitIntoRangesLoop must be repeated
+    * in all places that call this function otherwise scala cannot tell
+    * that it is tail recursive.
+    */
+  private def processConstants(
+      constantTo: Long,
+      value: Satoshis,
+      prevValue: Satoshis,
+      currentCETRange: CETRange,
+      cetRangesSoFar: Vector[CETRange],
+      currentOutcome: Long,
+      function: DLCPayoutCurve,
+      currentFunc: DLCPayoutCurvePiece,
+      to: Long,
+      currentFuncIndex: Int): ConstantRangeAccumulator = {
+    val (nextCETRangesSoFar, nextCETRange) =
+      if (value == prevValue) {
+        currentCETRange match {
+          case VariablePayoutRange(indexFrom, indexTo) =>
+            val newCETRangesSoFar =
+              cetRangesSoFar.:+(VariablePayoutRange(indexFrom, indexTo - 1))
+            val newCurrentCETRange =
+              ConstantPayoutRange(indexTo, constantTo)
+            (newCETRangesSoFar, newCurrentCETRange)
+          case _: ConstantPayoutRange | _: SingletonPayoutRange =>
+            val newCurrentCETRange =
+              ConstantPayoutRange(currentCETRange.indexFrom, constantTo)
+            (cetRangesSoFar, newCurrentCETRange)
+        }
+      } else if (constantTo > currentOutcome) {
+        val newCETRangesSoFar = cetRangesSoFar.:+(currentCETRange)
+        val newCurrentCETRange =
+          ConstantPayoutRange(currentOutcome, constantTo)
+        (newCETRangesSoFar, newCurrentCETRange)
+      } else {
+        currentCETRange match {
+          case _: VariablePayoutRange | _: SingletonPayoutRange =>
+            val newCurrentCETRange =
+              VariablePayoutRange(currentCETRange.indexFrom, currentOutcome)
+            (cetRangesSoFar, newCurrentCETRange)
+          case _: ConstantPayoutRange =>
+            val newCETRangesSoFar = cetRangesSoFar.:+(currentCETRange)
+            val newCurrentCETRange = SingletonPayoutRange(currentOutcome)
+            (newCETRangesSoFar, newCurrentCETRange)
+        }
+      }
+
+    val (nextFunc, nextFuncIndex) =
+      if (
+        constantTo + 1 == currentFunc.rightEndpoint.outcome && constantTo + 1 != to
+      ) {
+        (function.functionComponents(currentFuncIndex + 1),
+         currentFuncIndex + 1)
+      } else {
+        (currentFunc, currentFuncIndex)
+      }
+
+    ConstantRangeAccumulator(nextCETRangesSoFar,
+                             nextCETRange,
+                             nextFunc,
+                             nextFuncIndex)
   }
 
   /** Searches for an outcome which contains a prefix of digits */
