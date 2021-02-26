@@ -1,7 +1,7 @@
 package org.bitcoins.wallet.internal
 
-import org.bitcoins.core.api.wallet.{AddUtxoError, AddUtxoSuccess}
 import org.bitcoins.core.api.wallet.db._
+import org.bitcoins.core.api.wallet.{AddUtxoError, AddUtxoSuccess}
 import org.bitcoins.core.consensus.Consensus
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.number.UInt32
@@ -14,7 +14,9 @@ import org.bitcoins.core.wallet.utxo.{AddressTag, TxoState}
 import org.bitcoins.crypto.{DoubleSha256Digest, DoubleSha256DigestBE}
 import org.bitcoins.wallet._
 
-import scala.concurrent.{Future, Promise}
+import java.util.concurrent.{ScheduledFuture, TimeUnit}
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{Await, Future, Promise}
 import scala.util.{Failure, Success, Try}
 
 /** Provides functionality for processing transactions. This
@@ -24,6 +26,56 @@ import scala.util.{Failure, Success, Try}
   */
 private[wallet] trait TransactionProcessing extends WalletLogger {
   self: Wallet =>
+
+  private case object RebroadcastTransactionsRunnable extends Runnable {
+
+    override def run(): Unit = {
+      val f = for {
+        txs <- getTransactionsToBroadcast
+
+        _ = {
+          if (txs.size > 1)
+            logger.info(s"Rebroadcasting ${txs.size} transactions")
+          else if (txs.size == 1)
+            logger.info(s"Rebroadcasting ${txs.size} transaction")
+        }
+
+        _ <- nodeApi.broadcastTransactions(txs)
+      } yield ()
+
+      // Make sure broadcasting completes
+      // Wrap in try in case of spurious failure
+      Try(Await.result(f, 60.seconds))
+      ()
+    }
+  }
+
+  private[this] var rebroadcastTransactionsCancelOpt: Option[
+    ScheduledFuture[_]] = None
+
+  /** Starts the wallet's rebroadcast transaction scheduler */
+  def startRebroadcastTxsScheduler(): Unit = {
+    val future = scheduler.scheduleAtFixedRate(RebroadcastTransactionsRunnable,
+                                               30,
+                                               30,
+                                               TimeUnit.MINUTES)
+    rebroadcastTransactionsCancelOpt = Some(future)
+  }
+
+  /** Kills the wallet's rebroadcast transaction scheduler */
+  def stopRebroadcastTxsScheduler(): Unit = {
+    rebroadcastTransactionsCancelOpt match {
+      case Some(cancel) =>
+        if (!cancel.isCancelled) {
+          cancel.cancel(true)
+        } else {
+          rebroadcastTransactionsCancelOpt = None
+        }
+        ()
+      case None => ()
+    }
+  }
+
   /////////////////////
   // Public facing API
 
@@ -481,5 +533,13 @@ private[wallet] trait TransactionProcessing extends WalletLogger {
           utxos <- addUTXOsFut(ourOutputs, txDb.transaction, blockHashOpt)
         } yield utxos
     }
+  }
+
+  private[wallet] def getTransactionsToBroadcast: Future[
+    Vector[Transaction]] = {
+    for {
+      unconfirmedUtxos <- spendingInfoDAO.findAllPendingConfirmation
+      txDbs <- transactionDAO.findByTxIdBEs(unconfirmedUtxos.map(_.txid))
+    } yield txDbs.map(_.transaction)
   }
 }

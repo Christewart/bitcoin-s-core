@@ -44,6 +44,7 @@ import org.bitcoins.wallet.models._
 import scodec.bits.ByteVector
 
 import java.time.Instant
+import java.util.concurrent._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Random, Success}
 
@@ -62,6 +63,8 @@ abstract class Wallet
   implicit val ec: ExecutionContext
 
   implicit val walletConfig: WalletAppConfig
+
+  private[wallet] val scheduler = Executors.newScheduledThreadPool(1)
 
   val chainParams: ChainParams = walletConfig.chain
 
@@ -142,12 +145,14 @@ abstract class Wallet
   }
 
   override def start(): Future[Wallet] = {
+    logger.info("Starting Wallet")
     for {
       _ <- walletConfig.start()
       _ <- checkRootAccount
       _ <- downloadMissingUtxos
     } yield {
       startWalletThread()
+      startRebroadcastTxsScheduler()
       this
     }
   }
@@ -156,7 +161,8 @@ abstract class Wallet
     for {
       _ <- walletConfig.stop()
     } yield {
-      stopWalletThread()
+      stopAddressQueueThread()
+      stopRebroadcastTxsScheduler()
       this
     }
   }

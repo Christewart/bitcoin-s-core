@@ -355,7 +355,8 @@ object BitcoinSWalletTest extends WalletLogger {
 
   object MockNodeApi extends NodeApi {
 
-    override def broadcastTransaction(transaction: Transaction): Future[Unit] =
+    override def broadcastTransactions(
+        transactions: Vector[Transaction]): Future[Unit] =
       Future.unit
 
     override def downloadBlocks(
@@ -496,7 +497,7 @@ object BitcoinSWalletTest extends WalletLogger {
                                                          bip39PasswordOpt =
                                                            bip39PasswordOpt,
                                                          extraConfig)
-      _ = wallet.stopWalletThread()
+      _ = wallet.stopAddressQueueThread()
 
       //create the wallet with the appropriate callbacks now that
       //we have them
