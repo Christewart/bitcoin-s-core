@@ -497,7 +497,7 @@ object BitcoinSWalletTest extends WalletLogger {
                                                          bip39PasswordOpt =
                                                            bip39PasswordOpt,
                                                          extraConfig)
-      _ = wallet.stopAddressQueueThread()
+      //_ = wallet.stopAddressQueueThread()
 
       //create the wallet with the appropriate callbacks now that
       //we have them

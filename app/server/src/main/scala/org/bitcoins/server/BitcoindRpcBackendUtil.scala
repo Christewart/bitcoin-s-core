@@ -84,7 +84,7 @@ object BitcoindRpcBackendUtil extends BitcoinSLogger {
       bitcoind: BitcoindRpcClient,
       wallet: Wallet)(implicit ec: ExecutionContext): Wallet = {
     // Kill the old wallet
-    wallet.stopAddressQueueThread()
+    //wallet.stopAddressQueueThread()
 
     // We need to create a promise so we can inject the wallet with the callback
     // after we have created it into SyncUtil.getNodeApiWalletCallback
