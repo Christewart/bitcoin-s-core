@@ -131,6 +131,21 @@ abstract class NodeTestUtil extends P2PLogger {
     TestAsyncUtil.retryUntilSatisfiedF(() => bestHashF.map(_ == hash))
   }
 
+  /** The returned future doesnt' complete until the neutrino node and bitcoind rpc client have
+    * 1. same best block hash
+    * 2. Same number of compact filter headers
+    * 3. Same number of compact filters
+    */
+  def awaitFullNeutrinoSync(node: NeutrinoNode, rpc: BitcoindRpcClient)(implicit
+      system: ActorSystem): Future[Unit] = {
+    import system.dispatcher
+    for {
+      _ <- awaitSync(node, rpc)
+      _ <- awaitCompactFilterHeadersSync(node, rpc)
+      _ <- awaitCompactFiltersSync(node, rpc)
+    } yield ()
+  }
+
 }
 
 object NodeTestUtil extends NodeTestUtil

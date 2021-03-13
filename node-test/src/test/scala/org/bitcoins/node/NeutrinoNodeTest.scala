@@ -47,7 +47,7 @@ class NeutrinoNodeTest extends NodeUnitTest {
 
       syncF.flatMap { _ =>
         NodeTestUtil
-          .awaitSync(node, bitcoind)
+          .awaitFullNeutrinoSync(node, bitcoind)
           .map(_ => succeed)
       }
   }
@@ -67,9 +67,9 @@ class NeutrinoNodeTest extends NodeUnitTest {
       //as they happen with the 'sendheaders' message
       //both our spv node and our bitcoind node _should_ both be at the genesis block (regtest)
       //at this point so no actual syncing is happening
-      val initSyncF = gen1F.flatMap { hashes =>
+      val initSyncF = gen1F.flatMap { _ =>
         for {
-          _ <- NodeTestUtil.awaitBestHash(hashes.head, node)
+          _ <- NodeTestUtil.awaitFullNeutrinoSync(node, bitcoind)
         } yield ()
       }
 
@@ -85,7 +85,7 @@ class NeutrinoNodeTest extends NodeUnitTest {
         //we should expect 5 headers have been announced to us via
         //the send headers message.
         for {
-          _ <- NodeTestUtil.awaitSync(node, bitcoind)
+          _ <- NodeTestUtil.awaitFullNeutrinoSync(node, bitcoind)
         } yield {
           val isCancelled = cancellable.cancel()
           if (!isCancelled) {
