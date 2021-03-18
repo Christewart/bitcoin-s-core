@@ -13,6 +13,7 @@ import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.script.ScriptPubKey
 import org.bitcoins.core.protocol.transaction.TransactionInput
+import org.bitcoins.core.util.BitcoinSLogger
 import org.bitcoins.crypto.DoubleSha256DigestBE
 import org.bitcoins.rpc.util.NodePair
 import org.bitcoins.testkit.rpc.{
@@ -22,7 +23,9 @@ import org.bitcoins.testkit.rpc.{
 
 import scala.concurrent.Future
 
-class BitcoindV17RpcClientTest extends BitcoindFixturesCachedPairV17 {
+class BitcoindV17RpcClientTest
+    extends BitcoindFixturesCachedPairV17
+    with BitcoinSLogger {
   val usedLabel = "used_label"
   val unusedLabel = "unused_label"
 

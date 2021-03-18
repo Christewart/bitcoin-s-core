@@ -50,6 +50,8 @@ trait BCryptoCryptoRuntime extends CryptoRuntime {
     }
   }
 
+  }
+
   def randomBytes(n: Int): ByteVector = randomBytesFunc(n)
 
   override def ripeMd160(bytes: ByteVector): RipeMd160Digest = {
@@ -277,7 +279,7 @@ trait BCryptoCryptoRuntime extends CryptoRuntime {
   }
 
   override def decodePoint(bytes: ByteVector): ECPoint = {
-    if (bytes.size == 1 && bytes(0) == 0x00) {
+    if (bytes == ByteVector(0)) {
       ECPointInfinity
     } else {
       val decoded = ecdsa.curve

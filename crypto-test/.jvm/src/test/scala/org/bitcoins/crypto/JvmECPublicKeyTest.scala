@@ -13,7 +13,8 @@ class JvmECPublicKeyTest extends BitcoinSCryptoTest {
           val pub2 = BouncyCastleUtil.decodePubKey(p, pubKey.isCompressed)
           assert(pubKey == pub2)
         }
-      case _ => succeed
+      case runtime: CryptoRuntime =>
+        fail(s"Unexpected runtime given for the jvm, got=$runtime")
     }
   }
 }

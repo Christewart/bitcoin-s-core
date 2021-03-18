@@ -31,6 +31,7 @@ lazy val benchSettings: Seq[Def.SettingsDefinition] = {
 
 lazy val commonJsSettings = {
   Seq(
+    jsEnv := PhantomJSEnv().value,
     scalaJSLinkerConfig ~= {
       _.withModuleKind(ModuleKind.CommonJSModule)
     },
@@ -46,7 +47,8 @@ lazy val crypto = crossProject(JVMPlatform, JSPlatform)
   )
   .settings(CommonSettings.settings: _*)
   .jvmSettings(
-    libraryDependencies ++= Deps.cryptoJVM
+    libraryDependencies ++= Deps.cryptoJVM,
+    libraryDependencies += "org.scala-js" %% "scalajs-env-jsdom-nodejs" % "1.0.0"
   )
   .jsSettings(
     npmDependencies in Compile ++= Seq(
@@ -378,6 +380,13 @@ lazy val cryptoTest = crossProject(JVMPlatform, JSPlatform)
   .settings(CommonSettings.testSettings: _*)
   .jvmSettings(CommonSettings.jvmSettings: _*)
   .jsSettings(commonJsSettings: _*)
+  .jsSettings(webpackConfigFile := Some(
+    baseDirectory.value / "crypto.webpack.config.js"))
+  /*  .jsSettings(Compile / additionalNpmConfig ++= Map(
+    "browser" -> {
+      scalajsbundler.util.JSON.obj(("fs", scalajsbundler.util.JSON.bool(false)))
+    }
+  ))*/
   .settings(
     name := "bitcoin-s-crypto-test",
     libraryDependencies ++= Deps.cryptoTest.value
@@ -387,6 +396,7 @@ lazy val cryptoTest = crossProject(JVMPlatform, JSPlatform)
 lazy val cryptoTestJVM = cryptoTest.jvm
 
 lazy val cryptoTestJS = cryptoTest.js
+  .settings(requireJsDomEnv in Test := true)
   .enablePlugins(ScalaJSBundlerPlugin)
 
 lazy val coreTest = crossProject(JVMPlatform, JSPlatform)

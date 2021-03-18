@@ -1,7 +1,6 @@
 package org.bitcoins.testkit.util
 
 import grizzled.slf4j.Logging
-
 import java.nio.file.Files
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.testkit.rpc.BitcoindRpcTestUtil

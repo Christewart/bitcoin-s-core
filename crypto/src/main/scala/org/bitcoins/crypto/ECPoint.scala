@@ -4,13 +4,15 @@ import scodec.bits.ByteVector
 
 import java.math.BigInteger
 
-/** Represents a point on secp256k1 elliptic curve.
+/** Represents a point on an elliptic curve secp256k1
   */
 sealed trait ECPoint
 
 /** The infinity point.
   */
-case object ECPointInfinity extends ECPoint
+case object ECPointInfinity extends ECPoint {
+  val publicKey: ECPublicKey = ECPublicKey.fromHex("00")
+}
 
 /** A point on an elliptic curve.
   * @param x

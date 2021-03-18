@@ -261,6 +261,8 @@ object ECPublicKey extends Factory[ECPublicKey] {
     //we cannot do this. If there ever is a hard fork this would be a good thing to add.
   }
 
+  val infinity: ECPublicKey = ECPointInfinity.publicKey
+
   override def fromBytes(bytes: ByteVector): ECPublicKey = {
     ECPublicKeyImpl(bytes, ExecutionContext.global)
   }
