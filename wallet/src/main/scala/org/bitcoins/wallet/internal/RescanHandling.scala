@@ -199,6 +199,7 @@ private[wallet] trait RescanHandling extends WalletLogger {
         _ <- prevF
         _ <- nodeApi.downloadBlocks(Vector(blockHash))
         _ <- completedF
+        _ = println(s"Done inside of downloadAndProcessBlocks")
       } yield ()
     }
   }

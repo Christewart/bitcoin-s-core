@@ -55,11 +55,17 @@ private[wallet] trait TransactionProcessing extends WalletLogger {
 
   /** Starts the wallet's rebroadcast transaction scheduler */
   def startRebroadcastTxsScheduler(): Unit = {
-    val future = scheduler.scheduleAtFixedRate(RebroadcastTransactionsRunnable,
-                                               30,
-                                               30,
-                                               TimeUnit.MINUTES)
-    rebroadcastTransactionsCancelOpt = Some(future)
+    rebroadcastTransactionsCancelOpt match {
+      case Some(_) =>
+      //don't do anything as it is already started
+      case None =>
+        val future = scheduler.scheduleAtFixedRate(
+          RebroadcastTransactionsRunnable,
+          30,
+          30,
+          TimeUnit.MINUTES)
+        rebroadcastTransactionsCancelOpt = Some(future)
+    }
   }
 
   /** Kills the wallet's rebroadcast transaction scheduler */
@@ -219,7 +225,7 @@ private[wallet] trait TransactionProcessing extends WalletLogger {
       blockHash: DoubleSha256Digest,
       failure: Try[_]): Unit =
     synchronized {
-      logger.debug(s"Updating wallet signal completion for ${blockHash}")
+      logger.info(s"Updating wallet signal completion for ${blockHash}")
       blockProcessingSignals.get(blockHash).foreach { signal =>
         blockProcessingSignals =
           blockProcessingSignals.filterNot(_._1 == blockHash)

@@ -46,7 +46,7 @@ class BitcoindBlockPollingTest extends BitcoinSAsyncTest with EmbeddedPg {
       // Setup wallet
       tmpWallet <-
         BitcoinSWalletTest.createDefaultWallet(bitcoind, bitcoind, None)
-      wallet =
+      wallet <-
         BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(bitcoind,
                                                                  tmpWallet)
       // Assert wallet is empty

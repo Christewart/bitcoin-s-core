@@ -151,8 +151,8 @@ abstract class Wallet
       _ <- checkRootAccount
       _ <- downloadMissingUtxos
     } yield {
-      startWalletThread()
       startRebroadcastTxsScheduler()
+      startAddressRunnable()
       this
     }
   }
@@ -161,8 +161,8 @@ abstract class Wallet
     for {
       _ <- walletConfig.stop()
     } yield {
-      stopAddressQueueThread()
       stopRebroadcastTxsScheduler()
+      stopAddressRunnable()
       this
     }
   }

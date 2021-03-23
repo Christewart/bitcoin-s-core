@@ -138,11 +138,9 @@ class BitcoinSServerMain(override val args: Array[String])
         tmpWallet <- walletConf.createHDWallet(nodeApi = bitcoind,
                                                chainQueryApi = bitcoind,
                                                feeRateApi = feeProvider)
-        wallet = BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(
+        wallet <- BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(
           bitcoind,
           tmpWallet)
-        _ = logger.info("Starting wallet")
-        _ <- wallet.start()
         _ <- BitcoindRpcBackendUtil.syncWalletToBitcoind(bitcoind, wallet)
 
         blockCount <- bitcoind.getBlockCount

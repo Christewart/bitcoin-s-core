@@ -292,11 +292,16 @@ trait BitcoinSWalletTest extends BitcoinSFixture with EmbeddedPg {
           BitcoinSFixture
             .createBitcoindWithFunds(Some(BitcoindVersion.V19))
             .map(_.asInstanceOf[BitcoindV19RpcClient])
+        _ = println(s"Got bitgcoind")
         wallet <- createWalletWithBitcoindCallbacks(bitcoind, bip39PasswordOpt)
+        _ = println(s"Created wallet")
         fundedWallet <- fundWalletWithBitcoind(wallet)
+        _ = println(s"Funded wallet")
         _ <- SyncUtil.syncWalletFullBlocks(wallet = fundedWallet.wallet,
                                            bitcoind = bitcoind)
+        _ = println(s"Synced wallet")
         _ <- BitcoinSWalletTest.awaitWalletBalances(fundedWallet)
+        _ = println(s"Got balances synced")
       } yield {
         WalletWithBitcoindV19(fundedWallet.wallet, bitcoind)
       }
@@ -469,12 +474,14 @@ object BitcoinSWalletTest extends WalletLogger {
     }
     val km =
       createNewKeyManager(bip39PasswordOpt = bip39PasswordOpt)(newWalletConf)
-    createNewWallet(
+    val wallet = createNewWallet(
       keyManager = km,
       bip39PasswordOpt = bip39PasswordOpt,
       extraConfig = extraConfig,
       nodeApi = nodeApi,
       chainQueryApi = chainQueryApi)(config, ec)() // get the standard config
+
+    wallet.flatMap(_.start())
   }
 
   /** Creates a default wallet with bitcoind where the [[ChainQueryApi]] fed to the wallet
@@ -497,7 +504,6 @@ object BitcoinSWalletTest extends WalletLogger {
                                                          bip39PasswordOpt =
                                                            bip39PasswordOpt,
                                                          extraConfig)
-      _ = wallet.stopAddressQueueThread()
 
       //create the wallet with the appropriate callbacks now that
       //we have them
@@ -511,8 +517,10 @@ object BitcoinSWalletTest extends WalletLogger {
       )(wallet.walletConfig, wallet.ec)
       //complete the walletCallbackP so we can handle the callbacks when they are
       //called without hanging forever.
-      _ = walletCallbackP.success(walletWithCallback)
-    } yield WalletWithBitcoindRpc(walletWithCallback, bitcoind)
+      started <- wallet.start()
+      _ = walletCallbackP.success(started)
+      startedWithCallback <- walletWithCallback.start()
+    } yield WalletWithBitcoindRpc(startedWithCallback, bitcoind)
 
     walletWithBitcoindF.failed.foreach(err => walletCallbackP.failure(err))
 

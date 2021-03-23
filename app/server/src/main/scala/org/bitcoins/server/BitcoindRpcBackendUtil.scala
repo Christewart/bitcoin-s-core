@@ -82,16 +82,14 @@ object BitcoindRpcBackendUtil extends BitcoinSLogger {
 
   def createWalletWithBitcoindCallbacks(
       bitcoind: BitcoindRpcClient,
-      wallet: Wallet)(implicit ec: ExecutionContext): Wallet = {
-    // Kill the old wallet
-    wallet.stopAddressQueueThread()
+      wallet: Wallet)(implicit ec: ExecutionContext): Future[Wallet] = {
 
     // We need to create a promise so we can inject the wallet with the callback
     // after we have created it into SyncUtil.getNodeApiWalletCallback
     // so we don't lose the internal state of the wallet
     val walletCallbackP = Promise[Wallet]()
 
-    val pairedWallet = Wallet(
+    val pairedWallet: Wallet = Wallet(
       keyManager = wallet.keyManager,
       nodeApi =
         BitcoindRpcBackendUtil.getNodeApiWalletCallback(bitcoind,
@@ -103,7 +101,7 @@ object BitcoindRpcBackendUtil extends BitcoinSLogger {
 
     walletCallbackP.success(pairedWallet)
 
-    pairedWallet
+    pairedWallet.start()
   }
 
   def createZMQWalletCallbacks(wallet: Wallet)(implicit
@@ -156,7 +154,8 @@ object BitcoindRpcBackendUtil extends BitcoinSLogger {
                 wallet.processBlock(block)
               }
             }
-          } yield processedWallet
+            started <- processedWallet.start()
+          } yield started
 
           updatedWalletF
         }

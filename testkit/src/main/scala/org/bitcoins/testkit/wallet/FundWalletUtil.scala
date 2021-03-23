@@ -55,7 +55,6 @@ trait FundWalletUtil extends BitcoinSLogger {
       wallet: Wallet,
       bitcoind: BitcoindRpcClient)(implicit
       ec: ExecutionContext): Future[Wallet] = {
-
     val addressesF: Future[Vector[BitcoinAddress]] = Future.sequence {
       Vector.fill(3)(wallet.getNewAddress(account))
     }
@@ -139,6 +138,7 @@ object FundWalletUtil extends FundWalletUtil {
         chainQueryApi = chainQueryApi,
         bip39PasswordOpt = bip39PasswordOpt,
         extraConfig = extraConfig)
+      _ <- wallet.start()
       funded <- FundWalletUtil.fundWallet(wallet)
     } yield funded
   }
