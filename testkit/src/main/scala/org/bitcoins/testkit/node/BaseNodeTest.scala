@@ -1,6 +1,7 @@
 package org.bitcoins.testkit.node
 
 import akka.actor.{ActorSystem, Cancellable}
+import grizzled.slf4j.Logging
 import org.bitcoins.core.api.chain.{ChainApi, ChainQueryApi, FilterSyncMarker}
 import org.bitcoins.core.api.chain.db.{
   BlockHeaderDb,
@@ -12,7 +13,6 @@ import org.bitcoins.core.gcs.FilterHeader
 import org.bitcoins.core.p2p.CompactFilterMessage
 import org.bitcoins.core.protocol.blockchain.BlockHeader
 import org.bitcoins.core.protocol.{BitcoinAddress, BlockStamp}
-import org.bitcoins.core.util.BitcoinSLogger
 import org.bitcoins.crypto.DoubleSha256DigestBE
 import org.bitcoins.db.AppConfig
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
@@ -26,7 +26,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
 /** A base test trait for all the tests in our nodeTest module */
-trait BaseNodeTest extends BitcoinSFixture with EmbeddedPg with BitcoinSLogger {
+trait BaseNodeTest extends BitcoinSFixture with EmbeddedPg with Logging {
 
   /** Wallet config with data directory set to user temp directory */
   implicit protected def getFreshConfig: BitcoinSAppConfig

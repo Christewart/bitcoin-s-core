@@ -1,5 +1,7 @@
 package org.bitcoins.crypto
 
+import scodec.bits.ByteVector
+
 class KeysTest extends BitcoinSCryptoTest {
 
   it must "generate keys" in {
@@ -20,7 +22,7 @@ class KeysTest extends BitcoinSCryptoTest {
     assert(BCryptoCryptoRuntime.secKeyVerify(privkey.bytes))
     assert(privkey.isCompressed)
 
-    val pubkey = BCryptoCryptoRuntime.toPublicKey(privkey, isCompressed = false)
+    val pubkey = BCryptoCryptoRuntime.toPublicKey(privkey)
     assert(BCryptoCryptoRuntime.isValidPubKey(pubkey.bytes))
     assert(!pubkey.isCompressed)
 

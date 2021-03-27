@@ -5,11 +5,7 @@ import org.bitcoins.crypto.ECPrivateKey
 import org.bitcoins.testkitcore.gen.{ChainParamsGenerator, CryptoGenerators}
 import org.bitcoins.testkitcore.util.BitcoinSUnitTest
 
-<<<<<<< HEAD:core-test/src/test/scala/org/bitcoins/core/crypto/WIFEncodingTest.scala
 class WIFEncodingTest extends BitcoinSUnitTest {
-=======
-class WIFPrivateKeyTest extends BitcoinSUnitTest {
->>>>>>> d7e985d63cd... WIP:core-test/src/test/scala/org/bitcoins/core/crypto/WIFPrivateKeyTest.scala
 
   it must "determine if a private key corresponds to a compressed public key or not" in {
     val compressedKey = "L1RrrnXkcKut5DEMwtDthjwRcTTwED36thyL1DebVrKuwvohjMNi"
