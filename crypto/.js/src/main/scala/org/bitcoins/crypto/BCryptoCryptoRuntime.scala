@@ -50,8 +50,6 @@ trait BCryptoCryptoRuntime extends CryptoRuntime {
     }
   }
 
-  }
-
   def randomBytes(n: Int): ByteVector = randomBytesFunc(n)
 
   override def ripeMd160(bytes: ByteVector): RipeMd160Digest = {
