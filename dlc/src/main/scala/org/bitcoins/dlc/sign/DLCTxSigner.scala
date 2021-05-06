@@ -1,5 +1,6 @@
 package org.bitcoins.dlc.sign
 
+import grizzled.slf4j.Logging
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.crypto.{
   TransactionSignatureCreator,
@@ -30,7 +31,8 @@ case class DLCTxSigner(
     isInitiator: Boolean,
     fundingKey: AdaptorSign,
     finalAddress: BitcoinAddress,
-    fundingUtxos: Vector[ScriptSignatureParams[InputInfo]]) {
+    fundingUtxos: Vector[ScriptSignatureParams[InputInfo]])
+    extends Logging {
 
   private val offer = builder.offer
   private val accept = builder.accept
@@ -182,7 +184,15 @@ case class DLCTxSigner(
 
   /** Creates all of this party's CETSignatures */
   def createCETSigs(): CETSignatures = {
-    val cetSigs = signCETs(builder.contractInfo.allOutcomes)
+    logger.info(s"createCETSigs()")
+    val startOutcomes = System.currentTimeMillis()
+    val outcomes = builder.contractInfo.allOutcomes
+    logger.info(
+      s"Done computing outcomes=${System.currentTimeMillis() - startOutcomes}ms")
+    val startSigning = System.currentTimeMillis()
+    val cetSigs = signCETs(outcomes)
+    logger.info(
+      s"Done with cetSigs=${System.currentTimeMillis() - startSigning}ms")
     val refundSig = signRefundTx
 
     CETSignatures(cetSigs, refundSig)
