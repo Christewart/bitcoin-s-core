@@ -1,5 +1,6 @@
 package org.bitcoins.testkit.wallet
 
+import grizzled.slf4j.Logging
 import org.bitcoins.core.crypto.WitnessTxSigComponent
 import org.bitcoins.core.currency._
 import org.bitcoins.core.hd.{BIP32Path, HDAccount}
@@ -25,7 +26,7 @@ import scodec.bits.ByteVector
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object DLCWalletUtil {
+object DLCWalletUtil extends Logging {
   lazy val oraclePrivKey: ECPrivateKey = ECPrivateKey.freshPrivateKey
 
   lazy val kValues: Vector[ECPrivateKey] =
@@ -215,6 +216,7 @@ object DLCWalletUtil {
     val walletA = fundedWalletA.wallet
     val walletB = fundedWalletB.wallet
 
+    val startOffer = System.currentTimeMillis()
     for {
       offer <- walletA.createDLCOffer(
         contractInfo = contractInfo,
@@ -223,9 +225,20 @@ object DLCWalletUtil {
         locktime = dummyTimeouts.contractMaturity.toUInt32,
         refundLocktime = dummyTimeouts.contractTimeout.toUInt32
       )
+      _ = logger.error(
+        s"Created offer, it took=${System.currentTimeMillis() - startOffer}ms")
+      acceptStart = System.currentTimeMillis()
       accept <- walletB.acceptDLCOffer(offer)
+      _ = logger.error(
+        s"Accept took ${System.currentTimeMillis() - acceptStart}ms")
+      signStart = System.currentTimeMillis()
       sigs <- walletA.signDLC(accept)
+      _ = logger.error(s"Sign took ${System.currentTimeMillis() - signStart}ms")
+      addSigsStart = System.currentTimeMillis()
       _ <- walletB.addDLCSigs(sigs)
+
+      _ = logger.error(
+        s"Add sigs start took=${System.currentTimeMillis() - addSigsStart}ms")
 
       tx <- walletB.broadcastDLCFundingTx(sigs.contractId)
       _ <- walletA.processTransaction(tx, None)

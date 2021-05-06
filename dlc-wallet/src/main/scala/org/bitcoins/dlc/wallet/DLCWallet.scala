@@ -680,22 +680,36 @@ abstract class DLCWallet extends Wallet with AnyDLCHDWalletApi {
       offer: DLCOffer): Future[DLCAccept] = {
     logger.info(
       s"Creating DLC Accept for tempContractId ${offer.tempContractId.hex}")
-    for {
-      (txBuilder, spendingInfos) <- fundRawTransactionInternal(
-        destinations = Vector(TransactionOutput(collateral, EmptyScriptPubKey)),
-        feeRate = offer.feeRate,
-        fromAccount = account,
-        fromTagOpt = None,
-        markAsReserved = true
-      )
-      network = networkParameters.asInstanceOf[BitcoinNetwork]
 
-      serialIds = DLCMessage.genSerialIds(
-        spendingInfos.size,
-        offer.fundingInputs.map(_.inputSerialId))
-      utxos = spendingInfos.zip(serialIds).map { case (utxo, id) =>
+    val txBuilderWithSpendingInfosF = fundRawTransactionInternal(
+      destinations = Vector(TransactionOutput(collateral, EmptyScriptPubKey)),
+      feeRate = offer.feeRate,
+      fromAccount = account,
+      fromTagOpt = None,
+      markAsReserved = true
+    )
+
+    val txBuilderF = txBuilderWithSpendingInfosF.map(_._1)
+
+    val spendingInfoDbsF = txBuilderWithSpendingInfosF.map(_._2)
+    val network = networkParameters.asInstanceOf[BitcoinNetwork]
+    val serialIdsF = for {
+      spendingInfos <- spendingInfoDbsF
+    } yield {
+      DLCMessage.genSerialIds(spendingInfos.size,
+                              offer.fundingInputs.map(_.inputSerialId))
+    }
+
+    val utxosF = for {
+      spendingInfoDbs <- spendingInfoDbsF
+      serialIds <- serialIdsF
+      utxos = spendingInfoDbs.zip(serialIds).map { case (utxo, id) =>
         DLCFundingInput.fromInputSigningInfo(utxo, id)
       }
+    } yield utxos
+
+    for {
+      txBuilder <- txBuilderF
 
       changeSPK = txBuilder.finalizer.changeSPK.asInstanceOf[P2WPKHWitnessSPKV0]
       changeAddr = Bech32Address(changeSPK, network)
@@ -718,6 +732,7 @@ abstract class DLCWallet extends Wallet with AnyDLCHDWalletApi {
       changeSerialId = DLCMessage.genSerialId(
         Vector(offer.fundOutputSerialId, offer.changeSerialId))
 
+      utxos <- utxosF
       acceptWithoutSigs = DLCAcceptWithoutSigs(
         totalCollateral = collateral.satoshis,
         pubKeys = dlcPubKeys,
@@ -733,6 +748,7 @@ abstract class DLCWallet extends Wallet with AnyDLCHDWalletApi {
 
       contractId = builder.calcContractId
 
+      spendingInfos <- spendingInfoDbsF
       signer = DLCTxSigner(builder = builder,
                            isInitiator = false,
                            fundingKey = fundingPrivKey,
