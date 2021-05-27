@@ -52,19 +52,22 @@ class WalletGUIModel() {
 
   def onGetNewAddress(): Unit = {
     val address = StringProperty("")
-
+    println(s"Addressproperty=$address")
+    println(s"taskRunner=$taskRunner")
     taskRunner.run(
       caption = "Get New Address",
       op = {
+        println(s"Starting fetch getnewAddress")
         ConsoleCli.exec(GetNewAddress(None),
                         GlobalData.consoleCliConfig) match {
-          case Success(commandReturn) => address.value = commandReturn
-          case Failure(err)           => throw err
+          case Success(commandReturn) =>
+            address.value = commandReturn
+            GetNewAddressDialog.showAndWait(parentWindow.value, address)
+          case Failure(err) => throw err
         }
       }
     )
-
-    GetNewAddressDialog.showAndWait(parentWindow.value, address)
+    ()
   }
 
   def onSend(): Unit = {

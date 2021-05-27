@@ -60,7 +60,10 @@ abstract class WalletGUI {
 
   private lazy val getNewAddressButton = new Button {
     text = "Get New Address"
-    onAction = _ => model.onGetNewAddress()
+    onAction = _ => {
+      println(s"Before onGetNewAddress $model")
+      model.onGetNewAddress()
+    }
   }
 
   private lazy val sendButton = new Button {

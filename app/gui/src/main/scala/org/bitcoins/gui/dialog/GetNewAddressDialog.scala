@@ -21,11 +21,13 @@ object GetNewAddressDialog {
   }
 
   def showAndWait(parentWindow: Window, address: StringProperty): Unit = {
+    println(s"GetNewAddressDialog.showAndWait()")
     val dialog = new Dialog[Unit]() {
       initOwner(parentWindow)
       title = "New Address"
     }
 
+    println(s"Done with dialog")
     // TODO make a button to copy the address to clipboard
 
     dialog.dialogPane().buttonTypes = Seq(ButtonType.OK)
