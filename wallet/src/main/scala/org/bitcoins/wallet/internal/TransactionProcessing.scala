@@ -272,16 +272,16 @@ private[bitcoins] trait TransactionProcessing extends WalletLogger {
     }
 
     for {
+      spentSpendingInfoDbs <- spentSpendingInfoDbsF
+      outgoing <- processSpentUtxos(transaction = transaction,
+                                    outputsBeingSpent = spentSpendingInfoDbs,
+                                    blockHashOpt = blockHashOpt)
       receivedSpendingInfoDbs <- receivedSpendingInfoDbsF
       incoming <- processReceivedUtxos(transaction = transaction,
                                        blockHashOpt = blockHashOpt,
                                        spendingInfoDbs =
                                          receivedSpendingInfoDbs,
                                        newTags = newTags)
-      spentSpendingInfoDbs <- spentSpendingInfoDbsF
-      outgoing <- processSpentUtxos(transaction = transaction,
-                                    outputsBeingSpent = spentSpendingInfoDbs,
-                                    blockHashOpt = blockHashOpt)
       _ <- walletCallbacks.executeOnTransactionProcessed(logger, transaction)
     } yield {
       ProcessTxResult(incoming, outgoing)
