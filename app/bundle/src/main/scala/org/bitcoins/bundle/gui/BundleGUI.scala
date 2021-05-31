@@ -89,6 +89,6 @@ object BundleGUI extends WalletGUI with JFXApp {
 
   override def stopApp(): Unit = {
     super.stopApp()
-    sys.exit()
+//    sys.exit()
   }
 }
