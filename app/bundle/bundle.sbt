@@ -1,5 +1,7 @@
 import com.typesafe.sbt.packager.windows._
 
+import scala.util.Properties
+
 name := "bitcoin-s-bundle"
 
 enablePlugins(WindowsPlugin)
@@ -20,6 +22,8 @@ assembly / assemblyMergeStrategy := {
   case PathList("reference.conf", _ @_*) => MergeStrategy.concat
   case _                                 => MergeStrategy.first
 }
+
+version := "0.6.1"
 
 Compile / doc := (target.value / "none")
 // general package information (can be scoped to Windows)
