@@ -149,7 +149,7 @@ jobs:
       - name: Setup Scala
         uses: olafurpg/setup-scala@v10
         with:
-          java-version: adopt@1.11.0-1
+          java-version: adopt@1.16.0-1
 
       - name: 'Get Previous tag'
         id: previoustag
