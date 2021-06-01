@@ -16,7 +16,7 @@ assembly / mainClass := Some("org.bitcoins.bundle.gui.BundleGUI")
 
 assembly / assemblyJarName := s"${name.value}.jar"
 
-//need compatability with windows versioning scheme which is
+//need compatibility with windows versioning scheme which is
 //w.x.y.z
 Windows / version := previousStableVersion.value.get
 
@@ -47,3 +47,19 @@ wixFeatures += WindowsFeature(
     AddShortCuts(Seq("bin/bitcoin-s-bundle.bat"))
   )
 )
+
+// for windows class paths being too long
+scriptClasspath := Seq("*")
+
+Universal / mappings += {
+  // we are using the reference.conf as default application.conf
+  // the user can override settings here
+  val conf = (Compile / resourceDirectory).value / "application.conf"
+  conf -> "conf/application.conf"
+}
+
+scriptClasspath += "../conf/application.conf"
+
+// add jvm parameter for typesafe config
+bashScriptExtraDefines += """addJava "-Dconfig.file=${app_home}/../conf/application.conf""""
+batScriptExtraDefines += """call :add_java "-Dconfig.file=%APP_HOME%\conf\application.conf""""
