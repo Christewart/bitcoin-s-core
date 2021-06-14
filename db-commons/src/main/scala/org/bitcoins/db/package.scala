@@ -10,7 +10,7 @@ package object db {
   implicit class ConfigOps(private val config: Config) extends AnyVal {
 
     def asReadableJson: String = {
-      val options = ConfigRenderOptions.concise().setFormatted(true)
+      val options = ConfigRenderOptions.defaults().setFormatted(true)
       config.root().render(options)
     }
 
