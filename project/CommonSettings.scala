@@ -108,7 +108,8 @@ object CommonSettings {
       "-Xlint:inaccessible",
       "-Xlint:infer-any",
       "-Xlint:missing-interpolator",
-      "-Xlint:eta-sam"
+      "-Xlint:eta-sam",
+      "-Xlint:strict-unsealed-patmat"
     )
   }
 
