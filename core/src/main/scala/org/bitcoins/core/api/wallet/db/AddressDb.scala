@@ -133,5 +133,7 @@ object AddressDbHelper {
       case legacy: LegacyHDPath       => getLegacyAddress(pub, legacy, np)
       case nested: NestedSegWitHDPath => getNestedSegwitAddress(pub, nested, np)
       case segwit: SegWitHDPath       => getSegwitAddress(pub, segwit, np)
+      case _: MultisigHDPath =>
+        sys.error(s"multisig hd path not implemented")
     }
 }
