@@ -215,18 +215,7 @@ sealed abstract class BloomFilter extends NetworkElement {
   def updateP2PKOnly(
       scriptPubKeysWithIndex: Seq[(ScriptPubKey, Int)],
       txId: DoubleSha256Digest): BloomFilter = {
-    @tailrec
-    def loop(
-        constantsWithIndex: Seq[(ScriptToken, Int)],
-        accumFilter: BloomFilter): BloomFilter =
-      constantsWithIndex match {
-        case h +: t if accumFilter.contains(h._1.bytes) =>
-          val filter =
-            accumFilter.insert(TransactionOutPoint(txId, UInt32(h._2)))
-          loop(t, filter)
-        case _ +: t => loop(t, accumFilter)
-        case Nil    => accumFilter
-      }
+
     val p2pkOrMultiSigScriptPubKeys: Seq[(ScriptPubKey, Int)] =
       scriptPubKeysWithIndex.filter { case (s, _) =>
         s.isInstanceOf[P2PKScriptPubKey] ||
@@ -239,7 +228,17 @@ sealed abstract class BloomFilter extends NetworkElement {
           case (token, _) => token.isInstanceOf[ScriptConstant]
         }
       }
-    loop(scriptConstantsWithOutputIndex, this)
+
+    scriptConstantsWithOutputIndex.foldLeft(this) {
+      case (accumFilter, (scriptToken, idx)) =>
+        if (accumFilter.contains(scriptToken.bytes)) {
+          val filter =
+            accumFilter.insert(TransactionOutPoint(txId, UInt32(idx)))
+          filter
+        } else {
+          accumFilter
+        }
+    }
   }
 
   /** Performs the [[scala.util.hashing.MurmurHash3 MurmurHash3]] on the given hash

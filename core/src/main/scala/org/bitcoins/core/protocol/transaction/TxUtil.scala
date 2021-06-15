@@ -69,54 +69,57 @@ object TxUtil {
     @tailrec
     def loop(
         remaining: Seq[InputInfo],
-        currentLockTimeOpt: Option[UInt32]): Try[UInt32] =
-      remaining match {
-        case Nil =>
-          Success(currentLockTimeOpt.getOrElse(TransactionConstants.lockTime))
-        case spendingInfo +: newRemaining =>
-          spendingInfo match {
-            case lockTime: LockTimeInputInfo =>
-              lockTime.scriptPubKey match {
-                case _: CSVScriptPubKey =>
-                  loop(newRemaining, currentLockTimeOpt)
-                case cltv: CLTVScriptPubKey =>
-                  val result = computeNextLockTime(currentLockTimeOpt,
-                                                   cltv.locktime.toLong)
+        currentLockTimeOpt: Option[UInt32]): Try[UInt32] = {
+      if (remaining.isEmpty) {
+        Success(currentLockTimeOpt.getOrElse(TransactionConstants.lockTime))
+      } else {
+        val spendingInfo = remaining.head
+        val newRemaining = remaining.tail
 
-                  result match {
-                    case Success(newLockTime) =>
-                      loop(newRemaining, Some(newLockTime))
-                    case _: Failure[UInt32] => result
-                  }
-              }
-            case p2pkWithTimeout: P2PKWithTimeoutInputInfo =>
-              if (p2pkWithTimeout.isBeforeTimeout) {
+        spendingInfo match {
+          case lockTime: LockTimeInputInfo =>
+            lockTime.scriptPubKey match {
+              case _: CSVScriptPubKey =>
                 loop(newRemaining, currentLockTimeOpt)
-              } else {
-                val result = computeNextLockTime(
-                  currentLockTimeOpt,
-                  p2pkWithTimeout.scriptPubKey.lockTime.toLong)
+              case cltv: CLTVScriptPubKey =>
+                val result =
+                  computeNextLockTime(currentLockTimeOpt, cltv.locktime.toLong)
 
                 result match {
                   case Success(newLockTime) =>
                     loop(newRemaining, Some(newLockTime))
                   case _: Failure[UInt32] => result
                 }
-              }
-            case p2sh: P2SHInputInfo =>
-              loop(p2sh.nestedInputInfo +: newRemaining, currentLockTimeOpt)
-            case p2wsh: P2WSHV0InputInfo =>
-              loop(p2wsh.nestedInputInfo +: newRemaining, currentLockTimeOpt)
-            case conditional: ConditionalInputInfo =>
-              loop(conditional.nestedInputInfo +: newRemaining,
-                   currentLockTimeOpt)
-            case _: P2WPKHV0InputInfo | _: UnassignedSegwitNativeInputInfo |
-                _: P2PKInputInfo | _: P2PKHInputInfo |
-                _: MultiSignatureInputInfo | _: EmptyInputInfo =>
-              // none of these scripts affect the locktime of a tx
+            }
+          case p2pkWithTimeout: P2PKWithTimeoutInputInfo =>
+            if (p2pkWithTimeout.isBeforeTimeout) {
               loop(newRemaining, currentLockTimeOpt)
-          }
+            } else {
+              val result = computeNextLockTime(
+                currentLockTimeOpt,
+                p2pkWithTimeout.scriptPubKey.lockTime.toLong)
+
+              result match {
+                case Success(newLockTime) =>
+                  loop(newRemaining, Some(newLockTime))
+                case _: Failure[UInt32] => result
+              }
+            }
+          case p2sh: P2SHInputInfo =>
+            loop(p2sh.nestedInputInfo +: newRemaining, currentLockTimeOpt)
+          case p2wsh: P2WSHV0InputInfo =>
+            loop(p2wsh.nestedInputInfo +: newRemaining, currentLockTimeOpt)
+          case conditional: ConditionalInputInfo =>
+            loop(conditional.nestedInputInfo +: newRemaining,
+                 currentLockTimeOpt)
+          case _: P2WPKHV0InputInfo | _: UnassignedSegwitNativeInputInfo |
+              _: P2PKInputInfo | _: P2PKHInputInfo |
+              _: MultiSignatureInputInfo | _: EmptyInputInfo =>
+            // none of these scripts affect the locktime of a tx
+            loop(newRemaining, currentLockTimeOpt)
+        }
       }
+    }
 
     loop(utxos, None)
   }

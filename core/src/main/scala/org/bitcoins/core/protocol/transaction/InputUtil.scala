@@ -45,52 +45,56 @@ object InputUtil {
     @tailrec
     def loop(
         remaining: Seq[InputInfo],
-        accum: Seq[TransactionInput]): Seq[TransactionInput] =
-      remaining match {
-        case Nil => accum.reverse
-        case spendingInfo +: newRemaining =>
-          spendingInfo match {
-            case lockTime: LockTimeInputInfo =>
-              val sequence = lockTime.scriptPubKey match {
-                case csv: CSVScriptPubKey => solveSequenceForCSV(csv.locktime)
-                case _: CLTVScriptPubKey  => UInt32.zero
-              }
-              val input = TransactionInput(lockTime.outPoint,
-                                           EmptyScriptSignature,
-                                           sequence)
-              loop(newRemaining, input +: accum)
-            case p2pkWithTimeout: P2PKWithTimeoutInputInfo =>
-              if (p2pkWithTimeout.isBeforeTimeout) {
-                val input =
-                  TransactionInput(spendingInfo.outPoint,
-                                   EmptyScriptSignature,
-                                   defaultSequence)
-                loop(newRemaining, input +: accum)
-              } else {
-                val sequence = solveSequenceForCSV(
-                  p2pkWithTimeout.scriptPubKey.lockTime)
-                val input = TransactionInput(p2pkWithTimeout.outPoint,
-                                             EmptyScriptSignature,
-                                             sequence)
-                loop(newRemaining, input +: accum)
-              }
-            case p2sh: P2SHInputInfo =>
-              loop(p2sh.nestedInputInfo +: newRemaining, accum)
-            case p2wsh: P2WSHV0InputInfo =>
-              loop(p2wsh.nestedInputInfo +: newRemaining, accum)
-            case conditional: ConditionalInputInfo =>
-              loop(conditional.nestedInputInfo +: newRemaining, accum)
-            case _: P2WPKHV0InputInfo | _: UnassignedSegwitNativeInputInfo |
-                _: P2PKInputInfo | _: P2PKHInputInfo |
-                _: MultiSignatureInputInfo | _: EmptyInputInfo =>
-              //none of these script types affect the sequence number of a tx so the defaultSequence is used
+        accum: Seq[TransactionInput]): Seq[TransactionInput] = {
+      if (remaining.isEmpty) {
+        accum.reverse
+      } else {
+        val spendingInfo = remaining.head
+        val newRemaining = remaining.tail
+        spendingInfo match {
+          case lockTime: LockTimeInputInfo =>
+            val sequence = lockTime.scriptPubKey match {
+              case csv: CSVScriptPubKey => solveSequenceForCSV(csv.locktime)
+              case _: CLTVScriptPubKey  => UInt32.zero
+            }
+            val input = TransactionInput(lockTime.outPoint,
+                                         EmptyScriptSignature,
+                                         sequence)
+            loop(newRemaining, input +: accum)
+          case p2pkWithTimeout: P2PKWithTimeoutInputInfo =>
+            if (p2pkWithTimeout.isBeforeTimeout) {
               val input =
                 TransactionInput(spendingInfo.outPoint,
                                  EmptyScriptSignature,
                                  defaultSequence)
               loop(newRemaining, input +: accum)
-          }
+            } else {
+              val sequence = solveSequenceForCSV(
+                p2pkWithTimeout.scriptPubKey.lockTime)
+              val input = TransactionInput(p2pkWithTimeout.outPoint,
+                                           EmptyScriptSignature,
+                                           sequence)
+              loop(newRemaining, input +: accum)
+            }
+          case p2sh: P2SHInputInfo =>
+            loop(p2sh.nestedInputInfo +: newRemaining, accum)
+          case p2wsh: P2WSHV0InputInfo =>
+            loop(p2wsh.nestedInputInfo +: newRemaining, accum)
+          case conditional: ConditionalInputInfo =>
+            loop(conditional.nestedInputInfo +: newRemaining, accum)
+          case _: P2WPKHV0InputInfo | _: UnassignedSegwitNativeInputInfo |
+              _: P2PKInputInfo | _: P2PKHInputInfo |
+              _: MultiSignatureInputInfo | _: EmptyInputInfo =>
+            //none of these script types affect the sequence number of a tx so the defaultSequence is used
+            val input =
+              TransactionInput(spendingInfo.outPoint,
+                               EmptyScriptSignature,
+                               defaultSequence)
+            loop(newRemaining, input +: accum)
+        }
+
       }
+    }
 
     loop(utxos, Nil)
   }

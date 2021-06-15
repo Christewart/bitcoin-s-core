@@ -31,17 +31,18 @@ trait Merkle {
     * @param transactions the list of transactions whose merkle root needs to be computed
     * @return the merkle root for the sequence of transactions
     */
-  def computeMerkleRoot(transactions: Seq[Transaction]): DoubleSha256Digest =
-    transactions match {
-      case Nil =>
-        throw new IllegalArgumentException(
-          "We cannot have zero transactions in the block. There always should be ATLEAST one - the coinbase tx")
-      case h +: Nil => h.txId
-      case _ +: _ =>
-        val leafs = transactions.map(tx => Leaf(tx.txId))
-        val merkleTree = build(leafs, Nil)
-        merkleTree.value.get
+  def computeMerkleRoot(transactions: Seq[Transaction]): DoubleSha256Digest = {
+    if (transactions.isEmpty) {
+      sys.error(
+        "We cannot have zero transactions in the block. There always should be ATLEAST one - the coinbase tx")
+    } else if (transactions.length == 1) {
+      transactions.head.txId
+    } else {
+      val leafs = transactions.map(tx => Leaf(tx.txId))
+      val merkleTree = build(leafs.toVector, Vector.empty)
+      merkleTree.value.get
     }
+  }
 
   /** Builds a [[MerkleTree]] from sequence of sub merkle trees.
     * This subTrees can be individual txids (leafs) or full blown subtrees
@@ -51,28 +52,29 @@ trait Merkle {
     */
   @tailrec
   final def build(
-      subTrees: Seq[MerkleTree],
-      accum: Seq[MerkleTree]): MerkleTree =
-    subTrees match {
-      case Nil =>
-        if (accum.size == 1) accum.head
-        else if (accum.isEmpty)
-          throw new IllegalArgumentException(
-            "Should never have sub tree size of zero, this implies there was zero hashes given")
-        else build(accum.reverse, Nil)
-      case h +: h1 +: t =>
-        val newTree = computeTree(h, h1)
-        build(t, newTree +: accum)
-      case h +: t =>
-        //means that we have an odd amount of txids, this means we duplicate the last hash in the tree
-        val newTree = computeTree(h, h)
-        build(t, newTree +: accum)
+      subTrees: Vector[MerkleTree],
+      accum: Vector[MerkleTree]): MerkleTree = {
+
+    if (subTrees.isEmpty) {
+      if (accum.size == 1) accum.head
+      else if (accum.isEmpty)
+        throw new IllegalArgumentException(
+          "Should never have sub tree size of zero, this implies there was zero hashes given")
+      else build(subTrees = accum.reverse, accum = Vector.empty)
+    } else if (subTrees.length > 2) {
+      val newTree = computeTree(subTrees.head, subTrees(1))
+      build(subTrees = subTrees.drop(2), accum = newTree +: accum)
+    } else {
+      //means that we have an odd amount of txids, this means we duplicate the last hash in the tree
+      val newTree = computeTree(subTrees.head, subTrees.head)
+      build(subTrees = Vector.empty, accum = newTree +: accum)
     }
+  }
 
   /** Builds a merkle tree from a sequence of hashes */
-  def build(hashes: Seq[DoubleSha256Digest]): MerkleTree = {
+  def build(hashes: Vector[DoubleSha256Digest]): MerkleTree = {
     val leafs = hashes.map(Leaf(_))
-    build(leafs, Nil)
+    build(leafs, Vector.empty)
   }
 
   /** Computes the merkle tree of two sub merkle trees */
@@ -93,7 +95,8 @@ trait Merkle {
       case wtx: WitnessTransaction    => wtx.wTxId
       case btx: NonWitnessTransaction => btx.txId
     }
-    build(coinbaseWTxId +: hashes)
+    val txids = coinbaseWTxId +: hashes
+    build(txids.toVector)
   }
 
   /** Computes the merkle root for the committment inside of a coinbase txs scriptPubKey
