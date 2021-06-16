@@ -75,7 +75,7 @@ sealed abstract class ScriptParser
                       Vector(scriptNumber, OP_PUSHDATA1)
                     case size if size < Short.MaxValue =>
                       Vector(scriptNumber, OP_PUSHDATA2)
-                    case size if size < Int.MaxValue =>
+                    case _ =>
                       Vector(scriptNumber, OP_PUSHDATA4)
                   }
                 case false => Vector(BytesToPushOntoStack(bytes.size.toInt))

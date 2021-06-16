@@ -178,21 +178,23 @@ trait BitcoinScriptUtil {
     */
   def isPushOnly(script: Seq[ScriptToken]): Boolean = {
     @tailrec
-    def loop(tokens: Seq[ScriptToken]): Boolean =
-      tokens match {
-        case h +: t =>
-          h match {
-            case scriptOp: ScriptOperation =>
-              if (scriptOp.opCode < OP_16.opCode) {
-                loop(t)
-              } else {
-                false
-              }
-
-            case _: ScriptToken => loop(t)
-          }
-        case Nil => true
+    def loop(tokens: Seq[ScriptToken]): Boolean = {
+      if (tokens.nonEmpty) {
+        val h = tokens.head
+        val t = tokens.tail
+        h match {
+          case scriptOp: ScriptOperation =>
+            if (scriptOp.opCode < OP_16.opCode) {
+              loop(t)
+            } else {
+              false
+            }
+          case _: ScriptToken => loop(t)
+        }
+      } else {
+        true
       }
+    }
     loop(script)
   }
 
@@ -531,11 +533,13 @@ trait BitcoinScriptUtil {
     def loop(
         remainingSigs: Seq[ECDigitalSignature],
         scriptTokens: Seq[ScriptToken]): Seq[ScriptToken] = {
-      remainingSigs match {
-        case Nil => scriptTokens
-        case h +: t =>
-          val newScriptTokens = removeSignatureFromScript(h, scriptTokens)
-          loop(t, newScriptTokens)
+      if (remainingSigs.nonEmpty) {
+        val h = remainingSigs.head
+        val t = remainingSigs.tail
+        val newScriptTokens = removeSignatureFromScript(h, scriptTokens)
+        loop(t, newScriptTokens)
+      } else {
+        scriptTokens
       }
     }
     loop(sigs, script)
