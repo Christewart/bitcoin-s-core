@@ -4,7 +4,10 @@ import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import org.bitcoins.core.protocol.blockchain.Block
-import org.bitcoins.core.protocol.transaction.WitnessTransaction
+import org.bitcoins.core.protocol.transaction.{
+  TransactionInput,
+  WitnessTransaction
+}
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.server.BitcoindRpcAppConfig
 import org.bitcoins.server.routes.BitcoinSRunner
@@ -28,12 +31,12 @@ class ScanBitcoind(override val args: Array[String])(implicit
 
     val bitcoind = rpcAppConfig.client
 
-    val startHeight = 675000
+    val startHeight = 688890
     val endHeightF: Future[Int] = bitcoind.getBlockCount
 
     for {
       endHeight <- endHeightF
-      _ <- countSegwitTxs(bitcoind, startHeight, endHeight)
+      _ <- getCoinbaseScriptSigs(bitcoind, startHeight, endHeight)
     } yield {
       sys.exit(0)
     }
@@ -94,6 +97,33 @@ class ScanBitcoind(override val args: Array[String])(implicit
         s"Count of segwit txs from height=${startHeight} to endHeight=${endHeight} is ${count}. It took ${endTime - startTime}ms ")
     } yield ()
   }
+
+  def getCoinbaseScriptSigs(
+      bitcoind: BitcoindRpcClient,
+      startHeight: Int,
+      endHeight: Int): Future[Unit] = {
+    val startTime = System.currentTimeMillis()
+    val source: Source[Int, NotUsed] = Source(startHeight.to(endHeight))
+
+    val getScriptSigs: Block => Vector[TransactionInput] = { block: Block =>
+      block.transactions.head.inputs.toVector
+    }
+
+    val coinbaseInputsF: Future[Vector[TransactionInput]] = for {
+      scriptSig <- searchBlocks(bitcoind, source, getScriptSigs)
+    } yield scriptSig.flatten.toVector
+
+    for {
+      coinbaseInputs <- coinbaseInputsF
+      endTime = System.currentTimeMillis()
+    } yield {
+      coinbaseInputs.foreach { input =>
+        println(s"coinbaseInput=$input")
+      }
+      println(s"Done counting coinbase tx, it took=${endTime - startTime}ms")
+    }
+  }
+
 }
 
 object ScanBitcoind extends BitcoinSApp {
