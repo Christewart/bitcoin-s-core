@@ -64,18 +64,21 @@ class CreateDLCOfferDialog
     }
   }
 
-  val fields: mutable.Map[Int, (TextField, TextField)] = mutable.Map.empty
+  private val fields: mutable.Map[Int, (TextField, TextField)] =
+    mutable.Map.empty
 
-  var announcementDetailsShown = false
+  private var announcementDetailsShown = false
   lazy val announcementOrContractInfoTF = new TextField()
-  var decompOpt: Option[DigitDecompositionEventDescriptorV0TLV] = None
+  private var decompOpt: Option[DigitDecompositionEventDescriptorV0TLV] = None
 
-  val pointMap: scala.collection.mutable.Map[
+  private val pointMap: scala.collection.mutable.Map[
     Int,
     (TextField, TextField, CheckBox)] =
     scala.collection.mutable.Map.empty
 
-  val roundingMap: scala.collection.mutable.Map[Int, (TextField, TextField)] =
+  private val roundingMap: scala.collection.mutable.Map[
+    Int,
+    (TextField, TextField)] =
     scala.collection.mutable.Map.empty
 
   lazy val feeRateTF = new TextField() {

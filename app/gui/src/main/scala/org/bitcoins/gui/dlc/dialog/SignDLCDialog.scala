@@ -35,7 +35,7 @@ object SignDLCDialog
     }
   }
 
-  var dialogOpt: Option[Dialog[Option[SignDLCCliCommand]]] = None
+  private var dialogOpt: Option[Dialog[Option[SignDLCCliCommand]]] = None
 
   def showAndWait(
       parentWindow: Window,
