@@ -18,11 +18,7 @@ import org.bitcoins.crypto.{DoubleSha256Digest, DoubleSha256DigestBE}
 import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.node.models._
 import org.bitcoins.node.networking.P2PClient
-import org.bitcoins.node.networking.peer.{
-  DataMessageHandler,
-  PeerMessageReceiver,
-  PeerMessageSender
-}
+import org.bitcoins.node.networking.peer.{DataMessageHandler, PeerMessageSender}
 
 import java.time.Instant
 import scala.collection.mutable
@@ -45,34 +41,10 @@ trait Node extends NodeApi with ChainQueryApi with P2PLogger {
 
   def peers: Vector[Peer] = peerData.keys.toVector
 
-  case class PeerData(peer: Peer) {
-
-    lazy val peerMessageSender: PeerMessageSender = PeerMessageSender(client)
-
-    lazy val client: P2PClient = {
-      val peerMessageReceiver =
-        PeerMessageReceiver.newReceiver(node = Node.this, peer = peer)
-      P2PClient(context = system,
-                peer = peer,
-                peerMessageReceiver = peerMessageReceiver)
-    }
-
-    private var _serviceIdentifier: Option[ServiceIdentifier] = None
-
-    def serviceIdentifier: ServiceIdentifier = {
-      _serviceIdentifier.getOrElse(
-        throw new RuntimeException("Service identifier not initialized"))
-    }
-
-    def setServiceIdentifier(serviceIdentifier: ServiceIdentifier): Unit = {
-      _serviceIdentifier = Some(serviceIdentifier)
-    }
-  }
-
   def addPeer(peer: Peer): Unit = {
     logger.info(s"Adding peer $peer")
     if (!_peerData.contains(peer)) {
-      _peerData.put(peer, PeerData(peer))
+      _peerData.put(peer, PeerData(peer, this))
     }
     ()
   }
