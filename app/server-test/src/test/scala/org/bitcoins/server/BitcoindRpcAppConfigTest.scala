@@ -13,7 +13,9 @@ class BitcoindRpcAppConfigTest extends BitcoinSAsyncTest {
   val tempDir: Path = Files.createTempDirectory("bitcoin-s")
 
   val config: BitcoindRpcAppConfig =
-    BitcoindRpcAppConfig(directory = tempDir)
+    BitcoindRpcAppConfig(directory = tempDir,
+                         confs = Vector.empty,
+                         torAppConfigOpt = None)
 
   override def afterAll(): Unit = {
     super.afterAll()

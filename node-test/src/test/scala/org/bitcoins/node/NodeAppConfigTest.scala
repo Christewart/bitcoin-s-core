@@ -14,7 +14,9 @@ class NodeAppConfigTest extends BitcoinSAsyncTest {
   val tempDir = Files.createTempDirectory("bitcoin-s")
 
   val config: NodeAppConfig =
-    NodeAppConfig(directory = tempDir)
+    NodeAppConfig(directory = tempDir,
+                  confs = Vector.empty,
+                  torAppConfigOpt = None)
 
   it must "be overridable" in {
     assert(config.network == RegTest)

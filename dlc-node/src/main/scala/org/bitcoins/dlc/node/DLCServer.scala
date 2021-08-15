@@ -77,34 +77,24 @@ object DLCServer {
   def bind(
       dlcWalletApi: DLCWalletApi,
       bindAddress: InetSocketAddress,
-      torParams: Option[TorParams],
+      torParams: TorParams,
       dataHandlerFactory: DLCDataHandler.Factory =
         DLCDataHandler.defaultFactory)(implicit
       system: ActorSystem): Future[(InetSocketAddress, ActorRef)] = {
     import system.dispatcher
 
-    val promise = Promise[InetSocketAddress]()
-
     for {
-      onionAddress <- torParams match {
-        case Some(params) =>
-          TorController
-            .setUpHiddenService(
-              params.controlAddress,
-              params.authentication,
-              params.privateKeyPath,
-              bindAddress.getPort
-            )
-            .map(Some(_))
-        case None => Future.successful(None)
-      }
+      onionAddress <- TorController
+        .setUpHiddenService(
+          torParams.controlAddress,
+          torParams.authentication,
+          torParams.privateKeyPath,
+          bindAddress.getPort
+        )
       actorRef = system.actorOf(
-        props(dlcWalletApi, bindAddress, Some(promise), dataHandlerFactory))
-      boundAddress <- promise.future
+        props(dlcWalletApi, bindAddress, None, dataHandlerFactory))
     } yield {
-      val addr = onionAddress.getOrElse(boundAddress)
-
-      (addr, actorRef)
+      (onionAddress, actorRef)
     }
   }
 }

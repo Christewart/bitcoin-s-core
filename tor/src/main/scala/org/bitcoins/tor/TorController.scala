@@ -96,7 +96,7 @@ object TorController {
       authentication: Authentication,
       privateKeyPath: Path,
       virtualPort: Int,
-      targets: Seq[String] = Seq())(implicit
+      targets: Seq[String] = Seq.empty)(implicit
       system: ActorSystem): Future[InetSocketAddress] = {
 
     val promiseTorAddress = Promise[InetSocketAddress]()

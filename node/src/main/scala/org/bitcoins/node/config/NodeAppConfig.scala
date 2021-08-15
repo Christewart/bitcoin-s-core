@@ -28,7 +28,9 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 case class NodeAppConfig(
     private val directory: Path,
-    private val confs: Config*)(implicit override val ec: ExecutionContext)
+    private val confs: Vector[Config],
+    torAppConfigOpt: Option[TorAppConfig])(implicit
+    override val ec: ExecutionContext)
     extends DbAppConfig
     with NodeDbManagement
     with JdbcProfileComponent[NodeAppConfig] {
@@ -38,7 +40,7 @@ case class NodeAppConfig(
 
   override protected[bitcoins] def newConfigOfType(
       configs: Seq[Config]): NodeAppConfig =
-    NodeAppConfig(directory, configs: _*)
+    NodeAppConfig(directory, configs.toVector, torAppConfigOpt)
 
   protected[bitcoins] def baseDatadir: Path = directory
 
@@ -94,9 +96,9 @@ case class NodeAppConfig(
     TorAppConfig(directory, confs: _*)
 
   lazy val socks5ProxyParams: Option[Socks5ProxyParams] =
-    torConf.socks5ProxyParams
+    torAppConfigOpt.map(_.socks5ProxyParams)
 
-  lazy val torParams: Option[TorParams] = torConf.torParams
+  lazy val torParams: Option[TorParams] = torAppConfigOpt.map(_.torParams)
 
   lazy val relay: Boolean = {
     if (config.hasPath("bitcoin-s.node.relay")) {
@@ -122,8 +124,9 @@ object NodeAppConfig extends AppConfigFactory[NodeAppConfig] {
     * data directory and given list of configuration overrides.
     */
   override def fromDatadir(datadir: Path, confs: Vector[Config])(implicit
-      ec: ExecutionContext): NodeAppConfig =
-    NodeAppConfig(datadir, confs: _*)
+      ec: ExecutionContext): NodeAppConfig = {
+    NodeAppConfig(directory = datadir, confs = confs, torAppConfigOpt = None)
+  }
 
   /** Creates either a neutrino node or a spv node based on the [[NodeAppConfig]] given */
   def createNode(peers: Vector[Peer])(implicit

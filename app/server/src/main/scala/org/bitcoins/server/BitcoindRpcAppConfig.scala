@@ -21,7 +21,8 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 case class BitcoindRpcAppConfig(
     private val directory: Path,
-    private val confs: Config*)(implicit val ec: ExecutionContext)
+    private val confs: Vector[Config],
+    torAppConfigOpt: Option[TorAppConfig])(implicit val ec: ExecutionContext)
     extends AppConfig {
   override protected[bitcoins] def configOverrides: List[Config] = confs.toList
 
@@ -31,11 +32,13 @@ case class BitcoindRpcAppConfig(
 
   override protected[bitcoins] def newConfigOfType(
       configs: Seq[Config]): BitcoindRpcAppConfig =
-    BitcoindRpcAppConfig(directory, configs: _*)
+    BitcoindRpcAppConfig(directory, configs.toVector, torAppConfigOpt)
 
   protected[bitcoins] def baseDatadir: Path = directory
 
-  lazy val nodeConf: NodeAppConfig = NodeAppConfig(directory, confs: _*)
+  lazy val nodeConf: NodeAppConfig = NodeAppConfig(directory = directory,
+                                                   confs = confs.toVector,
+                                                   torAppConfigOpt = None)
 
   override def start(): Future[Unit] = {
     nodeConf.nodeType match {
@@ -92,11 +95,8 @@ case class BitcoindRpcAppConfig(
   lazy val rpcPassword: String =
     config.getString("bitcoin-s.bitcoind-rpc.rpcpassword")
 
-  lazy val torConf: TorAppConfig =
-    TorAppConfig(directory, confs: _*)
-
   lazy val socks5ProxyParams: Option[Socks5ProxyParams] =
-    torConf.socks5ProxyParams
+    torAppConfigOpt.map(_.socks5ProxyParams)
 
   lazy val versionOpt: Option[BitcoindVersion] =
     config
@@ -170,5 +170,7 @@ object BitcoindRpcAppConfig extends AppConfigFactory[BitcoindRpcAppConfig] {
     */
   override def fromDatadir(datadir: Path, confs: Vector[Config])(implicit
       ec: ExecutionContext): BitcoindRpcAppConfig =
-    BitcoindRpcAppConfig(datadir, confs: _*)
+    BitcoindRpcAppConfig(directory = datadir,
+                         confs = confs,
+                         torAppConfigOpt = None)
 }

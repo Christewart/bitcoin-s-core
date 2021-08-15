@@ -20,7 +20,9 @@ import scala.concurrent._
   */
 case class DLCNodeAppConfig(
     private val directory: Path,
-    private val conf: Config*)(implicit ec: ExecutionContext)
+    private val conf: Config*)(implicit
+    ec: ExecutionContext,
+    torAppConfig: TorAppConfig)
     extends AppConfig {
   override protected[bitcoins] def configOverrides: List[Config] = conf.toList
 
@@ -40,13 +42,10 @@ case class DLCNodeAppConfig(
 
   override def stop(): Future[Unit] = Future.unit
 
-  lazy val torConf: TorAppConfig =
-    TorAppConfig(directory, conf: _*)
+  lazy val socks5ProxyParams: Socks5ProxyParams =
+    torAppConfig.socks5ProxyParams
 
-  lazy val socks5ProxyParams: Option[Socks5ProxyParams] =
-    torConf.socks5ProxyParams
-
-  lazy val torParams: Option[TorParams] = torConf.torParams
+  lazy val torParams: TorParams = torAppConfig.torParams
 
   lazy val listenAddress: InetSocketAddress = {
     val str = config.getString(s"bitcoin-s.$moduleName.listen")

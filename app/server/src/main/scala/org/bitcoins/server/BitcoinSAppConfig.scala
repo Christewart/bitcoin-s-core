@@ -31,13 +31,18 @@ case class BitcoinSAppConfig(
     private val confs: Config*)(implicit ec: ExecutionContext)
     extends StartStopAsync[Unit] {
   lazy val walletConf: WalletAppConfig = WalletAppConfig(directory, confs: _*)
-  lazy val nodeConf: NodeAppConfig = NodeAppConfig(directory, confs: _*)
+
+  lazy val nodeConf: NodeAppConfig = NodeAppConfig(directory = directory,
+                                                   confs = confs.toVector,
+                                                   torAppConfigOpt =
+                                                     Some(torConf))
+
   lazy val chainConf: ChainAppConfig = ChainAppConfig(directory, confs: _*)
   lazy val dlcConf: DLCAppConfig = DLCAppConfig(directory, confs: _*)
   lazy val torConf: TorAppConfig = TorAppConfig(directory, confs: _*)
 
   lazy val dlcNodeConf: DLCNodeAppConfig =
-    DLCNodeAppConfig(directory, confs: _*)
+    DLCNodeAppConfig(directory, confs: _*)(ec, torConf)
 
   def copyWithConfig(newConfs: Vector[Config]): BitcoinSAppConfig = {
     val configs = newConfs ++ confs
@@ -47,8 +52,11 @@ case class BitcoinSAppConfig(
   lazy val kmConf: KeyManagerAppConfig =
     KeyManagerAppConfig(directory, confs: _*)
 
-  lazy val bitcoindRpcConf: BitcoindRpcAppConfig =
-    BitcoindRpcAppConfig(directory, confs: _*)
+  lazy val bitcoindRpcConf: BitcoindRpcAppConfig = {
+    BitcoindRpcAppConfig(directory = directory,
+                         confs = confs.toVector,
+                         torAppConfigOpt = Some(torConf))
+  }
 
   /** Initializes the wallet, node and chain projects */
   override def start(): Future[Unit] = {

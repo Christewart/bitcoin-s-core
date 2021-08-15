@@ -26,7 +26,9 @@ class DBConfigTest extends BitcoinSAsyncTest {
                   StandardOpenOption.WRITE)
 
       val chainConfig = ChainAppConfig(dataDir)
-      val nodeConfig = NodeAppConfig(dataDir)
+      val nodeConfig = NodeAppConfig(directory = dataDir,
+                                     confs = Vector.empty,
+                                     torAppConfigOpt = None)
       val walletConfig = WalletAppConfig(dataDir)
 
       val slickChainConfig = chainConfig.slickDbConfig
