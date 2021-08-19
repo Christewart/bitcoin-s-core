@@ -34,6 +34,7 @@ trait NativeProcessFactory extends Logging {
         logger.debug(s"Binary was already started!")
         ()
       case None =>
+        println(s"STARTING BITCOIND BINARY")
         if (cmd.nonEmpty) {
           val started = process.run()
           processOpt = Some(started)
@@ -52,6 +53,7 @@ trait NativeProcessFactory extends Logging {
   def stopBinary(): Future[Unit] = Future {
     processOpt match {
       case Some(process) =>
+        println(s"STOPPING BITCOIND BINARY")
         if (process.isAlive()) {
           val _ = process.destroy()
         }
