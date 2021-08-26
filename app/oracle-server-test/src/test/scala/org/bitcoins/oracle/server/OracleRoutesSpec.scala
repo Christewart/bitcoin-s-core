@@ -22,7 +22,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.wordspec.AnyWordSpec
 import ujson._
 
-import java.time.Instant
+import java.time.{Instant, LocalDateTime, ZoneOffset}
 import scala.concurrent.Future
 
 class OracleRoutesSpec
@@ -260,6 +260,44 @@ class OracleRoutesSpec
                             Bool(true),
                             Num(17),
                             Str("units"),
+                            Num(0))))
+
+      Post() ~> route ~> check {
+        assert(contentType == `application/json`)
+        assert(responseAs[
+          String] == s"""{"result":"${OracleAnnouncementV0TLV.dummy.hex}","error":null}""")
+      }
+    }
+
+    "create a digit decomp with datetime" in {
+      val localDateTime = LocalDateTime.of(2030, 1, 1, 0, 0)
+      val instant = localDateTime.toInstant(ZoneOffset.UTC)
+      (mockOracleApi
+        .createNewDigitDecompEvent(_: String,
+                                   _: Instant,
+                                   _: UInt16,
+                                   _: Boolean,
+                                   _: Int,
+                                   _: String,
+                                   _: Int32))
+        .expects("digitdecompEvent",
+                 instant,
+                 UInt16(2),
+                 false,
+                 3,
+                 "Unit",
+                 Int32.zero)
+        .returning(Future.successful(OracleAnnouncementV0TLV.dummy))
+
+      val route =
+        oracleRoutes.handleCommand(
+          ServerCommand("createdigitdecompevent",
+                        Arr(Str("digitdecompEvent"),
+                            Num((instant.toEpochMilli / 1000).toDouble),
+                            Num(2),
+                            Bool(false),
+                            Num(3),
+                            Str("Unit"),
                             Num(0))))
 
       Post() ~> route ~> check {
