@@ -264,8 +264,9 @@ object WitnessTransaction extends Factory[WitnessTransaction] {
     val version = Int32(versionBytes.reverse)
     val marker = bytes(4)
     require(
-      marker.toInt == 0,
-      "Incorrect marker for witness transaction, the marker MUST be 0 for the marker according to BIP141, got: " + marker)
+      marker.toInt == WitnessTransaction.marker,
+      "Incorrect marker for witness transaction, the marker MUST be 0 for the marker according to BIP141, got: " + marker
+    )
     val flag = bytes(5)
     require(
       flag.toInt != 0,

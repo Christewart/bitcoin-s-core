@@ -24,11 +24,11 @@ private[bitcoins] trait DLCTransactionProcessing extends TransactionProcessing {
   /** Calculates the new state of the DLCDb based on the closing transaction,
     * will delete old CET sigs that are no longer needed after execution
     */
-  def calculateAndSetState(dlcDb: DLCDb): Future[DLCDb] = {
+  private def calculateAndSetState(dlcDb: DLCDb): Future[DLCDb] = {
     (dlcDb.contractIdOpt, dlcDb.closingTxIdOpt) match {
       case (Some(id), Some(txId)) =>
         executorAndSetupFromDb(id).flatMap { case (_, setup) =>
-          val updatedF = if (txId == setup.refundTx.txIdBE) {
+          val updatedF: Future[DLCDb] = if (txId == setup.refundTx.txIdBE) {
             Future.successful(dlcDb.copy(state = DLCState.Refunded))
           } else if (dlcDb.state == DLCState.Claimed) {
             Future.successful(dlcDb.copy(state = DLCState.Claimed))
@@ -71,7 +71,7 @@ private[bitcoins] trait DLCTransactionProcessing extends TransactionProcessing {
   /** Calculates the outcome used for execution
     *  based on the closing transaction
     */
-  def calculateAndSetOutcome(dlcDb: DLCDb): Future[DLCDb] = {
+  private def calculateAndSetOutcome(dlcDb: DLCDb): Future[DLCDb] = {
     if (dlcDb.state == DLCState.RemoteClaimed) {
       val dlcId = dlcDb.dlcId
       for {
@@ -246,7 +246,9 @@ private[bitcoins] trait DLCTransactionProcessing extends TransactionProcessing {
       blockHashOpt: Option[DoubleSha256DigestBE]): Future[
     Vector[SpendingInfoDb]] = {
     super
-      .processSpentUtxos(transaction, outputsBeingSpent, blockHashOpt)
+      .processSpentUtxos(transaction = transaction,
+                         outputsBeingSpent = outputsBeingSpent,
+                         blockHashOpt = blockHashOpt)
       .flatMap { res =>
         val outPoints = transaction.inputs.map(_.previousOutput).toVector
 

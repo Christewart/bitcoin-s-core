@@ -71,15 +71,17 @@ object TransactionDbHelper {
         (uwtx, Some(uwtx.wTxIdBE))
     }
     val totalOutput = tx.outputs.map(_.value).sum
-    TransactionDb(tx.txIdBE,
-                  tx,
-                  unsignedTx.txIdBE,
-                  unsignedTx,
-                  wTxIdBEOpt,
-                  totalOutput,
-                  tx.inputs.size,
-                  tx.outputs.size,
-                  tx.lockTime,
-                  blockHashOpt)
+    TransactionDb(
+      txIdBE = tx.txIdBE,
+      transaction = tx,
+      unsignedTxIdBE = unsignedTx.txIdBE,
+      unsignedTx = unsignedTx,
+      wTxIdBEOpt = wTxIdBEOpt,
+      totalOutput = totalOutput,
+      numInputs = tx.inputs.size,
+      numOutputs = tx.outputs.size,
+      lockTime = tx.lockTime,
+      blockHashOpt = blockHashOpt
+    )
   }
 }
