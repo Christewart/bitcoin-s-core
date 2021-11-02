@@ -6,6 +6,7 @@ import org.bitcoins.rpc.client.v18.BitcoindV18RpcClient
 import org.bitcoins.rpc.client.v19.BitcoindV19RpcClient
 import org.bitcoins.rpc.client.v20.BitcoindV20RpcClient
 import org.bitcoins.rpc.client.v21.BitcoindV21RpcClient
+import org.bitcoins.rpc.client.v22.BitcoindV22RpcClient
 import org.bitcoins.rpc.util.{NodePair, NodeTriple}
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.util.BitcoinSAkkaAsyncTest
@@ -128,6 +129,18 @@ trait CachedBitcoindV21 extends CachedBitcoindFunded[BitcoindV21RpcClient] {
     BitcoinSFixture
       .createBitcoindWithFunds(Some(BitcoindVersion.V21))
       .map(_.asInstanceOf[BitcoindV21RpcClient])
+  }
+}
+
+trait CachedBitcoindV22 extends CachedBitcoindFunded[BitcoindV22RpcClient] {
+  _: BitcoinSAkkaAsyncTest =>
+
+  override protected lazy val cachedBitcoindWithFundsF: Future[
+    BitcoindV22RpcClient] = {
+    val _ = isBitcoindUsed.set(true)
+    BitcoinSFixture
+      .createBitcoindWithFunds(Some(BitcoindVersion.V22))
+      .map(_.asInstanceOf[BitcoindV22RpcClient])
   }
 }
 
