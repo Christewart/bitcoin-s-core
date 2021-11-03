@@ -5,10 +5,10 @@ import org.bitcoins.commons.jsonmodels.ExplorerEnv
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.protocol.BlockTimeStamp
 import org.bitcoins.core.protocol.tlv.{
+  BaseOracleAnnouncement,
   ContractInfoTLV,
   ContractInfoV0TLV,
-  ContractInfoV1TLV,
-  OracleAnnouncementTLV
+  ContractInfoV1TLV
 }
 import org.bitcoins.crypto.SchnorrPublicKey
 import org.bitcoins.gui.{GUI, GlobalData}
@@ -186,7 +186,7 @@ object GUIUtil {
 
   def getAnnouncementUrl(
       network: BitcoinNetwork,
-      primaryOracle: OracleAnnouncementTLV): String = {
+      primaryOracle: BaseOracleAnnouncement): String = {
     val baseUrl =
       ExplorerEnv.fromBitcoinNetwork(network).siteUrl
     s"${baseUrl}announcement/${primaryOracle.sha256.hex}"
@@ -204,11 +204,11 @@ object GUIUtil {
   def getOraclePubKeyEventId(
       contractInfo: ContractInfoTLV): (SchnorrPublicKey, String) = {
     contractInfo match {
-      case ContractInfoV0TLV(_, _, oracleInfo) =>
-        (oracleInfo.announcements.head.publicKey,
+      case ContractInfoV0TLV(_, _, oracleInfo, _) =>
+        (oracleInfo.announcements.head.announcementPublicKey,
          oracleInfo.announcements.head.eventTLV.eventId)
       case ContractInfoV1TLV(_, contractOraclePairs) =>
-        (contractOraclePairs.head._2.announcements.head.publicKey,
+        (contractOraclePairs.head._2.announcements.head.announcementPublicKey,
          contractOraclePairs.head._2.announcements.head.eventTLV.eventId)
     }
   }
