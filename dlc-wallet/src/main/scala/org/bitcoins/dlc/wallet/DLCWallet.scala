@@ -732,7 +732,7 @@ abstract class DLCWallet
                   "Offer and Accept have differing tempContractIds!")
 
       _ <- remoteTxDAO.upsertAll(offerPrevTxs)
-      _ <- dlcInputsDAO.createAll(offerInputs ++ acceptInputs)
+      _ <- dlcInputsDAO.upsertAll(offerInputs ++ acceptInputs)
       _ <- dlcOfferDAO.create(dlcOfferDb)
       _ <- dlcAcceptDAO.create(dlcAcceptDb)
       _ <- dlcSigsDAO.createAll(sigsDbs)
