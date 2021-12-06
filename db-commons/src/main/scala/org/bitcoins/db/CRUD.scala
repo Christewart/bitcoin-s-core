@@ -124,18 +124,8 @@ abstract class CRUD[T, PrimaryKeyType](implicit
 
   /** Upserts all of the given ts in the database, then returns the upserted values */
   def upsertAll(ts: Vector[T]): Future[Vector[T]] = {
-    def oldUpsertAll(ts: Vector[T]): Future[Vector[T]] = {
-      val actions = ts.map(t => table.insertOrUpdate(t))
-      for {
-        _ <- safeDatabase.run(DBIO.sequence(actions).transactionally)
-        result <- safeDatabase.runVec(findAll(ts).result)
-      } yield result
-
-    }
-
-    FutureUtil.foldLeftAsync(Vector.empty[T], ts) { (accum, t) =>
-      oldUpsertAll(Vector(t)).map(accum ++ _)
-    }
+    val actions = upsertAllAction(ts)
+    safeDatabase.runVec(actions)
   }
 
   /** return all rows that have a certain primary key
