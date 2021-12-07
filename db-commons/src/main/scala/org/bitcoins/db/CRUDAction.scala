@@ -85,22 +85,19 @@ abstract class CRUDAction[T, PrimaryKeyType](implicit
     upsertAllAction(Vector(t)).map { ts =>
       ts.headOption match {
         case Some(t) => t
-        case None => sys.error(s"Failed to upsert t=$t")
+        case None    => sys.error(s"Failed to upsert t=$t")
       }
     }
   }
 
   /** @see [[https://scala-slick.org/doc/3.3.3/queries.html#upserting]] */
-  def upsertAllAction(ts: Vector[T]): DBIOAction[Vector[T], NoStream, Effect.Write] = {
+  def upsertAllAction(
+      ts: Vector[T]): DBIOAction[Vector[T], NoStream, Effect.Write] = {
     val actions: Vector[DBIOAction[T, NoStream, Effect.Write]] = ts.map { t =>
       val a = table.returning(table).insertOrUpdate(t)
       a.map {
-        case Some(x) =>
-          //means we inserted
-          x
-        case None =>
-          //means we upserted
-          t
+        case Some(x) => x //means we inserted
+        case None    => t //means we upserted
       }
     }
     DBIO.sequence(actions)

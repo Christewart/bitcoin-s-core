@@ -1,7 +1,6 @@
 package org.bitcoins.db
 
 import grizzled.slf4j.Logging
-import org.bitcoins.core.util.FutureUtil
 import slick.dbio.{DBIOAction, NoStream}
 import slick.lifted.AbstractTable
 
