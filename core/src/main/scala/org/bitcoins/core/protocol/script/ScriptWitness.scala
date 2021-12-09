@@ -1,5 +1,6 @@
 package org.bitcoins.core.protocol.script
 
+import org.bitcoin.{NativeSecp256k1, Secp256k1Context}
 import org.bitcoins.core.protocol.CompactSizeUInt
 import org.bitcoins.core.script.constant.{OP_0, ScriptNumberOperation}
 import org.bitcoins.core.serializers.script.{
@@ -7,16 +8,10 @@ import org.bitcoins.core.serializers.script.{
   ScriptParser
 }
 import org.bitcoins.core.util.{BitcoinScriptUtil, BytesUtil}
-import org.bitcoins.crypto.{
-  CryptoUtil,
-  ECDigitalSignature,
-  ECPublicKey,
-  ECPublicKeyBytes,
-  EmptyDigitalSignature,
-  Factory,
-  NetworkElement
-}
+import org.bitcoins.crypto._
 import scodec.bits.ByteVector
+
+import scala.util.Try
 
 /** Created by chris on 11/10/16.
   * The witness used to evaluate a [[RawScriptPubKey]] inside of Bitcoin
@@ -177,22 +172,38 @@ object ScriptWitness extends Factory[ScriptWitness] {
     RawScriptWitnessParser.read(bytes)
   }
 
-  def apply(stack: Seq[ByteVector]): ScriptWitness = {
+  private def isValid(bytes: ByteVector): Boolean = {
+    bytes.nonEmpty
+  }
+
+  private def isFullyValid(bytes: ByteVector): Boolean = {
+    if (Secp256k1Context.isEnabled) {
+      Try(NativeSecp256k1.isValidPubKey(bytes.toArray)).isSuccess && isValid(
+        bytes)
+    } else {
+      Try(BouncyCastleUtil.curve.decodePoint(bytes.toArray)).isSuccess &&
+      (bytes.size == 33 || bytes.size == 65) &&
+      isValid(bytes)
+    }
+  }
+
+  def apply(stack: Seq[scodec.bits.ByteVector]): ScriptWitness = {
     //TODO: eventually only compressed public keys will be allowed in v0 scripts
     //https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki#restrictions-on-public-key-type
     val isPubKey = {
-      stack.nonEmpty && (stack.head.size == 33 && (stack.head.head == 0x02 || stack.head.head == 0x03)
-        || (stack.head.size == 65 && stack.head.head == 0x04 && CryptoUtil
-          .isValidPubKey(ECPublicKeyBytes(stack.head))))
+      stack.headOption.isDefined &&
+      isFullyValid(stack.head) &&
+      (stack.head.size == 33
+        || stack.head.size == 65)
     }
     if (stack.isEmpty) {
       EmptyScriptWitness
     } else if (isPubKey && stack.size == 2) {
-      val pubKey = ECPublicKeyBytes(stack.head)
+      val pubKey = ECPublicKey(stack.head)
       val sig = ECDigitalSignature(stack(1))
       P2WPKHWitnessV0(pubKey, sig)
     } else if (isPubKey && stack.size == 1) {
-      val pubKey = ECPublicKeyBytes(stack.head)
+      val pubKey = ECPublicKey(stack.head)
       P2WPKHWitnessV0(pubKey)
     } else {
       //wont match a Vector if I don't convert to list
@@ -202,8 +213,8 @@ object ScriptWitness extends Factory[ScriptWitness] {
           EmptyScriptWitness
         case h :: t =>
           val cmpct = CompactSizeUInt.calc(h)
-          val spk = RawScriptPubKey(cmpct.bytes ++ h)
-          P2WSHWitnessV0(spk, t)
+          val spk = ScriptPubKey(cmpct.bytes ++ h)
+          P2WSHWitnessV0(spk.asInstanceOf[RawScriptPubKey], t)
       }
     }
   }

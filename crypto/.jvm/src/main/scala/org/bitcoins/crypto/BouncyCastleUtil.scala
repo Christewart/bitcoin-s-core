@@ -14,7 +14,7 @@ import scala.util.Try
 
 object BouncyCastleUtil {
 
-  private val curve: ECCurve = BouncyCastleCryptoParams.curve.getCurve
+  val curve: ECCurve = BouncyCastleCryptoParams.curve.getCurve
   private val G = BouncyCastleCryptoParams.curve.getG
 
   private def getBigInteger(bytes: ByteVector): BigInteger = {
