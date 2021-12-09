@@ -327,9 +327,10 @@ object TxUtil {
       val max = Satoshis(acceptableVariance)
       val difference = estimatedFee - actualFee
       if (difference <= min) {
-        TxBuilderError.HighFee
+        //TxBuilderError.getHighFee(estimatedFee, actualFee)
+        Success(())
       } else if (difference >= max) {
-        TxBuilderError.LowFee
+        TxBuilderError.getLowFee(estimatedFee, actualFee)
       } else {
         Success(())
       }

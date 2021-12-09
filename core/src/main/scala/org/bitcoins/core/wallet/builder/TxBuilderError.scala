@@ -1,5 +1,6 @@
 package org.bitcoins.core.wallet.builder
 
+import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.protocol.transaction.TransactionOutput
 
 import scala.util.Failure
@@ -153,15 +154,17 @@ object TxBuilderError {
   /** Means that the fee was too low for
     * [[org.bitcoins.core.wallet.builder.TxBuilder.feeRate TxBuilder.feeRate]]
     */
-  val LowFee = Failure(
-    new IllegalArgumentException("Means that the fee was too low"))
+  def getLowFee(estimatedFee: CurrencyUnit, actualFee: CurrencyUnit) = Failure(
+    new IllegalArgumentException(
+      s"Means that the fee was too low expectedFee=$estimatedFee actualFee=$actualFee"))
 
   /** Means tha this transaction pays too high of a fee for
     * [[org.bitcoins.core.wallet.builder.TxBuilder.feeRate TxBuilder.feeRate]]
     */
 
-  val HighFee = Failure(
-    new IllegalArgumentException("Means that the fee was too high"))
+  def getHighFee(estimatedFee: CurrencyUnit, actualFee: CurrencyUnit) = Failure(
+    new IllegalArgumentException(
+      s"Means that the fee was too high expectedFee=$estimatedFee actualFee=$actualFee"))
 
   /** Indicates we are spending multiple
     * [[org.bitcoins.core.protocol.script.CLTVScriptPubKey CLTVScriptPubKey]],

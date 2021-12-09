@@ -6,7 +6,8 @@ import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction._
 import org.bitcoins.core.psbt.PSBT
-import org.bitcoins.core.wallet.fee.SatoshisPerByte
+import org.bitcoins.core.wallet.builder.RawTxSigner
+import org.bitcoins.core.wallet.fee.{SatoshisPerByte, SatoshisPerVirtualByte}
 import org.bitcoins.core.wallet.utxo.TxoState
 import org.bitcoins.core.wallet.utxo.TxoState._
 import org.bitcoins.crypto.ECPublicKey
@@ -351,7 +352,7 @@ class UTXOLifeCycleTest extends BitcoinSWalletTestCachedBitcoindNewest {
         _ = assert(reservedUtxos.forall(_.state == TxoState.Reserved))
         _ = assert(reservedUtxos.forall(allReserved.contains))
 
-        unreservedUtxos <- wallet.unmarkUTXOsAsReserved(reservedUtxos.toVector)
+        unreservedUtxos <- wallet.unmarkUTXOsAsReserved(reservedUtxos)
         newReserved <- wallet.listUtxos(TxoState.Reserved)
         newTransactions <- wallet.listTransactions()
       } yield {
@@ -470,6 +471,43 @@ class UTXOLifeCycleTest extends BitcoinSWalletTestCachedBitcoindNewest {
         assert(
           updatedCoins.forall(_.state == TxoState.PendingConfirmationsSpent))
         assert(updatedCoins.forall(_.spendingTxIdOpt.contains(tx.txIdBE)))
+      }
+  }
+
+  it must "send to an in our wallet from a reserved utxo in our wallet" in {
+    param =>
+      val WalletWithBitcoindRpc(wallet, bitcoind) = param
+
+      val addressF = wallet.getNewAddress()
+      val randomAddrF = bitcoind.getNewAddress
+      val balanceF = wallet.getBalance()
+      val accountF = wallet.getDefaultAccount()
+      for {
+        address <- addressF
+        balance <- balanceF
+        account <- accountF
+        randomAddr <- randomAddrF
+        feeRate = SatoshisPerVirtualByte.one
+        amt = balance - Satoshis(1000)
+        output = TransactionOutput(amt, address.scriptPubKey)
+        (txbuilder, scriptSigParams) <- wallet.fundRawTransactionInternal(
+          Vector(output),
+          feeRate = feeRate,
+          fromTagOpt = None,
+          fromAccount = account,
+          markAsReserved = true)
+        unsignedTx = txbuilder.buildTx()
+        signedTx = RawTxSigner.sign(unsignedTx, scriptSigParams)
+        _ <- bitcoind.sendRawTransaction(signedTx)
+        blockHash <- bitcoind.generateToAddress(1, randomAddr).map(_.head)
+        block <- bitcoind.getBlockRaw(blockHash)
+        _ = assert(block.transactions.exists(_.txIdBE == signedTx.txIdBE))
+        _ <- wallet.processBlock(block)
+        exists <- wallet
+          .listUtxos()
+          .map(_.exists(_.spendingTxIdOpt == Some(signedTx.txIdBE)))
+      } yield {
+        assert(exists)
       }
   }
 }

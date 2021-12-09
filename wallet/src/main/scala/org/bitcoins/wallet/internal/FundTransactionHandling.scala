@@ -34,7 +34,7 @@ trait FundTransactionHandling extends WalletLogger { self: Wallet =>
       feeRate: FeeUnit,
       fromAccount: AccountDb,
       fromTagOpt: Option[AddressTag] = None,
-      markAsReserved: Boolean = false): Future[Transaction] = {
+      markAsReserved: Boolean = true): Future[Transaction] = {
     fundRawTransactionInternal(destinations = destinations,
                                feeRate = feeRate,
                                fromAccount = fromAccount,
@@ -57,7 +57,7 @@ trait FundTransactionHandling extends WalletLogger { self: Wallet =>
       markAsReserved: Boolean = false): Future[(
       RawTxBuilderWithFinalizer[ShufflingNonInteractiveFinalizer],
       Vector[ScriptSignatureParams[InputInfo]])] = {
-    def utxosF: Future[Vector[(SpendingInfoDb, Transaction)]] =
+    val utxosF: Future[Vector[(SpendingInfoDb, Transaction)]] = {
       for {
         utxos <- fromTagOpt match {
           case None =>
@@ -77,6 +77,7 @@ trait FundTransactionHandling extends WalletLogger { self: Wallet =>
           _._1.state == TxoState.ImmatureCoinbase)
       } yield utxoWithTxs.filter(utxo =>
         !immatureCoinbases.exists(_._1 == utxo._1))
+    }
 
     val selectedUtxosF: Future[Vector[(SpendingInfoDb, Transaction)]] =
       for {
@@ -103,15 +104,12 @@ trait FundTransactionHandling extends WalletLogger { self: Wallet =>
         if (markAsReserved) markUTXOsAsReserved(selectedUtxos.map(_._1))
         else Future.unit
     } yield {
-      logger.info {
-        val utxosStr = utxoSpendingInfos
-          .map { utxo =>
-            import utxo.outPoint
-            s"${outPoint.txId.hex}:${outPoint.vout.toInt}"
-          }
-          .mkString(", ")
-        s"Spending UTXOs: $utxosStr"
-      }
+      val utxosStr = utxoSpendingInfos
+        .map { utxo =>
+          utxo.outPoint.toString
+        }
+        .mkString(", ")
+      logger.info(s"Spending UTXOs: $utxosStr")
 
       utxoSpendingInfos.zipWithIndex.foreach { case (utxo, index) =>
         logger.info(s"UTXO $index details: ${utxo.output}")
