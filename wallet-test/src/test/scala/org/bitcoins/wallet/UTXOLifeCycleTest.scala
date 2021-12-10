@@ -496,18 +496,37 @@ class UTXOLifeCycleTest extends BitcoinSWalletTestCachedBitcoindNewest {
           fromTagOpt = None,
           fromAccount = account,
           markAsReserved = true)
+        _ = println(
+          "fundingOutpoints=" + txbuilder
+            .buildTx()
+            .inputs
+            .map(_.previousOutput)
+            .mkString(","))
+        beforeUtxos <- wallet.listUtxos()
+        _ = beforeUtxos.foreach(u => println(s"u=$u"))
+
         unsignedTx = txbuilder.buildTx()
+        _ = unsignedTx.inputs.foreach { i =>
+          println(s"outPoint=${i.previousOutput.toString}")
+        }
         signedTx = RawTxSigner.sign(unsignedTx, scriptSigParams)
+        _ = println(s"signedTxId=${signedTx.txIdBE.hex}")
+        _ = assert(beforeUtxos.exists(u => u.state == TxoState.Reserved))
         _ <- bitcoind.sendRawTransaction(signedTx)
         blockHash <- bitcoind.generateToAddress(1, randomAddr).map(_.head)
         block <- bitcoind.getBlockRaw(blockHash)
         _ = assert(block.transactions.exists(_.txIdBE == signedTx.txIdBE))
+
+        _ = println(s"@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@")
         _ <- wallet.processBlock(block)
-        exists <- wallet
-          .listUtxos()
-          .map(_.exists(_.spendingTxIdOpt == Some(signedTx.txIdBE)))
+        utxos <- wallet.listUtxos()
+        _ = utxos.foreach(u =>
+          println(
+            s"u=$u spendingTxIdOpt=${u.spendingTxIdOpt} outpoint=${u.outPoint}"))
+        existsSpendingTx = utxos.exists(
+          _.spendingTxIdOpt == Some(signedTx.txIdBE))
       } yield {
-        assert(exists)
+        assert(existsSpendingTx)
       }
   }
 }
