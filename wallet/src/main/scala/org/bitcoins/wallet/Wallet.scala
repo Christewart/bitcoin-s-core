@@ -1051,7 +1051,7 @@ object Wallet extends WalletLogger {
     val passwordOpt = walletAppConfig.aesPasswordOpt
 
     val createMasterXpubF = createMasterXPub(wallet.keyManager)
-    // We want to make sure all level 0 accounts are created,
+    // We want to make sure all level 0 accounts are createFd,
     // so the user can change the default account kind later
     // and still have their wallet work
     def createAccountFutures: Future[Vector[Future[AccountDb]]] = {

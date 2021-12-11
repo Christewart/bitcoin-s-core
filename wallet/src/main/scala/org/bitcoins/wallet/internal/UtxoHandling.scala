@@ -16,6 +16,7 @@ import org.bitcoins.core.util.BlockHashWithConfs
 import org.bitcoins.core.wallet.utxo.TxoState._
 import org.bitcoins.core.wallet.utxo._
 import org.bitcoins.crypto.DoubleSha256DigestBE
+import org.bitcoins.db.SafeDatabase
 import org.bitcoins.wallet.{Wallet, WalletLogger}
 import slick.dbio.{DBIOAction, Effect, NoStream}
 
@@ -28,6 +29,8 @@ import scala.concurrent.Future
   */
 private[wallet] trait UtxoHandling extends WalletLogger {
   self: Wallet =>
+
+  private lazy val safeDatabase: SafeDatabase = accountDAO.safeDatabase
 
   /** @inheritdoc */
   def listDefaultAccountUtxos(): Future[Vector[SpendingInfoDb]] =
@@ -81,7 +84,10 @@ private[wallet] trait UtxoHandling extends WalletLogger {
 
   private[wallet] def updateUtxoConfirmedState(
       txo: SpendingInfoDb): Future[Option[SpendingInfoDb]] = {
-    updateUtxoConfirmedStates(Vector(txo)).map(_.headOption)
+    val actionF = updateUtxoConfirmedStates(Vector(txo))
+    actionF
+      .flatMap(a => safeDatabase.run(a))
+      .map(_.headOption)
   }
 
   /** Returns a map of the SpendingInfoDbs with their relevant block.
@@ -157,8 +163,10 @@ private[wallet] trait UtxoHandling extends WalletLogger {
     * based on how many confirmations they have received
     */
   private[wallet] def updateUtxoConfirmedStates(
-      spendingInfoDbs: Vector[SpendingInfoDb]): Future[
-    Vector[SpendingInfoDb]] = {
+      spendingInfoDbs: Vector[SpendingInfoDb]): Future[DBIOAction[
+    Vector[SpendingInfoDb],
+    NoStream,
+    Effect.Read with Effect.Write]] = {
     val relevantBlocksF: Future[
       Map[Option[DoubleSha256DigestBE], Vector[SpendingInfoDb]]] = {
       getDbsByRelevantBlock(spendingInfoDbs)
@@ -200,8 +208,8 @@ private[wallet] trait UtxoHandling extends WalletLogger {
         if (toUpdate.nonEmpty)
           logger.info(s"${toUpdate.size} txos are now confirmed!")
         else logger.trace("No txos to be confirmed")
-      updated <- spendingInfoDAO.upsertAllSpendingInfoDb(toUpdate)
-    } yield updated
+      action = spendingInfoDAO.upsertAllSpendingInfoDbAction(toUpdate)
+    } yield action
   }
 
   /** Fetches confirmations for the given blocks in parallel */
@@ -354,8 +362,8 @@ private[wallet] trait UtxoHandling extends WalletLogger {
     for {
       updatedUtxos <- updatedUtxosF
       // update the confirmed utxos
-      updatedConfirmed <- updateUtxoConfirmedStates(updatedUtxos)
-
+      updatedConfirmedA <- updateUtxoConfirmedStates(updatedUtxos)
+      updatedConfirmed <- safeDatabase.runVec(updatedConfirmedA)
       // update the utxos that are in blocks but not considered confirmed yet
       pendingConf = updatedUtxos.filterNot(utxo =>
         updatedConfirmed.exists(_.outPoint == utxo.outPoint))
@@ -376,12 +384,23 @@ private[wallet] trait UtxoHandling extends WalletLogger {
     } yield updated
   }
 
+  def updateUtxoPendingStatesAction: DBIOAction[
+    Vector[SpendingInfoDb],
+    NoStream,
+    Effect.Read with Effect.Write] = {
+    val infosAction = spendingInfoDAO.findAllPendingConfirmationAction
+
+    val action: Int = {
+      infosAction.map { infos =>
+        logger.debug(s"Updating states of ${infos.size} pending utxos...")
+        updateUtxoConfirmedStates(infos)
+      }
+    }
+    action
+  }
+
   /** @inheritdoc */
   override def updateUtxoPendingStates(): Future[Vector[SpendingInfoDb]] = {
-    for {
-      infos <- spendingInfoDAO.findAllPendingConfirmation
-      _ = logger.debug(s"Updating states of ${infos.size} pending utxos...")
-      updatedInfos <- updateUtxoConfirmedStates(infos)
-    } yield updatedInfos
+    safeDatabase.runVec(updateUtxoPendingStatesAction)
   }
 }

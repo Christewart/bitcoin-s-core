@@ -5,7 +5,6 @@ import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.hd._
 import org.bitcoins.core.protocol.script.{ScriptPubKey, ScriptWitness}
 import org.bitcoins.core.protocol.transaction.{Transaction, TransactionOutPoint}
-import org.bitcoins.core.util.FutureUtil
 import org.bitcoins.core.wallet.utxo._
 import org.bitcoins.crypto.DoubleSha256DigestBE
 import org.bitcoins.db.CRUDAutoInc
@@ -94,19 +93,35 @@ case class SpendingInfoDAO()(implicit
       .run(actions)
   }
 
+  def upsertAllSpendingInfoDbAction(ts: Vector[SpendingInfoDb]): DBIOAction[
+    Vector[SpendingInfoDb],
+    NoStream,
+    Effect.Read with Effect.Write] = {
+    val nested: Vector[
+      DBIOAction[SpendingInfoDb, NoStream, Effect.Read with Effect.Write]] =
+      ts.map(upsertAction)
+
+    val actions = profile.api.DBIO.sequence(nested)
+    actions
+  }
+
   def upsertAllSpendingInfoDb(
       ts: Vector[SpendingInfoDb]): Future[Vector[SpendingInfoDb]] = {
-    FutureUtil.foldLeftAsync(Vector.empty[SpendingInfoDb], ts)((acc, si) =>
-      upsert(si).map(res => acc :+ res))
+    val actions = upsertAllSpendingInfoDbAction(ts)
+    safeDatabase.runVec(actions)
   }
 
   def updateAllSpendingInfoDb(
       ts: Vector[SpendingInfoDb]): Future[Vector[SpendingInfoDb]] = {
-    FutureUtil.foldLeftAsync(Vector.empty[SpendingInfoDb], ts)((acc, si) =>
-      update(si).map(res => acc :+ res))
+    val nested = ts.map(updateAction)
+    val actions = DBIO.sequence(nested)
+    safeDatabase.runVec(actions)
   }
 
-  def update(si: SpendingInfoDb): Future[SpendingInfoDb] = {
+  def updateAction(si: SpendingInfoDb): DBIOAction[
+    SpendingInfoDb,
+    NoStream,
+    Effect.Read with Effect.Write] = {
     val actions = for {
       spkOpt <-
         spkTable
@@ -134,17 +149,25 @@ case class SpendingInfoDAO()(implicit
           .result
           .headOption
     } yield (utxo, spk)
-    safeDatabase
-      .run(actions.transactionally)
-      .map {
-        case (Some(utxo), Some(spk)) => utxo.toSpendingInfoDb(spk.scriptPubKey)
-        case _ =>
-          throw new SQLException(
-            s"Unexpected result: Cannot update either a UTXO or a SPK record for $si")
-      }
+
+    actions.map {
+      case (Some(utxo), Some(spk)) => utxo.toSpendingInfoDb(spk.scriptPubKey)
+      case _ =>
+        throw new SQLException(
+          s"Unexpected result: Cannot update either a UTXO or a SPK record for $si")
+    }
   }
 
-  def upsert(si: SpendingInfoDb): Future[SpendingInfoDb] = {
+  def update(si: SpendingInfoDb): Future[SpendingInfoDb] = {
+    val actions = updateAction(si)
+    safeDatabase
+      .run(actions.transactionally)
+  }
+
+  def upsertAction(si: SpendingInfoDb): DBIOAction[
+    SpendingInfoDb,
+    NoStream,
+    Effect.Read with Effect.Write] = {
     val actions = for {
       spkOpt <-
         spkTable
@@ -170,14 +193,19 @@ case class SpendingInfoDAO()(implicit
           .result
           .headOption
     } yield (utxo, spk)
+
+    actions.map {
+      case (Some(utxo), Some(spk)) => utxo.toSpendingInfoDb(spk.scriptPubKey)
+      case _ =>
+        throw new SQLException(
+          s"Unexpected result: Cannot upsert either a UTXO or a SPK record for $si")
+    }
+  }
+
+  def upsert(si: SpendingInfoDb): Future[SpendingInfoDb] = {
+    val actions = upsertAction(si)
     safeDatabase
       .run(actions.transactionally)
-      .map {
-        case (Some(utxo), Some(spk)) => utxo.toSpendingInfoDb(spk.scriptPubKey)
-        case _ =>
-          throw new SQLException(
-            s"Unexpected result: Cannot upsert either a UTXO or a SPK record for $si")
-      }
   }
 
   def delete(si: SpendingInfoDb): Future[Int] = {
@@ -364,21 +392,27 @@ case class SpendingInfoDAO()(implicit
         })
   }
 
-  /** Enumerates all TX outputs in the wallet with the state
-    * [[TxoState.PendingConfirmationsReceived]] or [[TxoState.PendingConfirmationsSpent]]
-    */
-  def findAllPendingConfirmation: Future[Vector[SpendingInfoDb]] = {
+  def findAllPendingConfirmationAction: DBIOAction[
+    Vector[SpendingInfoDb],
+    NoStream,
+    Effect.Read] = {
     val query = table
       .join(spkTable)
       .on(_.scriptPubKeyId === _.id)
     val filtered = query.filter(_._1.state.inSet(TxoState.pendingConfStates))
-
-    safeDatabase
-      .runVec(filtered.result)
+    filtered.result
       .map(res =>
         res.map { case (utxoRec, spkRec) =>
           utxoRec.toSpendingInfoDb(spkRec.scriptPubKey)
         })
+      .map(_.toVector)
+  }
+
+  /** Enumerates all TX outputs in the wallet with the state
+    * [[TxoState.PendingConfirmationsReceived]] or [[TxoState.PendingConfirmationsSpent]]
+    */
+  def findAllPendingConfirmation: Future[Vector[SpendingInfoDb]] = {
+    safeDatabase.runVec(findAllPendingConfirmationAction)
   }
 
   /** Enumerates all TX outputs in the wallet with the state
