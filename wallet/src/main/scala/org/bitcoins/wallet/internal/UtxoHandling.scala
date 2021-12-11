@@ -1,12 +1,8 @@
 package org.bitcoins.wallet.internal
 
+import org.bitcoins.core.api.wallet.AddUtxoError
 import org.bitcoins.core.api.wallet.AddUtxoError._
 import org.bitcoins.core.api.wallet.db._
-import org.bitcoins.core.api.wallet.{
-  AddUtxoError,
-  AddUtxoResult,
-  AddUtxoSuccess
-}
 import org.bitcoins.core.consensus.Consensus
 import org.bitcoins.core.hd.HDAccount
 import org.bitcoins.core.number.UInt32
@@ -21,6 +17,7 @@ import org.bitcoins.core.wallet.utxo.TxoState._
 import org.bitcoins.core.wallet.utxo._
 import org.bitcoins.crypto.DoubleSha256DigestBE
 import org.bitcoins.wallet.{Wallet, WalletLogger}
+import slick.dbio.{DBIOAction, Effect, NoStream}
 
 import scala.concurrent.Future
 
@@ -238,7 +235,10 @@ private[wallet] trait UtxoHandling extends WalletLogger {
       state: ReceivedState,
       output: TransactionOutput,
       outPoint: TransactionOutPoint,
-      addressDb: AddressDb): Future[SpendingInfoDb] = {
+      addressDb: AddressDb): DBIOAction[
+    SpendingInfoDb,
+    NoStream,
+    Effect.Read with Effect.Write] = {
 
     val utxo: SpendingInfoDb = addressDb match {
       case segwitAddr: SegWitAddressDb =>
@@ -273,7 +273,7 @@ private[wallet] trait UtxoHandling extends WalletLogger {
     }
 
     for {
-      written <- spendingInfoDAO.create(utxo)
+      written <- spendingInfoDAO.createAction(utxo)
     } yield {
       val writtenOut = written.outPoint
       logger.info(
@@ -289,28 +289,32 @@ private[wallet] trait UtxoHandling extends WalletLogger {
       transaction: Transaction,
       vout: UInt32,
       state: ReceivedState,
-      addressDbE: Either[AddUtxoError, AddressDb]): Future[AddUtxoResult] = {
+      addressDbE: Either[AddUtxoError, AddressDb]): Either[
+    AddUtxoError,
+    DBIOAction[SpendingInfoDb, NoStream, Effect.Read with Effect.Write]] = {
 
     if (vout.toInt >= transaction.outputs.length) {
       //out of bounds output
-      Future.successful(VoutIndexOutOfBounds)
+      Left(VoutIndexOutOfBounds)
     } else {
       val output = transaction.outputs(vout.toInt)
       val outPoint = TransactionOutPoint(transaction.txId, vout)
       logger.info(
         s"Adding UTXO to wallet: ${transaction.txIdBE.hex}:${vout.toInt} amt=${output.value}")
       // insert the UTXO into the DB
-      val insertedUtxoEF: Either[AddUtxoError, Future[SpendingInfoDb]] = for {
-        addressDb <- addressDbE
-      } yield writeUtxo(tx = transaction,
-                        state = state,
-                        output = output,
-                        outPoint = outPoint,
-                        addressDb = addressDb)
-      insertedUtxoEF match {
-        case Right(utxoF) => utxoF.map(AddUtxoSuccess)
-        case Left(e)      => Future.successful(e)
-      }
+      val insertedUtxoEA: Either[
+        AddUtxoError,
+        DBIOAction[SpendingInfoDb, NoStream, Effect.Read with Effect.Write]] =
+        for {
+          addressDb <- addressDbE
+        } yield {
+          writeUtxo(tx = transaction,
+                    state = state,
+                    output = output,
+                    outPoint = outPoint,
+                    addressDb = addressDb)
+        }
+      insertedUtxoEA
     }
   }
 

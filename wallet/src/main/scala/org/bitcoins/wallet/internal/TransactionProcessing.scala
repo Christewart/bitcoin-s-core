@@ -1,7 +1,7 @@
 package org.bitcoins.wallet.internal
 
+import org.bitcoins.core.api.wallet.AddUtxoError
 import org.bitcoins.core.api.wallet.db._
-import org.bitcoins.core.api.wallet.{AddUtxoError, AddUtxoSuccess}
 import org.bitcoins.core.consensus.Consensus
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.number.UInt32
@@ -14,7 +14,9 @@ import org.bitcoins.core.wallet.fee.FeeUnit
 import org.bitcoins.core.wallet.utxo.TxoState._
 import org.bitcoins.core.wallet.utxo.{AddressTag, ReceivedState, TxoState}
 import org.bitcoins.crypto.{DoubleSha256Digest, DoubleSha256DigestBE}
+import org.bitcoins.db.SafeDatabase
 import org.bitcoins.wallet._
+import slick.dbio.{DBIOAction, Effect, NoStream}
 
 import scala.concurrent.{Future, Promise}
 import scala.util.{Failure, Success, Try}
@@ -29,6 +31,8 @@ private[bitcoins] trait TransactionProcessing extends WalletLogger {
 
   /////////////////////
   // Public facing API
+
+  private lazy val safeDatabase: SafeDatabase = accountDAO.safeDatabase
 
   /** @inheritdoc */
   override def processTransaction(
@@ -426,17 +430,21 @@ private[bitcoins] trait TransactionProcessing extends WalletLogger {
       transaction: Transaction,
       index: Int,
       state: ReceivedState,
-      addressDbE: Either[AddUtxoError, AddressDb]): Future[SpendingInfoDb] = {
-    val addIncomingUtxoF =
+      addressDbE: Either[AddUtxoError, AddressDb]): DBIOAction[
+    SpendingInfoDb,
+    NoStream,
+    Effect.Read with Effect.Write] = {
+    val addIncomingUtxoEA =
       addUtxo(transaction = transaction,
               vout = UInt32(index),
               state = state,
               addressDbE = addressDbE)
-    addIncomingUtxoF.flatMap {
-      case AddUtxoSuccess(utxo) => Future.successful(utxo)
-      case err: AddUtxoError =>
-        logger.error(s"Could not add UTXO", err)
-        Future.failed(err)
+
+    addIncomingUtxoEA match {
+      case Left(x) =>
+        DBIOAction.failed(x)
+      case Right(action) =>
+        action
     }
   }
 
@@ -530,23 +538,27 @@ private[bitcoins] trait TransactionProcessing extends WalletLogger {
       addressDbs <- addressDbsF
     } yield matchAddressDbWithOutputs(addressDbs, outputsWithIndex.toVector)
 
-    val nested = for {
+    val spendingInfoDbsF = for {
       state <- stateF
       addressDbWithOutput <- addressDbWithOutputF
-    } yield {
-      val outputsVec = addressDbWithOutput.map { case (addressDb, out) =>
-        require(addressDb.scriptPubKey == out.output.scriptPubKey)
-        processReceivedUtxo(
-          transaction,
-          out.index,
-          state = state,
-          Right(addressDb)
-        )
+      outputsVecA = {
+        addressDbWithOutput.map { case (addressDb, out) =>
+          require(addressDb.scriptPubKey == out.output.scriptPubKey)
+          processReceivedUtxo(
+            transaction,
+            out.index,
+            state = state,
+            Right(addressDb)
+          )
+        }
       }
-      Future.sequence(outputsVec)
+      seq = DBIOAction.sequence(outputsVecA)
+      spendingInfoDbs <- safeDatabase.run(seq)
+    } yield {
+      spendingInfoDbs
     }
 
-    nested.flatten
+    spendingInfoDbsF
   }
 
   /** Tries to convert the provided spk to an address, and then checks if we have

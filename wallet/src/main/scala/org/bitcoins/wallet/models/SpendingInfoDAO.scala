@@ -46,7 +46,10 @@ case class SpendingInfoDAO()(implicit
     ScriptPubKeyDAO().table
   }
 
-  def create(si: SpendingInfoDb): Future[SpendingInfoDb] = {
+  def createAction(si: SpendingInfoDb): DBIOAction[
+    SpendingInfoDb,
+    NoStream,
+    Effect.Read with Effect.Write] = {
     val query =
       table.returning(table.map(_.id)).into((t, id) => t.copyWithId(id = id))
 
@@ -77,14 +80,18 @@ case class SpendingInfoDAO()(implicit
           .headOption
     } yield (utxo, spk)
 
+    actions.map {
+      case (utxo, Some(spk)) => utxo.toSpendingInfoDb(spk.scriptPubKey)
+      case _ =>
+        throw new SQLException(
+          s"Unexpected result: Cannot create either a UTXO or a SPK record for $si")
+    }
+  }
+
+  def create(si: SpendingInfoDb): Future[SpendingInfoDb] = {
+    val actions = createAction(si)
     safeDatabase
-      .run(actions.transactionally)
-      .map {
-        case (utxo, Some(spk)) => utxo.toSpendingInfoDb(spk.scriptPubKey)
-        case _ =>
-          throw new SQLException(
-            s"Unexpected result: Cannot create either a UTXO or a SPK record for $si")
-      }
+      .run(actions)
   }
 
   def upsertAllSpendingInfoDb(
