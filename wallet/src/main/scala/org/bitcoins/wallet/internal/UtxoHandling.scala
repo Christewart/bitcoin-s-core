@@ -390,10 +390,14 @@ private[wallet] trait UtxoHandling extends WalletLogger {
     Effect.Read with Effect.Write] = {
     val infosAction = spendingInfoDAO.findAllPendingConfirmationAction
 
-    val action: Int = {
-      infosAction.map { infos =>
+    val action: DBIOAction[
+      Vector[SpendingInfoDb],
+      NoStream,
+      Effect.Read with Effect.Write] = {
+      infosAction.flatMap { infos =>
         logger.debug(s"Updating states of ${infos.size} pending utxos...")
-        updateUtxoConfirmedStates(infos)
+        val f = updateUtxoConfirmedStates(infos)
+        DBIOAction.from(f).flatten
       }
     }
     action
