@@ -14,7 +14,7 @@ import org.bitcoins.core.bloom.{BloomFilter, BloomUpdateAll}
 import org.bitcoins.core.config.BitcoinNetwork
 import org.bitcoins.core.crypto.ExtPublicKey
 import org.bitcoins.core.currency._
-import org.bitcoins.core.gcs.{GolombFilter, SimpleFilterMatcher}
+import org.bitcoins.core.gcs.GolombFilter
 import org.bitcoins.core.hd._
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.BitcoinAddress
@@ -183,6 +183,7 @@ abstract class Wallet
         chainQueryApi.getBlockHeight(blockHash)
       case None => Future.successful(None)
     }
+
     for {
       utxos <- utxosF
       scripts <- spksF
@@ -194,12 +195,7 @@ abstract class Wallet
           //we don't need to search the filters
           Future.successful(Vector.empty)
         } else {
-          FutureUtil
-            .batchAndParallelExecute(
-              blockFilters,
-              searchFilterMatches(scriptPubKeys.toVector)
-            )
-            .map(_.flatten)
+          Future.successful(blockFilters.map(_._1))
         }
       }
       _ <- nodeApi.downloadBlocks(blockHashToDownload)
@@ -220,7 +216,7 @@ abstract class Wallet
     }
   }
 
-  private def searchFilterMatches(spks: Vector[ScriptPubKey])(
+  /*  private def searchFilterMatches(spks: Vector[ScriptPubKey])(
       blockFilters: Vector[(DoubleSha256Digest, GolombFilter)]): Future[
     Vector[DoubleSha256Digest]] = FutureUtil.makeAsync { () =>
     val asmVec = spks.map(_.asmBytes)
@@ -232,7 +228,7 @@ abstract class Wallet
         Vector.empty
       }
     }
-  }
+  }*/
 
   override def broadcastTransaction(transaction: Transaction): Future[Unit] =
     for {
