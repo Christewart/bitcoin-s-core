@@ -509,6 +509,7 @@ class BitcoinSServerMain(override val serverArgParser: ServerArgParser)(implicit
       chainApi: ChainApi): WalletCallbacks = {
     val onAddressCreated: OnNewAddressGenerated = { addr =>
       val f = Future {
+        logger.info(s"addr=$addr")
         val notification = WalletNotification.NewAddressNotification(addr)
         val json =
           upickle.default.writeJs(notification)(WsPicklers.newAddressPickler)
