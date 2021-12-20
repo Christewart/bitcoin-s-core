@@ -54,12 +54,17 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
       val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort))
       //start the websocket
 
+      val sourceKickOff = Source
+        .single(TextMessage("kick off msg"))
+        // Keeps the connection open
+        .concatMat(Source.maybe[Message])(Keep.right)
+
       val f: Flow[
         Message,
         Message,
         (Future[Seq[WalletNotification[_]]], Promise[Option[Message]])] = {
         Flow
-          .fromSinkAndSourceMat(sink, Source.maybe[Message])(Keep.both)
+          .fromSinkAndSourceMat(sink, sourceKickOff)(Keep.both)
           .log("@FLOW@")
       }
 
