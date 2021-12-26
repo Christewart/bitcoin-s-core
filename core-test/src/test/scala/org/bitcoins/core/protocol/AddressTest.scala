@@ -1,9 +1,10 @@
 package org.bitcoins.core.protocol
 
 import org.bitcoins.core.config.MainNet
-import org.bitcoins.crypto.ECPublicKey
+import org.bitcoins.crypto.{ECPrivateKey, ECPrivateKeyBytes, ECPublicKey}
 import org.bitcoins.testkitcore.gen.AddressGenerator
 import org.bitcoins.testkitcore.util.{BitcoinSUnitTest, TestUtil}
+import scodec.bits.ByteVector
 
 import scala.util.{Failure, Success}
 
@@ -46,5 +47,25 @@ class AddressTest extends BitcoinSUnitTest {
     val pubKey = ECPublicKey.fromHex(hex)
     val p2pkh = P2PKHAddress(pubKey, MainNet)
     println(s"address=${p2pkh.toString}")
+  }
+
+  it must "keep a decompressed representation when generating an address" in {
+
+    val padded: Array[Byte] = ECPrivateKey.freshPrivateKey.bytes.toArray
+    val compressedPK: ECPrivateKeyBytes =
+      ECPrivateKeyBytes(bytes = ByteVector(padded), isCompressed = true)
+    val uncompressedPK: ECPrivateKeyBytes =
+      ECPrivateKeyBytes(bytes = ByteVector(padded), isCompressed = false)
+    println(s"${compressedPK.publicKeyBytes.hex}")
+    println(s"${uncompressedPK.publicKeyBytes.hex}")
+
+    val compressedPubKey: ECPublicKey =
+      ECPublicKey.fromHex(compressedPK.publicKeyBytes.hex)
+    val uncompressedPubKey: ECPublicKey =
+      ECPublicKey.fromHex(uncompressedPK.publicKeyBytes.hex)
+    println(s"${compressedPubKey}")
+    println(s"${uncompressedPubKey}")
+    println(s"${P2PKHAddress(compressedPubKey, MainNet)}")
+    println(s"${P2PKHAddress(uncompressedPubKey, MainNet)}")
   }
 }

@@ -17,9 +17,11 @@ case class ECPrivateKeyBytes(bytes: ByteVector, isCompressed: Boolean = true)
   /** Returns the raw ECPublicKeyBytes serialized using isCompressed. */
   def publicKeyBytes: ECPublicKeyBytes = {
     val pubKey = toPrivateKey.publicKey
+    println(s"isCompressed=$isCompressed")
     if (isCompressed) {
       ECPublicKeyBytes(pubKey.bytes)
     } else {
+      println(s"pubKey.decompressedBytes=${pubKey.decompressedBytes}")
       ECPublicKeyBytes(pubKey.decompressedBytes)
     }
   }
