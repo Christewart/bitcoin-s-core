@@ -5,7 +5,11 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import org.bitcoins.core.protocol.blockchain.Block
 import org.bitcoins.core.protocol.script._
-import org.bitcoins.core.protocol.transaction.{Transaction, WitnessTransaction}
+import org.bitcoins.core.protocol.transaction.{
+  Transaction,
+  TransactionOutput,
+  WitnessTransaction
+}
 import org.bitcoins.crypto.DoubleSha256DigestBE
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.rpc.config.BitcoindRpcAppConfig
@@ -36,7 +40,7 @@ class ScanBitcoind()(implicit
       bitcoind <- bitcoindF
       endHeight <- endHeightF
       //_ <- countWitV1MempoolTxs(bitcoind)
-      _ <- countTaprootTxsInBlocks(endHeight, 10000, bitcoind)
+      _ <- countTaprootTxsInBlocks(endHeight, 5000, bitcoind)
     } yield ()
     f.failed.foreach(err =>
       logger.error(s"Failed to count witness v1 mempool txs", err))
@@ -106,24 +110,37 @@ class ScanBitcoind()(implicit
     val startTime = System.currentTimeMillis()
     val startHeight = endHeight - lastBlocks
     val source: Source[Int, NotUsed] = Source(startHeight.to(endHeight))
-    val countTaprootOutputs: Block => Int = { block =>
+    /*    val countTaprootOutputs: Block => Int = { block =>
       val outputs = block.transactions
         .flatMap(_.outputs)
         .filter(_.scriptPubKey.isInstanceOf[WitnessScriptPubKeyV1])
       outputs.length
+    }*/
+
+    val countUnassignedWitnessSPK: Block => Vector[TransactionOutput] = {
+      block =>
+        val outputs = block.transactions
+          .flatMap(_.outputs)
+          .filter(_.scriptPubKey.isInstanceOf[UnassignedWitnessScriptPubKey])
+        outputs.toVector
     }
 
-    val countsF: Future[Seq[Int]] = for {
-      counts <- searchBlocks[Int](bitcoind, source, countTaprootOutputs)
-    } yield counts
+    val outputsF: Future[Vector[TransactionOutput]] = for {
+      counts <- searchBlocks[Vector[TransactionOutput]](
+        bitcoind,
+        source,
+        countUnassignedWitnessSPK)
+    } yield counts.flatten.toVector
 
-    val countF: Future[Int] = countsF.map(_.sum)
+    val countF: Future[Int] = outputsF.map(_.length)
 
     for {
       count <- countF
+      outputs <- outputsF
+      _ = outputs.foreach(o => logger.info(s"output=$o"))
       endTime = System.currentTimeMillis()
       _ = logger.info(
-        s"Count of taproot outputs from height=${startHeight} to endHeight=${endHeight} is ${count}. It took ${endTime - startTime}ms ")
+        s"Count of invalid taproot outputs from height=${startHeight} to endHeight=${endHeight} is ${count}. It took ${endTime - startTime}ms ")
     } yield count
   }
 
