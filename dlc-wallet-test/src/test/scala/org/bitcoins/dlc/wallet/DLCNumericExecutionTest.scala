@@ -57,8 +57,6 @@ class DLCNumericExecutionTest extends BitcoinSDualWalletTest {
         .asInstanceOf[UnsignedNumericOutcome]
         .digits
         .padTo(oracleInfo.nonces.size, 0)
-    println(
-      s"initiatorWinVec=$initiatorWinVec receipientWinVec=$recipientWinVec oracleInfo.nonces.size=${oracleInfo.nonces.size}")
     val kValues2 = DLCWalletUtil.kValues.take(recipientWinVec.size)
 
     val recipientWinSigs =
@@ -180,7 +178,7 @@ class DLCNumericExecutionTest extends BitcoinSDualWalletTest {
                                               sigs = badSigs,
                                               outcomes = badOutcomes)
         func = (wallet: DLCWallet) =>
-          wallet.executeDLC(contractId, goodAttestment)
+          wallet.executeDLC(contractId, badAttestment)
 
         result <- dlcExecutionTest(wallets = wallets,
                                    asInitiator = false,
@@ -188,8 +186,7 @@ class DLCNumericExecutionTest extends BitcoinSDualWalletTest {
                                    expectedOutputs = 1)
       } yield assert(result)
 
-      resultF
-    // recoverToSucceededIf[IllegalArgumentException](resultF)
+      recoverToSucceededIf[IllegalArgumentException](resultF)
   }
 
   private def verifyingMatchingOracleSigs(

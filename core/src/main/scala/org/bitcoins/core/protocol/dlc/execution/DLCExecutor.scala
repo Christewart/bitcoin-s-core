@@ -219,8 +219,6 @@ object DLCExecutor {
         oracleSigs = sigsUsed
       )
     }
-
-    println(s"@@@@ outcome=${msg.outcome} @@@@")
     ExecutedDLCOutcome(fundingTx, cet, msg, sigsUsed)
   }
 }

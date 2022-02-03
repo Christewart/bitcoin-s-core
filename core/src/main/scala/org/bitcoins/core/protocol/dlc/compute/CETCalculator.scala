@@ -394,29 +394,46 @@ object CETCalculator {
     val (prefixDigits, startDigits, endDigits) =
       separatePrefix(start, end, base, numDigits)
 
-    if (start == end) { // Special Case: Range Length 1
-      Vector(prefixDigits)
-    } else if (startDigits.forall(_ == 0) && endDigits.forall(_ == base - 1)) { // Total Optimization
-      Vector(prefixDigits)
-    } else if (prefixDigits.length == numDigits - 1) { // Special Case: Front Grouping = Back Grouping
-      startDigits.last.to(endDigits.last).toVector.map { lastDigit =>
-        prefixDigits :+ lastDigit
-      }
-    } else {
-      val front = frontGroupings(startDigits, base)
-      val middle = middleGrouping(startDigits.head, endDigits.head)
-      val back = backGroupings(endDigits, base)
+    val resultNoPadding: Vector[Digits] = {
+      if (start == end) { // Special Case: Range Length 1
+        Vector(prefixDigits)
+      } else if (
+        startDigits.forall(_ == 0) && endDigits.forall(_ == base - 1)
+      ) { // Total Optimization
+        Vector(prefixDigits)
+      } else if (prefixDigits.length == numDigits - 1) { // Special Case: Front Grouping = Back Grouping
+        startDigits.last.to(endDigits.last).toVector.map { lastDigit =>
+          prefixDigits :+ lastDigit
+        }
+      } else {
+        val front = frontGroupings(startDigits, base)
+        val middle = middleGrouping(startDigits.head, endDigits.head)
+        val back = backGroupings(endDigits, base)
 
-      val groupings = front ++ middle ++ back
+        val groupings = front ++ middle ++ back
 
-      groupings.map { digits =>
-        val result: Digits = prefixDigits ++ digits
-        require(
-          digits.length == numDigits,
-          s"Cannot have different numDigits from the oracle and result, oracle=$numDigits result=${result.length}")
-        result
+        groupings.map { digits =>
+          prefixDigits ++ digits
+        }
       }
     }
+
+    val results: Vector[Digits] = resultNoPadding.map { digits =>
+      if (digits.length < numDigits) {
+        //pad to make sure we have correct num digits
+        val diff = numDigits - digits.length
+        Vector.fill(diff)(0) ++ digits
+      } else {
+        //do we want to throw if we have too many digits??
+        digits
+      }
+    }
+
+    require(
+      results.forall(_.length == numDigits),
+      s"Cannot have different numDigits from the oracle and result, oracle=$numDigits result=${results
+        .map(_.length)}")
+    results
   }
 
   /** Computes the compressed set of outcomes and their corresponding payouts given
