@@ -17,7 +17,9 @@ case class EnumOutcome(outcome: String) extends DLCOutcomeType {
     Vector(CryptoUtil.serializeForHash(outcome))
 }
 
-sealed trait NumericDLCOutcomeType extends DLCOutcomeType
+sealed trait NumericDLCOutcomeType extends DLCOutcomeType {
+  def digits: Vector[Int]
+}
 
 /** An outcome from a multi-nonce unsigned numeric event type.
   *
@@ -27,7 +29,7 @@ sealed trait NumericDLCOutcomeType extends DLCOutcomeType
   *
   * I.e. the Vector[Int] is always the most significant digits.
   */
-case class UnsignedNumericOutcome(digits: Vector[Int])
+case class UnsignedNumericOutcome(override val digits: Vector[Int])
     extends NumericDLCOutcomeType {
 
   override lazy val serialized: Vector[ByteVector] =
@@ -42,7 +44,9 @@ case class UnsignedNumericOutcome(digits: Vector[Int])
   *
   * I.e. the Vector[Int] is always the most significant digits.
   */
-case class SignedNumericOutcome(positive: Boolean, digits: Vector[Int])
+case class SignedNumericOutcome(
+    positive: Boolean,
+    override val digits: Vector[Int])
     extends NumericDLCOutcomeType {
 
   private val signOutcomeStr = if (positive) "+" else "-"

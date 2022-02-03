@@ -5,10 +5,12 @@ import org.bitcoins.core.protocol.dlc.build.DLCTxBuilder
 import org.bitcoins.core.protocol.dlc.compute.CETCalculator
 import org.bitcoins.core.protocol.dlc.models._
 import org.bitcoins.core.protocol.dlc.sign.DLCTxSigner
+import org.bitcoins.core.protocol.tlv.{EnumOutcome, NumericDLCOutcomeType}
 import org.bitcoins.core.protocol.transaction.{Transaction, WitnessTransaction}
 import org.bitcoins.core.psbt.InputPSBTRecord.PartialSignature
 import org.bitcoins.core.util.Indexed
-import org.bitcoins.crypto.{AdaptorSign, ECPublicKey}
+import org.bitcoins.core.wallet.utxo.{ECSignatureParams, P2WSHV0InputInfo}
+import org.bitcoins.crypto.{AdaptorSign, ECAdaptorSignature, ECPublicKey}
 
 import scala.util.{Success, Try}
 
@@ -136,59 +138,89 @@ object DLCExecutor {
       fundingTx: Transaction,
       fundOutputIndex: Int
   ): ExecutedDLCOutcome = {
-    val sigOracles = oracleSigs.map(_.oracle)
+    val singleOracles: Vector[SingleOracleInfo] = oracleSigs.map(_.oracle)
 
-    val oracleInfoOpt = contractInfo.oracleInfos.find { oracleInfo =>
-      oracleInfo.threshold <= oracleSigs.length &&
-      sigOracles.forall(oracleInfo.singleOracleInfos.contains)
+    val oracleInfoOpt: Option[OracleInfo] = {
+      contractInfo.oracleInfos.find { oracleInfo =>
+        oracleInfo.threshold <= oracleSigs.length &&
+        singleOracles.forall(oracleInfo.singleOracleInfos.contains)
+      }
     }
 
-    val oracleInfo = oracleInfoOpt.getOrElse(
+    val oracleInfo: OracleInfo = oracleInfoOpt.getOrElse(
       throw new IllegalArgumentException(
         s"Signatures do not correspond to any possible outcome! $oracleSigs"))
 
     val threshold = oracleInfo.threshold
-    val sigCombinations = CETCalculator.combinations(oracleSigs, threshold)
+    val sigCombinations: Vector[Vector[OracleSignatures]] = {
+      CETCalculator.combinations(oracleSigs, threshold)
+    }
 
-    var msgOpt: Option[OracleOutcome] = None
+    var oracleOutcomeOpt: Option[OracleOutcome] = None
     val sigsUsedOpt = sigCombinations.find { sigs =>
-      msgOpt = contractInfo.findOutcome(sigs)
-      msgOpt.isDefined
+      oracleOutcomeOpt = contractInfo.findOutcome(sigs)
+      if (oracleOutcomeOpt.isDefined) {
+        //make sure we have the correct number of digits
+        oracleOutcomeOpt.get.outcome match {
+          case EnumOutcome(_) =>
+            require(
+              oracleSigs.forall(_.sigs.length == 1),
+              s"Enum outcomes require 1 signature from oracles. Got=${oracleSigs
+                .map(_.sigs.length)}")
+          case n: NumericDLCOutcomeType =>
+            require(
+              oracleSigs.forall(_.sigs.length == n.digits.length),
+              s"Numeric outcomes require the same number of sigs as nonces in the announcement, oracleSigs=${oracleSigs
+                .map(_.sigs.length)} digits=${n.digits.length}"
+            )
+        }
+      }
+      oracleOutcomeOpt.isDefined
     }
 
-    val msgAndCETInfoOpt = msgOpt.flatMap { msg =>
-      remoteCETInfos
-        .find(_._1 == msg.sigPoint)
-        .map { case (_, info) => (msg, info) }
-    }
+    val msgAndCETInfoOpt: Option[(OracleOutcome, CETInfo)] =
+      oracleOutcomeOpt.flatMap { msg =>
+        remoteCETInfos
+          .find(_._1 == msg.sigPoint)
+          .map { case (_, info) => (msg, info) }
+      }
 
-    val (msg, ucet, remoteAdaptorSig) = msgAndCETInfoOpt match {
-      case Some((msg, CETInfo(ucet, remoteSig))) => (msg, ucet, remoteSig)
-      case None =>
-        throw new IllegalArgumentException(
-          s"Signature does not correspond to any possible outcome! $oracleSigs")
+    val (msg: OracleOutcome,
+         ucet: WitnessTransaction,
+         remoteAdaptorSig: ECAdaptorSignature) = {
+      msgAndCETInfoOpt match {
+        case Some((msg, CETInfo(ucet, remoteSig))) => (msg, ucet, remoteSig)
+        case None =>
+          throw new IllegalArgumentException(
+            s"Signature does not correspond to any possible outcome! $oracleSigs")
+      }
     }
-    val sigsUsed =
+    val sigsUsed: Vector[OracleSignatures] =
       sigsUsedOpt.get // Safe because msgOpt is defined if no throw
 
     val (fundingMultiSig, _) = DLCTxBuilder.buildFundingSPKs(
       Vector(fundingKey.publicKey, remoteFundingPubKey))
 
-    val signingInfo =
-      DLCTxSigner.buildCETSigningInfo(fundOutputIndex,
-                                      fundingTx,
-                                      fundingMultiSig,
-                                      fundingKey)
+    val signingInfo: ECSignatureParams[P2WSHV0InputInfo] =
+      DLCTxSigner.buildCETSigningInfo(fundOutputIndex = fundOutputIndex,
+                                      fundingTx = fundingTx,
+                                      fundingMultiSig = fundingMultiSig,
+                                      fundingKey = fundingKey)
 
-    val cet = DLCTxSigner.completeCET(msg,
-                                      signingInfo,
-                                      fundingMultiSig,
-                                      fundingTx,
-                                      ucet,
-                                      remoteAdaptorSig,
-                                      remoteFundingPubKey,
-                                      sigsUsed)
+    val cet: WitnessTransaction = {
+      DLCTxSigner.completeCET(
+        outcome = msg,
+        cetSigningInfo = signingInfo,
+        fundingMultiSig = fundingMultiSig,
+        fundingTx = fundingTx,
+        ucet = ucet,
+        remoteAdaptorSig = remoteAdaptorSig,
+        remoteFundingPubKey = remoteFundingPubKey,
+        oracleSigs = sigsUsed
+      )
+    }
 
+    println(s"@@@@ outcome=${msg.outcome} @@@@")
     ExecutedDLCOutcome(fundingTx, cet, msg, sigsUsed)
   }
 }

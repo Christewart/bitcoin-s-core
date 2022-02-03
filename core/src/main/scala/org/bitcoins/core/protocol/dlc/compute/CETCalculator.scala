@@ -410,7 +410,11 @@ object CETCalculator {
       val groupings = front ++ middle ++ back
 
       groupings.map { digits =>
-        prefixDigits ++ digits
+        val result: Digits = prefixDigits ++ digits
+        require(
+          digits.length == numDigits,
+          s"Cannot have different numDigits from the oracle and result, oracle=$numDigits result=${result.length}")
+        result
       }
     }
   }
