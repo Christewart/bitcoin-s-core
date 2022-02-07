@@ -156,4 +156,11 @@ class EventDescriptorTest extends BitcoinSUnitTest {
     assert(!descriptor4.containsPreciseOutcome(13.55))
     assert(descriptor4.containsPreciseOutcome(13.5))
   }
+
+  it must "determine nonces needed" in {
+    val hex = "fdd80a0b0002000131000000010008"
+    val eventTLV = EventDescriptorTLV.fromHex(hex)
+    println(s"eventTLV=$eventTLV noncesNeeded=${eventTLV.noncesNeeded}")
+    fail()
+  }
 }
