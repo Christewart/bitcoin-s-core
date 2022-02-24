@@ -244,7 +244,6 @@ case class AddressDAO()(implicit
           .joinLeft(spendingInfoTable)
           .on(_._1.scriptPubKeyId === _.scriptPubKeyId)
 
-
       joinedWithSpendingInfo.filter(_._2.isEmpty)
     }
     safeDatabase

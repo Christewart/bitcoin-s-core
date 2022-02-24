@@ -117,7 +117,7 @@ class AddressHandlingTest extends BitcoinSWalletTest {
       //we failed
       val allCompletedF =
         AsyncUtil.retryUntilSatisfied(generatedF.forall(_.isCompleted),
-                                      250.millis)
+                                      500.millis)
       val addressesF = allCompletedF.flatMap { _ =>
         Future.sequence {
           generatedF

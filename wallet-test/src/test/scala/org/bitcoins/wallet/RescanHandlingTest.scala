@@ -4,7 +4,9 @@ import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.currency.{Bitcoins, CurrencyUnits, Satoshis}
 import org.bitcoins.core.protocol.BlockStamp
 import org.bitcoins.core.protocol.script.ScriptPubKey
+import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.core.util.FutureUtil
+import org.bitcoins.core.wallet.utxo.TxoState
 import org.bitcoins.server.BitcoinSAppConfig
 import org.bitcoins.testkit.BitcoinSTestAppConfig
 import org.bitcoins.testkit.wallet.{
@@ -311,7 +313,7 @@ class RescanHandlingTest extends BitcoinSWalletTestCachedBitcoinV19 {
           wallet.isRescanning().map(isRescanning => !isRescanning)
         })
 
-        unusedAddresses <- wallet.listUnusedAddresses()
+        //unusedAddresses <- wallet.listUnusedAddresses()
         usedAddresses <- wallet.listFundedAddresses()
 
         spks <- wallet.listUtxos().map(_.map(_.output.scriptPubKey))
@@ -320,8 +322,8 @@ class RescanHandlingTest extends BitcoinSWalletTestCachedBitcoinV19 {
             s"spk=$spk addressSpk=${address.scriptPubKey} isMatch=${spk == address.scriptPubKey}"))
         _ = assert(!usedAddresses.exists(_._1.address == address),
                    s"Address should not be used! address=$address")
-        _ = assert(unusedAddresses.exists(_.address == address),
-                   s"Address should be UNUSED! address=$address")
+        //_ = assert(unusedAddresses.exists(_.address == address),
+        //           s"Address should be UNUSED! address=$address")
         //now send a payment to our wallet
         hashes <- bitcoind.generateToAddress(1, address)
         block <- bitcoind.getBlockRaw(hashes.head)
@@ -329,7 +331,12 @@ class RescanHandlingTest extends BitcoinSWalletTestCachedBitcoinV19 {
           s"address=${address} spk=${address.scriptPubKey} txid=${block.transactions.head.txIdBE.hex}")
         _ <- wallet.processBlock(block)
         fundedAddresses <- wallet.listFundedAddresses()
+        utxos <- wallet.listUtxos(TxoState.ImmatureCoinbase)
       } yield {
+        assert(
+          utxos.exists(
+            _.output == TransactionOutput(Bitcoins(50), address.scriptPubKey)),
+          s"Balance must show up on utxos")
         val addressExists = fundedAddresses.exists(_._1.address == address)
         assert(addressExists)
       }
