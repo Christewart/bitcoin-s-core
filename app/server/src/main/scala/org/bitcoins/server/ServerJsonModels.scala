@@ -1369,15 +1369,19 @@ object RegisterIncomingOffer {
   def fromJsArr(arr: ujson.Arr): Try[RegisterIncomingOffer] = {
     arr.arr.toList match {
       case offerTlvJs :: peerJs :: messageJs :: Nil =>
-        Try {
-          val tlv = DLCOfferTLV.fromHex(offerTlvJs.str)
+        val t = Try {
+          val lnMessage = LnMessage.fromHex(offerTlvJs.str)
+          val tlv = lnMessage.tlv.asInstanceOf[DLCOfferTLV]
           val peer = nullToOpt(peerJs).map(_.str)
           val message = nullToOpt(messageJs).map(_.str)
-          RegisterIncomingOffer(tlv, peer,  message)
+          RegisterIncomingOffer(tlv, peer, message)
         }
+
+        t.failed.foreach(err => throw err)
+        t
       case other =>
         val exn = new IllegalArgumentException(
-          s"Bad number or arguments to registerincomingoffer, got=${other.length} expected=1")
+          s"Bad number or arguments to registerincomingoffer, got=${other.length} expected=33")
         Failure(exn)
     }
   }

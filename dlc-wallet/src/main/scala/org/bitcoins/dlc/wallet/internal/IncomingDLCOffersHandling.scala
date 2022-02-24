@@ -14,6 +14,8 @@ trait IncomingDLCOffersHandling { self: DLCWallet =>
       offerTLV: DLCOfferTLV,
       peer: Option[String],
       message: Option[String]): Future[Sha256Digest] = {
+    logger.info(
+      s"Registering offer=${offerTLV.sha256.hex} for peer=$peer with message=$message")
     val dbo = IncomingDLCOfferDbHelper.fromTLV(offerTLV = offerTLV,
                                                peer = peer,
                                                message = message)

@@ -3,6 +3,7 @@ package org.bitcoins.server
 import akka.actor.ActorSystem
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
+import grizzled.slf4j.Logging
 import org.bitcoins.core.api.dlc.node.DLCNodeApi
 import org.bitcoins.core.api.dlc.wallet.db.IncomingDLCOfferDb
 import org.bitcoins.core.protocol.dlc.models.{
@@ -19,7 +20,8 @@ import ujson._
 import upickle.default._
 
 case class DLCRoutes(dlcNode: DLCNodeApi)(implicit system: ActorSystem)
-    extends ServerRoute {
+    extends ServerRoute
+    with Logging {
 
   import system.dispatcher
 
@@ -70,11 +72,13 @@ case class DLCRoutes(dlcNode: DLCNodeApi)(implicit system: ActorSystem)
       complete {
         dlcNode.wallet.listIncomingDLCOffers().map { offers =>
           def toJson(io: IncomingDLCOfferDb): Value = {
-            Obj("hash" -> io.hash.hex,
-                "receivedAt" -> io.receivedAt.getEpochSecond,
-                "peer" -> io.peer.map(Str).getOrElse(Null),
-                "message" -> io.message.map(Str).getOrElse(Null),
-                "offerTLV" -> io.offerTLV.hex)
+            Obj(
+              "hash" -> io.hash.hex,
+              "receivedAt" -> io.receivedAt.getEpochSecond,
+              "peer" -> io.peer.map(Str).getOrElse(Null),
+              "message" -> io.message.map(Str).getOrElse(Null),
+              "offerTLV" -> io.offerTLV.hex
+            )
           }
 
           Server.httpSuccess(offers.map(toJson))
