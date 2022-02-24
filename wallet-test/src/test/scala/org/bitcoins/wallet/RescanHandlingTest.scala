@@ -1,5 +1,6 @@
 package org.bitcoins.wallet
 
+import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.currency.{Bitcoins, CurrencyUnits, Satoshis}
 import org.bitcoins.core.protocol.BlockStamp
 import org.bitcoins.core.protocol.script.ScriptPubKey
@@ -70,7 +71,7 @@ class RescanHandlingTest extends BitcoinSWalletTestCachedBitcoinV19 {
       }
   }
 
-  val DEFAULT_ADDR_BATCH_SIZE = 10
+  val DEFAULT_ADDR_BATCH_SIZE = 1000
   it must "be able to discover funds that belong to the wallet using WalletApi.rescanNeutrinoWallet" in {
     fixture: WalletWithBitcoind =>
       val WalletWithBitcoindV19(wallet, _) = fixture
@@ -290,6 +291,49 @@ class RescanHandlingTest extends BitcoinSWalletTestCachedBitcoinV19 {
       }
 
       rescanF
+  }
+
+  it must "still receive payments to addresses generated pre-rescan" in {
+    fixture: WalletWithBitcoind =>
+      val WalletWithBitcoindV19(wallet, bitcoind) = fixture
+      logger.info(s"Beginning test case")
+      val addressNoFundsF = wallet.getNewAddress()
+
+      //start a rescan without sending payment to that address
+      for {
+        address <- addressNoFundsF
+        _ = logger.info(s"Beginning test case address=$address")
+        _ <- wallet.rescanNeutrinoWallet(startOpt = None,
+                                         endOpt = None,
+                                         addressBatchSize = 10,
+                                         useCreationTime = false)
+        _ <- AsyncUtil.retryUntilSatisfiedF(() => {
+          wallet.isRescanning().map(isRescanning => !isRescanning)
+        })
+
+        unusedAddresses <- wallet.listUnusedAddresses()
+        usedAddresses <- wallet.listFundedAddresses()
+
+        spks <- wallet.listUtxos().map(_.map(_.output.scriptPubKey))
+        _ = spks.foreach(spk =>
+          logger.info(
+            s"spk=$spk addressSpk=${address.scriptPubKey} isMatch=${spk == address.scriptPubKey}"))
+        _ = assert(!usedAddresses.exists(_._1.address == address),
+                   s"Address should not be used! address=$address")
+        _ = assert(unusedAddresses.exists(_.address == address),
+                   s"Address should be UNUSED! address=$address")
+        //now send a payment to our wallet
+        hashes <- bitcoind.generateToAddress(1, address)
+        block <- bitcoind.getBlockRaw(hashes.head)
+        _ = logger.info(
+          s"address=${address} spk=${address.scriptPubKey} txid=${block.transactions.head.txIdBE.hex}")
+        _ <- wallet.processBlock(block)
+        fundedAddresses <- wallet.listFundedAddresses()
+      } yield {
+        val addressExists = fundedAddresses.exists(_._1.address == address)
+        assert(addressExists)
+      }
+
   }
 
 }

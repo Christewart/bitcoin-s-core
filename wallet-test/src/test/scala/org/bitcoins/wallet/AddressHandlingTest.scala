@@ -4,6 +4,7 @@ import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.currency.{Bitcoins, Satoshis}
 import org.bitcoins.core.protocol.script.EmptyScriptPubKey
 import org.bitcoins.core.protocol.transaction.TransactionOutput
+import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.core.wallet.utxo.StorageLocationTag.HotStorage
 import org.bitcoins.core.wallet.utxo.{
   AddressLabelTag,
@@ -81,14 +82,21 @@ class AddressHandlingTest extends BitcoinSWalletTest {
   it must "be safe to call getNewAddress multiple times in a row" in {
     fundedWallet: FundedWallet =>
       val wallet = fundedWallet.wallet
-      val addressesF = Future.sequence {
-        Vector.fill(10)(wallet.getNewAddress())
+      val initAddressCountF = wallet.addressDAO.count()
+      val numAddresses = 100
+      val addressesF = initAddressCountF.flatMap { _ =>
+        Future.sequence {
+          Vector.fill(numAddresses)(wallet.getNewAddress())
+        }
       }
 
       for {
         addresses <- addressesF
+        initAddressCount <- initAddressCountF
+        addressCount <- wallet.addressDAO.count()
       } yield {
-        assert(addresses.size == 10)
+        assert(addressCount == initAddressCount + numAddresses)
+        assert(addresses.size == numAddresses)
         assert(addresses.distinct.length == addresses.length,
                s"We receive an identical address!")
 
@@ -99,8 +107,8 @@ class AddressHandlingTest extends BitcoinSWalletTest {
     fundedWallet: FundedWallet =>
       val wallet = fundedWallet.wallet
       //attempt to generate 50 addresses simultaneously
-      //this should overwhelm our buffer size of 10
-      val numAddress = 50
+      //this should overwhelm our buffer size of 1000
+      val numAddress = 1000
       val generatedF = Vector.fill(numAddress)(wallet.getNewAddress())
 
       //some hacking here so we don't get an ugly stack trace
@@ -287,5 +295,24 @@ class AddressHandlingTest extends BitcoinSWalletTest {
       } yield {
         assert(tags.isEmpty)
       }
+  }
+
+  it must "list unused addresses" in { fundedWallet: FundedWallet =>
+    val wallet = fundedWallet.wallet
+    val addressF = wallet.getNewAddress()
+    val address2F = wallet.getNewAddress()
+
+    for {
+      address <- addressF
+      address2 <- address2F
+      _ <- wallet.sendToAddress(address2,
+                                Satoshis(100000),
+                                SatoshisPerVirtualByte.one)
+      unusedAddrs <- wallet.listUnusedAddresses()
+    } yield {
+      val addresses = unusedAddrs.map(_.address)
+      assert(addresses.exists(_ == address))
+      assert(!addresses.exists(_ == address2))
+    }
   }
 }

@@ -239,7 +239,7 @@ case class WalletAppConfig(baseDatadir: Path, configOverrides: Vector[Config])(
     if (config.hasPath("bitcoin-s.wallet.addressQueueSize")) {
       config.getInt("bitcoin-s.wallet.addressQueueSize")
     } else {
-      100
+      1000
     }
   }
 

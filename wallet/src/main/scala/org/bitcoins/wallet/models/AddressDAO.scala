@@ -1,11 +1,11 @@
 package org.bitcoins.wallet.models
 
 import java.sql.SQLException
-
 import org.bitcoins.core.api.wallet.db.{
   AddressDb,
   AddressRecord,
-  ScriptPubKeyDb
+  ScriptPubKeyDb,
+  UTXORecord
 }
 import org.bitcoins.core.currency.CurrencyUnit
 import org.bitcoins.core.hd.{HDAccount, HDChainType, HDCoinType, HDPurpose}
@@ -233,10 +233,18 @@ case class AddressDAO()(implicit
   def getUnusedAddresses: Future[Vector[AddressDb]] = {
     val query = {
       val joineWithSpks = table.join(spkTable).on(_.scriptPubKeyId === _.id)
-      val joinedWithSpendingInfo =
+
+      val joinedWithSpendingInfo: Query[
+        (
+            (AddressTable, ScriptPubKeyDAO#ScriptPubKeyTable),
+            Rep[Option[SpendingInfoDAO#SpendingInfoTable]]),
+        ((AddressRecord, ScriptPubKeyDb), Option[UTXORecord]),
+        Seq] =
         joineWithSpks
           .joinLeft(spendingInfoTable)
           .on(_._1.scriptPubKeyId === _.scriptPubKeyId)
+
+
       joinedWithSpendingInfo.filter(_._2.isEmpty)
     }
     safeDatabase

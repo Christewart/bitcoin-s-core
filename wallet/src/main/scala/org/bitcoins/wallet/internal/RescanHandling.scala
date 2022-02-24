@@ -160,6 +160,7 @@ private[wallet] trait RescanHandling extends WalletLogger {
   }
 
   private def pruneUnusedAddresses(): Future[Unit] = {
+
     for {
       addressDbs <- addressDAO.findAll()
       _ <- addressDbs.foldLeft(Future.unit) { (prevF, addressDb) =>
@@ -172,7 +173,10 @@ private[wallet] trait RescanHandling extends WalletLogger {
             else Future.unit
         } yield ()
       }
-    } yield ()
+    } yield {
+      logger.info(s"Pruning unused addresses")
+      ()
+    }
   }
 
   private def calcAddressGap(
