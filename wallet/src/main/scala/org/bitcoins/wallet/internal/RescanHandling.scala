@@ -51,36 +51,40 @@ private[wallet] trait RescanHandling extends WalletLogger {
       endOpt: Option[BlockStamp],
       addressBatchSize: Int,
       useCreationTime: Boolean = true): Future[Unit] = {
+    if (rescanning.get) {
+      logger.info(s"Rescan already started in wallet, skipping...")
+      Future.unit
+    } else {
+      rescanning.set(true)
 
-    rescanning.set(true)
-
-    logger.info(
-      s"Starting rescanning the wallet from ${startOpt} to ${endOpt} useCreationTime=$useCreationTime")
-
-    val start = System.currentTimeMillis()
-    val res = for {
-      start <- (startOpt, useCreationTime) match {
-        case (Some(_), true) =>
-          Future.failed(new IllegalArgumentException(
-            "Cannot define a starting block and use the wallet creation time"))
-        case (Some(value), false) =>
-          Future.successful(Some(value))
-        case (None, true) =>
-          walletCreationBlockHeight.map(Some(_))
-        case (None, false) =>
-          Future.successful(None)
-      }
-      _ <- clearUtxosAndAddresses(account)
-      _ <- doNeutrinoRescan(account, start, endOpt, addressBatchSize)
-    } yield ()
-
-    res.onComplete { _ =>
-      rescanning.set(false)
       logger.info(
-        s"Finished rescanning the wallet. It took ${System.currentTimeMillis() - start}ms")
-    }
+        s"Starting rescanning the wallet from ${startOpt} to ${endOpt} useCreationTime=$useCreationTime")
 
-    res
+      val start = System.currentTimeMillis()
+      val res = for {
+        start <- (startOpt, useCreationTime) match {
+          case (Some(_), true) =>
+            Future.failed(new IllegalArgumentException(
+              "Cannot define a starting block and use the wallet creation time"))
+          case (Some(value), false) =>
+            Future.successful(Some(value))
+          case (None, true) =>
+            walletCreationBlockHeight.map(Some(_))
+          case (None, false) =>
+            Future.successful(None)
+        }
+        _ <- clearUtxosAndAddresses(account)
+        _ <- doNeutrinoRescan(account, start, endOpt, addressBatchSize)
+      } yield ()
+
+      res.onComplete { _ =>
+        rescanning.set(false)
+        logger.info(
+          s"Finished rescanning the wallet. It took ${System.currentTimeMillis() - start}ms")
+      }
+
+      res
+    }
   }
 
   /** @inheritdoc */
