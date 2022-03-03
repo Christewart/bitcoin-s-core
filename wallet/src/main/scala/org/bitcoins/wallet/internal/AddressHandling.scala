@@ -168,7 +168,7 @@ private[wallet] trait AddressHandling extends WalletLogger {
           val path = address.toPath
           logger.info(
             s"Did not find previous address, next=$path account=${account.hdAccount} diff=${account.hdAccount
-              .diff(path)}")
+              .diff(path)}, chain=${chain}, address=${address} chainType=${chainType}")
           path
       }
 
