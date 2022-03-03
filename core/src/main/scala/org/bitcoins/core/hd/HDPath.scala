@@ -57,11 +57,12 @@ trait HDPath extends BIP32Path {
 object HDPath extends StringFactory[HDPath] {
 
   /** Attempts to parse a string into a valid HD path */
-  override def fromStringT(string: String): Try[HDPath] =
+  override def fromStringT(string: String): Try[HDPath] = {
     LegacyHDPath
       .fromStringT(string)
       .orElse(SegWitHDPath.fromStringT(string))
       .orElse(NestedSegWitHDPath.fromStringT(string))
+  }
 
   override def fromString(string: String): HDPath = {
     fromStringT(string) match {

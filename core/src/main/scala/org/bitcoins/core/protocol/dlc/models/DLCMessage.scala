@@ -76,7 +76,7 @@ object DLCMessage {
     * @param feeRate         The fee rate to be used when computing fees for the different transactions.
     * @param timeouts        The set of timeouts for the CETs
     */
-  case class DLCOffer(
+  case class  DLCOffer(
       protocolVersionOpt: Option[Int],
       contractInfo: ContractInfo,
       pubKeys: DLCPublicKeys,

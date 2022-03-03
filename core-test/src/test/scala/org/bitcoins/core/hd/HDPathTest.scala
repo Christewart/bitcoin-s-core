@@ -714,4 +714,10 @@ class HDPathTest extends BitcoinSUnitTest {
     }
   }
 
+  it must "parse this string" in {
+    val string = "m/84'/1'/0'/0'/0'"
+    val path = SegWitHDPath.fromString(string)
+    assert(path.isInstanceOf[SegWitHDPath])
+  }
+
 }

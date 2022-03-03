@@ -158,14 +158,13 @@ private[wallet] trait AddressHandling extends WalletLogger {
       val addrPath: HDPath = lastAddrOpt match {
         case Some(addr) =>
           val next = addr.path.next
-          logger.debug(
-            s"Found previous address at path=${addr.path}, next=$next")
+          println(s"Found previous address at path=${addr.path}, next=$next")
           next
         case None =>
           val chain = account.hdAccount.toChain(chainType)
           val address = HDAddress(chain, 0)
           val path = address.toPath
-          logger.debug(s"Did not find previous address, next=$path")
+          println(s"Did not find previous address, next=$path")
           path
       }
 
