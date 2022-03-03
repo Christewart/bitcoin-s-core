@@ -39,8 +39,6 @@ private[hd] trait HDPathFactory[PathType <: BIP32Path]
     val bip32Path = BIP32Path.fromString(string)
     val children = bip32Path.path
     val maybePurpose = children.head
-    println(
-      s"bip32Path=${bip32Path} children=${children} maybePurpose=${maybePurpose}")
     val purpose: HDPurpose = maybePurpose match {
       case BIP32Node(_, false) =>
         throw new IllegalArgumentException(
@@ -65,8 +63,6 @@ private[hd] trait HDPathFactory[PathType <: BIP32Path]
     val _ :+ coinChild :+ accountChild :+ chainChild :+ addressChild =
       children
 
-    println(
-      s"coinChild=${coinChild} accountChild=${accountChild} chainChild=${chainChild} addressChild=${addressChild}")
     require(coinChild.hardened, "The coin type child must be hardened!")
     require(accountChild.hardened, "The account child must be hardened!")
     require(!chainChild.hardened,
