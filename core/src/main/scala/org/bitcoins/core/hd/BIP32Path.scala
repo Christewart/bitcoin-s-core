@@ -80,12 +80,20 @@ abstract class BIP32Path extends SeqWrapper[BIP32Node] {
     }
   }
 
-  override def toString: String =
+  //serialization path=Vector(BIP32Node(44,true), BIP32Node(1,true), BIP32Node(1,true), BIP32Node(0,false))
+  //path.toInt=0 path=m/44'/1'/1'/0' vec=Vector(BIP32Node(44,true), BIP32Node(1,true), BIP32Node(1,true), BIP32Node(0,false))
+  override def toString: String = {
+    println(s"serialization path=$path")
     path
-      .map { case BIP32Node(index, hardened) =>
-        index.toString + (if (hardened) "'" else "")
+      .map { case b @ BIP32Node(index, hardened) =>
+        val h = if (hardened) "'" else ""
+        val str = index.toString + h
+        println(
+          s"bip32node=$b index=$index hardened=$hardened b.hardened=${b.hardened} str=$str")
+        str
       }
       .fold("m")((accum, curr) => accum + "/" + curr)
+  }
 
   def bytes: ByteVector = path.foldLeft(ByteVector.empty)(_ ++ _.toUInt32.bytes)
 

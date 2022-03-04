@@ -262,4 +262,14 @@ class BIP32PathTest extends BitcoinSUnitTest {
       BIP32Path.fromHardenedString(badPath4)
     }
   }
+
+  it must "parse this correctly" in {
+    val path = Vector(BIP32Node(44, true),
+                      BIP32Node(1, true),
+                      BIP32Node(1, true),
+                      BIP32Node(0, false))
+    val bip32Path = BIP32Path(path)
+    println(s"bip32Path.toString=${bip32Path.toString}")
+    fail()
+  }
 }

@@ -163,12 +163,13 @@ private[wallet] trait AddressHandling extends WalletLogger {
               .diff(next)}")
           next
         case None =>
-          val chain = account.hdAccount.toChain(chainType)
-          val address = HDAddress(chain, 0)
+          val address = account.hdAccount
+            .toChain(chainType)
+            .toHDAddress(0)
           val path = address.toPath
           logger.info(
             s"Did not find previous address, next=$path account=${account.hdAccount} diff=${account.hdAccount
-              .diff(path)}, chain=${chain}, address=${address} chainType=${chainType}")
+              .diff(path)}, chain=${address.chain}, address=${address} chainType=${chainType}")
           path
       }
 
