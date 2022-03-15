@@ -236,7 +236,8 @@ private[wallet] trait AddressHandling extends WalletLogger {
   def getNextAvailableIndex(
       accountDb: AccountDb,
       chainType: HDChainType): Future[Int] = {
-    getNewAddressDb(accountDb, chainType).map(_.path.path.last.index)
+    getNewAddressHelper(accountDb, chainType)
+      .flatMap(addr => addressDAO.read(addr).map(_.get.addressIndex))
   }
 
   def getNewAddress(account: HDAccount): Future[BitcoinAddress] = {
