@@ -363,7 +363,7 @@ object BitcoindRpcBackendUtil extends Logging {
 
   def startBitcoindMempoolPolling(
       bitcoind: BitcoindRpcClient,
-      interval: FiniteDuration = 10.seconds)(
+      interval: FiniteDuration = 30.seconds)(
       processTx: Transaction => Future[Unit])(implicit
       system: ActorSystem,
       ec: ExecutionContext): Cancellable = {
@@ -387,11 +387,19 @@ object BitcoindRpcBackendUtil extends Logging {
         for {
           mempool <- bitcoind.getRawMemPool
           newTxIds = getDiffAndReplace(mempool.toSet)
-          _ = logger.trace(s"Found ${newTxIds} new mempool transactions")
+          _ = logger.info(s"Found ${newTxIds.size} new mempool transactions")
+          startFetch = System.currentTimeMillis()
           newTxs <- FutureUtil.sequentially(newTxIds)(
             bitcoind.getRawTransactionRaw(_))
+          _ = logger.info(
+            s"Done fetching ${newTxs.length} from the mempool, took=${System
+              .currentTimeMillis() - startFetch}ms")
+          startProcess = System.currentTimeMillis()
           _ <- FutureUtil.sequentially(newTxs)(processTx)
         } yield {
+          logger.info(
+            s"Done processing ${newTxs.length} mempool txs, took=${System
+              .currentTimeMillis() - startProcess}ms")
           ()
         }
         ()
