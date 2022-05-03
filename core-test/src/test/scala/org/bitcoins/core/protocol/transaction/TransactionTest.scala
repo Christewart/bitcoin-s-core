@@ -12,7 +12,7 @@ import org.bitcoins.core.protocol.transaction.testprotocol.CoreTransactionTestCa
 import org.bitcoins.core.script.PreExecutionScriptProgram
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.core.script.result.ScriptOk
-import org.bitcoins.crypto.{CryptoUtil, ECPublicKey}
+import org.bitcoins.crypto.{CryptoUtil, DERSignatureUtil, ECPublicKey}
 import org.bitcoins.testkitcore.gen.TransactionGenerators
 import org.bitcoins.testkitcore.util.{
   BitcoinSUnitTest,
@@ -24,6 +24,21 @@ import scodec.bits._
 class TransactionTest extends BitcoinSUnitTest {
   behavior of "Transaction"
 
+  it must "figure out sig" in {
+    val hex =
+      "020000000253d48c625bf87d438c8449c926dc4f4fe13a76735aa6fabad0221caaf3393a9b010000006b48304502210093c84b241df86e5683f47bba94388363b7e85226baa818b9e32e4d42f5a0119502211c0ad68bff6631f192fb649fd2174dd5211322245f9a8d4ead13cf18c69747da012102181de645d5018fd757b99772bbd56745b32166582239f10fee52f1b2552c7818ffffffff2b801641bc503b10441e6638b70911a6ce88f0334852898e6302d0362a1ca0da000000006a473044022073216ad2cb2b3948fe4d8c8ce152e245d5d67df9669a326783be52308b7abf4f02202e9ea9a557829f03f3b65565458858674e73fff87c25a887cb6fbecc5b691d8a012102181de645d5018fd757b99772bbd56745b32166582239f10fee52f1b2552c7818ffffffff0210270000000000001976a91496bfaef29ba1e9979268ccd41724fc25b983b64588ac60176a00000000001976a914bc6050723955b77d7979bac75c66feb91dac6c1588ac00000000"
+    val tx = Transaction.fromHex(hex)
+    val scriptSigs =
+      tx.inputs.map(i => i.scriptSignature.asInstanceOf[P2PKHScriptSignature])
+
+    scriptSigs.foreach { s =>
+      println(
+        s"s.signature=${s.signature} isValidSignatureEncoding=${DERSignatureUtil
+          .isValidSignatureEncoding(s.signature)}")
+    }
+
+    succeed
+  }
   it must "have serialization symmetry" in {
     forAll(TransactionGenerators.transaction) { tx =>
       val result = Transaction(tx.hex) == tx

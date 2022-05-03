@@ -126,6 +126,8 @@ sealed abstract class DERSignatureUtil {
     val sSize = bytes(5 + rSize)
     //logger.debug("sSize: " + sSize)
 
+    println(
+      s"here rSize=$rSize sSize=$sSize bytesSize=${bytes.size} result=${(rSize + sSize + 7) != bytes.size}")
     // Verify that the length of the signature matches the sum of the length
     // of the elements.
     if ((rSize + sSize + 7) != bytes.size) return false
