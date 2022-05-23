@@ -3,9 +3,10 @@ import com.typesafe.sbt.SbtNativePackager.Docker
 import com.typesafe.sbt.SbtNativePackager.autoImport.packageName
 
 import java.nio.file.Paths
-import com.typesafe.sbt.packager.Keys.{daemonUser, daemonUserUid, dockerAlias, dockerAliases, dockerRepository, dockerUpdateLatest, maintainer}
+import com.typesafe.sbt.packager.Keys.{daemonUser, daemonUserUid, dockerAlias, dockerAliases, dockerCommands, dockerRepository, dockerUpdateLatest, maintainer}
 import com.typesafe.sbt.packager.archetypes.jlink.JlinkPlugin.autoImport.JlinkIgnore
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.dockerBaseImage
+import com.typesafe.sbt.packager.docker.{CmdLike, ExecCmd}
 import sbt._
 import sbt.Keys._
 import sbtprotoc.ProtocPlugin.autoImport.PB
@@ -201,8 +202,28 @@ object CommonSettings {
   lazy val dockerSettings: Seq[Setting[_]] = {
     Vector(
       //https://sbt-native-packager.readthedocs.io/en/latest/formats/docker.html
-      dockerBaseImage := "busybox:latest",
+      dockerBaseImage := "alpine:latest",
       dockerRepository := Some("bitcoinscala"),
+      dockerCommands := {
+        //this is needy to insert installation of bash for the alpine image
+        //at the correct place during the docker build
+        //unfortunately it doesn't seem like we can insert commands
+        //at arbitrary places with sbt native packager: https://github.com/sbt/sbt-native-packager/pull/1437
+        val currentCommands = dockerCommands.value
+        val lastChmodIdx = currentCommands.zipWithIndex.filter(_.toString.contains("chmod")).last._2
+        val apkCmd = Vector(
+          ExecCmd("RUN", "apk", "add", "--no-cache", "bash"))
+        val builder = Vector.newBuilder[CmdLike]
+        currentCommands.zipWithIndex.foreach { case (cmd,idx) =>
+          if (idx == lastChmodIdx) {
+            builder.+=(cmd)
+            builder.++=(apkCmd)
+          } else {
+            builder.+=(cmd)
+          }
+        }
+        builder.result()
+      },
       //set the user to be 'bitcoin-s' rather than
       //the default provided by sbt native packager
       //which is 'demiourgos728'
