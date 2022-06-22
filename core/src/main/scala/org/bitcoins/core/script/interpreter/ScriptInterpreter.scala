@@ -517,7 +517,8 @@ sealed abstract class ScriptInterpreter {
       opCount: Int): ExecutedScriptProgram = {
 
     val scriptByteVector = BytesUtil.toByteVector(program.script)
-
+    println(s"stack=${program.stack}")
+    println(s"script=${program.script}")
     if (opCount > MAX_SCRIPT_OPS) {
       completeProgramExecution(program.failExecution(ScriptErrorOpCount))
     } else if (scriptByteVector.length > 10000) {

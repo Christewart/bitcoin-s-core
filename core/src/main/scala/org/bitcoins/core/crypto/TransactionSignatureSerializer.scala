@@ -75,7 +75,7 @@ sealed abstract class TransactionSignatureSerializer {
       sigVersion: SignatureVersion,
       taprootOptions: TaprootSerializationOptions): ByteVector = {
     val keyVersion: Byte = 0.toByte
-
+    println(s"inputIndex=$inputIndex hashType=$hashType")
     sigVersion match {
       case SigVersionBase =>
         require(

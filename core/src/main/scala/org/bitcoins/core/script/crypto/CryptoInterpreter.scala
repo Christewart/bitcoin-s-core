@@ -124,8 +124,11 @@ sealed abstract class CryptoInterpreter {
     require(program.script.headOption.contains(OP_CODESEPARATOR),
             "Script top must be OP_CODESEPARATOR")
 
-    val indexOfOpCodeSeparator =
-      program.originalScript.size - program.script.size
+    println(s"program.originalScript=${program.originalScript}")
+    val originalOps =
+      BitcoinScriptUtil.countOpCodes(program.originalScript.toVector)
+    val currentOps = BitcoinScriptUtil.countOpCodes(program.script.toVector)
+    val indexOfOpCodeSeparator = originalOps - currentOps
 
     program
       .updateScript(program.script.tail)

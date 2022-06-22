@@ -333,6 +333,7 @@ case class ExecutionInProgressScriptProgram(
 
   def updateLastCodeSeparator(
       newLastCodeSeparator: Int): ExecutionInProgressScriptProgram = {
+    println(s"newLastCodeSeparator=$newLastCodeSeparator")
     this.copy(lastCodeSeparator = Some(newLastCodeSeparator))
   }
 }
