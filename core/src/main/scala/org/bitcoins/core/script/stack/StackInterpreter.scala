@@ -37,7 +37,7 @@ sealed abstract class StackInterpreter {
             "Top of the script stack must be OP_DUP")
     if (program.stack.nonEmpty) {
       if (program.stack.head == ScriptNumber.zero)
-        return program.updateScript(program.script.tail)
+        return program.dropOpCodeAndIncrementOpCodeCounter()
       program.updateStackAndScript(program.stack.head :: program.stack,
                                    program.script.tail)
     } else {
@@ -64,7 +64,7 @@ sealed abstract class StackInterpreter {
     if (program.stack.nonEmpty) {
       program
         .updateStack(program.stack.tail)
-        .updateScript(program.script.tail)
+        .dropOpCodeAndIncrementOpCodeCounter()
         .updateAltStack(program.stack.head :: program.altStack)
     } else {
       program.failExecution(ScriptErrorInvalidStackOperation)
@@ -79,7 +79,7 @@ sealed abstract class StackInterpreter {
     if (program.altStack.nonEmpty) {
       program
         .updateStack(program.altStack.head :: program.stack)
-        .updateScript(program.script.tail)
+        .dropOpCodeAndIncrementOpCodeCounter()
         .updateAltStack(program.altStack.tail)
     } else {
       program.failExecution(ScriptErrorInvalidAltStackOperation)

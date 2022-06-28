@@ -124,12 +124,13 @@ sealed abstract class CryptoInterpreter {
     require(program.script.headOption.contains(OP_CODESEPARATOR),
             "Script top must be OP_CODESEPARATOR")
 
-    val indexOfOpCodeSeparator =
-      program.originalScript.size - program.script.size
+    val indexOfOpCodeSeparator = program.opCodeCounter
+    val pBeginHash = program.programCounter
 
     program
-      .updateScript(program.script.tail)
+      .dropOpCodeAndIncrementOpCodeCounter()
       .updateLastCodeSeparator(indexOfOpCodeSeparator)
+      .updatePBeginHash(pBeginHash)
   }
 
   /** Compares the first signature against each public key until it finds an ECDSA match.

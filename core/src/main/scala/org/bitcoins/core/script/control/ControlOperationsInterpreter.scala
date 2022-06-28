@@ -41,14 +41,16 @@ sealed abstract class ControlOperationsInterpreter {
             }
 
             program
-              .updateStackAndScript(program.stack.tail, program.script.tail)
+              .updateStackAndDropOpCode(program.stack.tail)
               .addCondition(conditionToAdd)
           }
       }
     } else {
       // Doesn't matter which condition we use here,
       // just that one gets added to keep track of depth
-      program.updateScript(program.script.tail).addCondition(condition = true)
+      program
+        .dropOpCodeAndIncrementOpCodeCounter()
+        .addCondition(condition = true)
     }
   }
 
@@ -80,7 +82,7 @@ sealed abstract class ControlOperationsInterpreter {
     require(program.script.headOption.contains(OP_ELSE),
             "First script opt must be OP_ELSE")
 
-    program.updateScript(program.script.tail).invertCondition()
+    program.dropOpCodeAndIncrementOpCodeCounter().invertCondition()
   }
 
   /** Evaluates an [[org.bitcoins.core.script.control.OP_ENDIF OP_ENDIF]] operator. */
@@ -89,7 +91,7 @@ sealed abstract class ControlOperationsInterpreter {
     require(program.script.headOption.contains(OP_ENDIF),
             "Script top must be OP_ENDIF")
 
-    program.updateScript(program.script.tail).removeCondition()
+    program.dropOpCodeAndIncrementOpCodeCounter().removeCondition()
   }
 
   /** Marks transaction as invalid. A standard way of attaching extra data to transactions is to add a zero-value output
@@ -116,7 +118,7 @@ sealed abstract class ControlOperationsInterpreter {
       case true =>
         if (program.stackTopIsFalse) program.failExecution(ScriptErrorVerify)
         else
-          program.updateStackAndScript(program.stack.tail, program.script.tail)
+          program.updateStackAndDropOpCode(program.stack.tail)
       case false =>
         program.failExecution(ScriptErrorInvalidStackOperation)
     }

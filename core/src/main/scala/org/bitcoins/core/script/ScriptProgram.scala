@@ -75,7 +75,10 @@ case class PreExecutionScriptProgram(
       altStack = altStack,
       flags = flags,
       lastCodeSeparator = None,
-      conditionalCounter = ConditionalCounter.empty
+      conditionalCounter = ConditionalCounter.empty,
+      opCodeCounter = 0,
+      programCounter = 0,
+      pbeginHash = None
     )
   }
 
@@ -128,6 +131,7 @@ object PreExecutionScriptProgram {
 /** This represents any ScriptProgram that is not PreExecution */
 sealed trait StartedScriptProgram extends ScriptProgram {
   def lastCodeSeparator: Option[Int]
+
 }
 
 /** Implements the counting required for O(1) handling of conditionals in Bitcoin Script.
@@ -212,6 +216,8 @@ object ConditionalCounter {
   *
   * @param lastCodeSeparator The index of the last [[org.bitcoins.core.script.crypto.OP_CODESEPARATOR OP_CODESEPARATOR]]
   * @param conditionalCounter Keeps track of where we are within a conditional tree.
+  * @param opCodeCounter the counter for the number of op codes executed. Needed for [[OP_CODESEPARATOR]]
+  * @param programCounter the counter for the number of elements we have executed in the script. This includes push operations and constants in the script unlike opCodeCounter
   */
 case class ExecutionInProgressScriptProgram(
     txSignatureComponent: TxSigComponent,
@@ -221,7 +227,10 @@ case class ExecutionInProgressScriptProgram(
     altStack: List[ScriptToken],
     flags: Seq[ScriptFlag],
     lastCodeSeparator: Option[Int],
-    conditionalCounter: ConditionalCounter)
+    conditionalCounter: ConditionalCounter,
+    opCodeCounter: Int,
+    programCounter: Int,
+    pbeginHash: Option[Int])
     extends StartedScriptProgram {
 
   def toExecutedProgram: ExecutedScriptProgram = {
@@ -239,7 +248,8 @@ case class ExecutionInProgressScriptProgram(
       altStack,
       flags,
       lastCodeSeparator,
-      errorOpt
+      errorOpt,
+      opCodeCounter
     )
   }
 
@@ -318,12 +328,33 @@ case class ExecutionInProgressScriptProgram(
     this.copy(script = tokens.toList)
   }
 
+  /** Increments program counter and drops the first op code in script that was just executed */
+  def dropOpCodeAndIncrementOpCodeCounter(): ExecutionInProgressScriptProgram = {
+    this.copy(script = script.tail,
+              opCodeCounter = opCodeCounter + 1,
+              programCounter = programCounter + 1)
+  }
+
   def updateStackAndScript(
       stack: Seq[ScriptToken],
       script: Seq[ScriptToken]): ExecutionInProgressScriptProgram = {
     this
       .updateStack(stack)
       .updateScript(script)
+  }
+
+  def updateStackAndIncrementProgramCounter(
+      stack: Seq[ScriptToken]): ExecutionInProgressScriptProgram = {
+    updateStack(stack)
+      .copy(programCounter = programCounter + 1)
+  }
+
+  /** Updates the stack, drops the first opcode in the script, and increments the program counter */
+  def updateStackAndDropOpCode(
+      stack: Seq[ScriptToken]): ExecutionInProgressScriptProgram = {
+    this
+      .updateStack(stack)
+      .dropOpCodeAndIncrementOpCodeCounter()
   }
 
   def updateOriginalScript(
@@ -334,6 +365,11 @@ case class ExecutionInProgressScriptProgram(
   def updateLastCodeSeparator(
       newLastCodeSeparator: Int): ExecutionInProgressScriptProgram = {
     this.copy(lastCodeSeparator = Some(newLastCodeSeparator))
+  }
+
+  /** Update the index where we start hashing the script for [[OP_CODESEPARATOR]] */
+  def updatePBeginHash(idx: Int): ExecutionInProgressScriptProgram = {
+    this.copy(pbeginHash = Some(idx))
   }
 }
 
@@ -352,7 +388,8 @@ case class ExecutedScriptProgram(
     altStack: List[ScriptToken],
     flags: Seq[ScriptFlag],
     lastCodeSeparator: Option[Int],
-    error: Option[ScriptError])
+    error: Option[ScriptError],
+    opCodeCounter: Int)
     extends StartedScriptProgram {
 
   override def failExecution(error: ScriptError): ExecutedScriptProgram = {

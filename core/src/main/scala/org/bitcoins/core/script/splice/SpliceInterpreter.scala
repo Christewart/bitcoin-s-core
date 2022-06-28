@@ -18,14 +18,13 @@ sealed abstract class SpliceInterpreter {
             "Script top must be OP_SIZE")
     if (program.stack.nonEmpty) {
       if (program.stack.head == OP_0) {
-        program.updateStackAndScript(OP_0 :: program.stack, program.script.tail)
+        program.updateStackAndDropOpCode(OP_0 :: program.stack)
       } else {
         val scriptNumber = program.stack.head match {
           case ScriptNumber.zero => ScriptNumber.zero
           case x: ScriptToken    => ScriptNumber(x.bytes.size)
         }
-        program.updateStackAndScript(scriptNumber :: program.stack,
-                                     program.script.tail)
+        program.updateStackAndDropOpCode(scriptNumber :: program.stack)
       }
     } else {
       program.failExecution(ScriptErrorInvalidStackOperation)

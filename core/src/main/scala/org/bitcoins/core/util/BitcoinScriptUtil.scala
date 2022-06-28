@@ -549,7 +549,7 @@ trait BitcoinScriptUtil {
       program: ExecutionInProgressScriptProgram): Seq[ScriptToken] = {
     if (program.lastCodeSeparator.isDefined) {
       program.originalScript
-        .slice(program.lastCodeSeparator.get + 1, program.originalScript.size)
+        .slice(program.programCounter + 1, program.originalScript.size)
     } else program.originalScript
   }
 

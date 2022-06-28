@@ -58,7 +58,7 @@ sealed abstract class LockTimeInterpreter {
             //if the number size is larger than 5 bytes the number is invalid
             program.failExecution(ScriptErrorUnknownError)
           } else if (checkLockTime(program, s)) {
-            program.updateScript(program.script.tail)
+            program.dropOpCodeAndIncrementOpCodeCounter()
           } else {
             program.failExecution(ScriptErrorUnsatisfiedLocktime)
           }
@@ -96,7 +96,7 @@ sealed abstract class LockTimeInterpreter {
           program.failExecution(ScriptErrorUnknownError)
         case s: ScriptNumber if !isLockTimeBitOff(s) =>
           //see BIP68 for semantic of locktimeDisableFlag
-          program.updateScript(program.script.tail)
+          program.dropOpCodeAndIncrementOpCodeCounter()
         case s: ScriptNumber
             if isLockTimeBitOff(
               s) && program.txSignatureComponent.transaction.version < TransactionConstants.validLockVersion =>
@@ -106,7 +106,7 @@ sealed abstract class LockTimeInterpreter {
             //if the number size is larger than 5 bytes the number is invalid
             program.failExecution(ScriptErrorUnknownError)
           } else if (checkSequence(program, s)) {
-            program.updateScript(program.script.tail)
+            program.dropOpCodeAndIncrementOpCodeCounter()
           } else {
             program.failExecution(ScriptErrorUnsatisfiedLocktime)
           }

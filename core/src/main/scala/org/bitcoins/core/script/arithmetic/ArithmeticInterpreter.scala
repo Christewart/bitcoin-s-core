@@ -246,9 +246,8 @@ sealed abstract class ArithmeticInterpreter {
       } else {
         val isWithinRange = a >= b && a < c
         val newStackTop = if (isWithinRange) OP_TRUE else OP_FALSE
-        program.updateStackAndScript(
-          newStackTop :: program.stack.tail.tail.tail,
-          program.script.tail)
+        program.updateStackAndDropOpCode(
+          newStackTop :: program.stack.tail.tail.tail)
       }
     }
   }
@@ -284,8 +283,8 @@ sealed abstract class ArithmeticInterpreter {
           program.failExecution(ScriptErrorUnknownError)
         } else {
           val newScriptNumber = op(s)
-          program.updateStackAndScript(newScriptNumber :: program.stack.tail,
-                                       program.script.tail)
+          program.updateStackAndDropOpCode(
+            newScriptNumber :: program.stack.tail)
         }
       case Some(s: ScriptConstant) =>
         if (
@@ -335,8 +334,8 @@ sealed abstract class ArithmeticInterpreter {
             program.failExecution(ScriptErrorUnknownError)
           } else {
             val newStackTop = op(x, y)
-            program.updateStackAndScript(newStackTop :: program.stack.tail.tail,
-                                         program.script.tail)
+            program.updateStackAndDropOpCode(
+              newStackTop :: program.stack.tail.tail)
           }
         case (x: ScriptConstant, _: ScriptNumber) =>
           //interpret x as a number
@@ -388,8 +387,7 @@ sealed abstract class ArithmeticInterpreter {
         program.failExecution(ScriptErrorUnknownError)
       } else {
         val newStackTop = if (op(x, y)) OP_TRUE else OP_FALSE
-        program.updateStackAndScript(newStackTop :: program.stack.tail.tail,
-                                     program.script.tail)
+        program.updateStackAndDropOpCode(newStackTop :: program.stack.tail.tail)
       }
     }
   }

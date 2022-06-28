@@ -469,7 +469,8 @@ sealed abstract class ScriptInterpreter {
               altStack = Nil,
               flags = wTxSigComponent.flags,
               lastCodeSeparator = None,
-              error = Some(err)
+              error = Some(err),
+              opCodeCounter = 0
             )
             Success(program)
         }
@@ -1049,7 +1050,7 @@ sealed abstract class ScriptInterpreter {
              calcOpCount(opCount, OP_CHECKLOCKTIMEVERIFY))
           } //in this case, just reat OP_CLTV just like a NOP and remove it from the stack
           else {
-            val programOrError = program.updateScript(program.script.tail)
+            val programOrError = program.dropOpCodeAndIncrementOpCodeCounter()
             val newOpCount =
               calcOpCount(opCount, OP_CHECKLOCKTIMEVERIFY)
             (programOrError, newOpCount)
@@ -1070,7 +1071,7 @@ sealed abstract class ScriptInterpreter {
              calcOpCount(opCount, OP_CHECKSEQUENCEVERIFY))
           } //in this case, just read OP_CSV just like a NOP and remove it from the stack
           else {
-            val programOrError = program.updateScript(program.script.tail)
+            val programOrError = program.dropOpCodeAndIncrementOpCodeCounter()
             val newOpCount =
               calcOpCount(opCount, OP_CHECKSEQUENCEVERIFY)
             (programOrError, newOpCount)
@@ -1203,7 +1204,8 @@ sealed abstract class ScriptInterpreter {
         altStack = Nil,
         flags = flags,
         lastCodeSeparator = None,
-        error = Some(ScriptErrorDiscourageUpgradeableWitnessProgram)
+        error = Some(ScriptErrorDiscourageUpgradeableWitnessProgram),
+        opCodeCounter = 0
       )
       Success(executed)
     } else {
