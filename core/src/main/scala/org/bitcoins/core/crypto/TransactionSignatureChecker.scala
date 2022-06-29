@@ -241,6 +241,9 @@ trait TransactionSignatureChecker {
       requiredSigs: Long): TransactionSignatureCheckerResult = {
     require(requiredSigs >= 0,
             s"requiredSigs cannot be negative, got $requiredSigs")
+
+    println(s"signatures=$sigs")
+    println(s"requiredSigs=$requiredSigs")
     if (sigs.size > pubKeys.size) {
       //this is how bitcoin core treats this. If there are ever any more
       //signatures than public keys remaining we immediately return

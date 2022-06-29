@@ -1,6 +1,6 @@
 package org.bitcoins.crypto
 
-import scodec.bits.ByteVector
+import scodec.bits.{BitVector, ByteVector}
 
 import scala.util.{Failure, Success, Try}
 
@@ -141,6 +141,7 @@ sealed abstract class DERSignatureUtil {
     if (bytes(2) != 0x02) return false
     //logger.debug("R element is an integer")
 
+    println("BISECT")
     // Zero-length integers are not allowed for R.
     if (rSize == 0) return false
     //logger.debug("r is not a zero length integer")
@@ -158,15 +159,25 @@ sealed abstract class DERSignatureUtil {
     if (bytes(rSize + 4) != 0x02) return false
     //logger.debug("The S element is an integer")
 
+    println(s"BISECT2")
     // Zero-length integers are not allowed for S.
     if (sSize == 0) return false
     //logger.debug("S was not a zero length integer")
 
+    println(s"rSize=${rSize}")
+    println(s"BISECT3 (bytes(rSize + 6)=${bytes(rSize + 6)} int=${ByteVector
+      .fromByte(bytes(rSize + 6))
+      .toInt(false)} result=${(bytes(rSize + 6) & 0x80)}")
     // Negative numbers are not allowed for S.
+    val bitVector = BitVector
+      .fromByte(bytes(rSize + 6))
+    println(s"bits=${bitVector} toInt=${bitVector.toInt(
+      false)} result=${bitVector.toInt(false) & 0x80}")
     if ((bytes(rSize + 6) & 0x80) != 0) return false
     //logger.debug("s was not a negative number")
     // Null bytes at the start of S are not allowed, unless S would otherwise be
     // interpreted as a negative number.
+    println(s"BISECT4")
     if (
       sSize > 1 && (bytes(rSize + 6) == 0x00) && (bytes(rSize + 7) & 0x80) == 0
     )

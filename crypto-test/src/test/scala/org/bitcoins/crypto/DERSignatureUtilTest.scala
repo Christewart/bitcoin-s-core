@@ -154,4 +154,12 @@ class DERSignatureUtilTest extends BitcoinSCryptoTest {
       }
     }
   }
+
+  it must "determine this signature is DER encoded" in {
+    //from bitcoin core's tx_valid.json static test vectors
+    val sigHex =
+      "304402203f16c6f40162ab686621ef3000b04e75418a0c0cb2d8aebeac894ae360ac1e780220ddc15ecdfc3507ac48e1681a33eb60996631bf6bf5bc0a0682c4db743ce7ca2b01"
+    val sig = ECDigitalSignature.fromHex(sigHex)
+    assert(DERSignatureUtil.isValidSignatureEncoding(sig))
+  }
 }
