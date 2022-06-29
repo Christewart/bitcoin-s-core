@@ -292,7 +292,8 @@ sealed abstract class CryptoInterpreter {
     * [[org.bitcoins.core.script.crypto.OP_CODESEPARATOR OP_CODESEPARATOR]].
     */
   def opCodeSeparator(
-      program: ExecutionInProgressScriptProgram): StartedScriptProgram = {
+      program: ExecutionInProgressScriptProgram,
+      opPos: Int): StartedScriptProgram = {
     require(program.script.headOption.contains(OP_CODESEPARATOR),
             "Script top must be OP_CODESEPARATOR")
 
@@ -301,6 +302,7 @@ sealed abstract class CryptoInterpreter {
     program
       .updateScript(program.script.tail)
       .updateLastCodeSeparator(indexOfOpCodeSeparator)
+      .updateCodeSeparatorPos(opPos)
   }
 
   /** Compares the first signature against each public key until it finds an ECDSA match.

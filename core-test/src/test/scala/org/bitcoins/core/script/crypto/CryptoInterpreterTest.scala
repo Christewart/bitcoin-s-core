@@ -58,7 +58,7 @@ class CryptoInterpreterTest extends BitcoinSJvmTest {
     Try(CI.opSha1(program)).isFailure must be(true)
     Try(CI.opCheckSig(program)).isFailure must be(true)
     Try(CI.opCheckSigVerify(program)).isFailure must be(true)
-    Try(CI.opCodeSeparator(program)).isFailure must be(true)
+    Try(CI.opCodeSeparator(program, 0)).isFailure must be(true)
     Try(CI.opCheckMultiSig(program)).isFailure must be(true)
     Try(CI.opCheckMultiSigVerify(program)).isFailure must be(true)
   }
@@ -228,7 +228,7 @@ class CryptoInterpreterTest extends BitcoinSJvmTest {
       .updateStackAndScript(stack, script)
       .updateOriginalScript(script)
     val newProgram = ScriptProgramTestUtil.toExecutionInProgressScriptProgram(
-      CI.opCodeSeparator(program))
+      CI.opCodeSeparator(program, 0))
     newProgram.lastCodeSeparator must be(Some(0))
   }
 

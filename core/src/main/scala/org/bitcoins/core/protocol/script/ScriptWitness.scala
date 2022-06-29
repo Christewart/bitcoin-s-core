@@ -323,13 +323,12 @@ case class TaprootScriptPath(stack: Vector[ByteVector]) extends TaprootWitness {
 
   /** Call the second-to-last stack element s, the script
     */
-  def script: ScriptPubKey = {
+  def script: TapScriptPubKey = {
     annexOpt match {
       case Some(_) =>
-        ScriptPubKey.fromAsmBytes(stack(2))
+        TapScriptPubKey.fromAsmBytes(stack(2))
       case None =>
-        val spk = ScriptPubKey.fromAsmBytes(stack(1))
-        spk
+        TapScriptPubKey.fromAsmBytes(stack(1))
     }
   }
 

@@ -72,6 +72,7 @@ class ScriptProgramFactoryTest extends BitcoinSUnitTest {
         originalScript = Nil,
         altStack = Nil,
         flags = Nil,
+        codeSeparatorPos = None,
         lastCodeSeparator = None,
         conditionalCounter = ConditionalCounter.empty
       )

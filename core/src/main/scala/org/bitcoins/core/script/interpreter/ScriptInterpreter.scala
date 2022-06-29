@@ -414,9 +414,10 @@ sealed abstract class ScriptInterpreter {
       // Scripts inside witness implicitly require cleanstack behaviour
       //https://github.com/bitcoin/bitcoin/blob/561a7d30478b82f5d46dcf0f16e864a9608004f4/src/script/interpreter.cpp#L1464
       evaluated.failExecution(ScriptErrorCleanStack)
-    } else if (evaluated.stackTopIsFalse)
+    } else if (evaluated.stackTopIsFalse) {
+      println("HERE========================")
       evaluated.failExecution(ScriptErrorEvalFalse)
-    else evaluated
+    } else evaluated
   }
 
   /** Rebuilds a [[WitnessVersion1]] witness program for execution in the script interpreter */
@@ -550,6 +551,7 @@ sealed abstract class ScriptInterpreter {
               originalScript = Nil,
               altStack = Nil,
               flags = wTxSigComponent.flags,
+              codeSeparatorPos = None,
               lastCodeSeparator = None,
               error = Some(err)
             )
@@ -581,6 +583,7 @@ sealed abstract class ScriptInterpreter {
               originalScript = Nil,
               altStack = Nil,
               flags = wTxSigComponent.flags,
+              codeSeparatorPos = None,
               lastCodeSeparator = None,
               error = Some(err)
             )
@@ -759,7 +762,7 @@ sealed abstract class ScriptInterpreter {
     if (scriptByteVector.length > 10000) {
       program.failExecution(ScriptErrorScriptSize)
     } else {
-      loop(program.toExecutionInProgress, 0)
+      loop(program.toExecutionInProgress, 0, 0)
     }
   }
 
@@ -791,6 +794,7 @@ sealed abstract class ScriptInterpreter {
   @tailrec
   private def loop(
       program: ExecutionInProgressScriptProgram,
+      opPos: Int,
       opCount: Int): ExecutedScriptProgram = {
     logger.debug(s"program.stack=${program.stack}")
     logger.debug(s"program.script=${program.script}")
@@ -1245,7 +1249,7 @@ sealed abstract class ScriptInterpreter {
           (programOrError, newOpCount)
 
         case OP_CODESEPARATOR :: _ =>
-          val programOrError = CryptoInterpreter.opCodeSeparator(program)
+          val programOrError = CryptoInterpreter.opCodeSeparator(program, opPos)
           val newOpCount =
             calcOpCount(opCount, OP_CODESEPARATOR)
           (programOrError, newOpCount)
@@ -1371,7 +1375,13 @@ sealed abstract class ScriptInterpreter {
       nextProgram match {
         case p: ExecutedScriptProgram =>
           completeProgramExecution(p)
-        case p: ExecutionInProgressScriptProgram => loop(p, nextOpCount)
+        case p: ExecutionInProgressScriptProgram =>
+          val vec = Vector(OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4)
+          val newOpPos =
+            if (vec.contains(program.script.head)) opPos
+            else opPos + 1
+
+          loop(p, newOpPos, nextOpCount)
       }
     }
   }
@@ -1492,6 +1502,7 @@ sealed abstract class ScriptInterpreter {
         originalScript = txSigComponent.scriptPubKey.asm.toList,
         altStack = Nil,
         flags = flags,
+        codeSeparatorPos = None,
         lastCodeSeparator = None,
         error = Some(ScriptErrorDiscourageUpgradeableWitnessProgram)
       )

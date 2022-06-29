@@ -1479,3 +1479,25 @@ object WitnessCommitment extends ScriptFactory[WitnessCommitment] {
     }
   }
 }
+
+case class TapScriptPubKey(asm: Vector[ScriptToken]) extends RawScriptPubKey {
+  override val scriptType: ScriptType = ScriptType.WITNESS_V1_TAPROOT
+}
+
+object TapScriptPubKey extends ScriptFactory[TapScriptPubKey] {
+
+  def fromAsm(asm: Seq[ScriptToken]): TapScriptPubKey = {
+    buildScript(asm.toVector,
+                TapScriptPubKey.apply,
+                "Given asm was not a TapScript scriptPubKey, got: " + asm)
+  }
+
+  def apply(asm: Seq[ScriptToken]): TapScriptPubKey = fromAsm(asm)
+
+  /** Checks if the given asm matches the pattern for
+    * [[org.bitcoins.core.protocol.script.TapScriptPubKey TapScriptPubKey]]
+    */
+  override def isValidAsm(asm: Seq[ScriptToken]): Boolean = {
+    true
+  }
+}

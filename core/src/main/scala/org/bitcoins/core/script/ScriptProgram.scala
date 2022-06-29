@@ -118,6 +118,7 @@ case class PreExecutionScriptProgram(
       altStack = altStack,
       flags = flags,
       lastCodeSeparator = None,
+      codeSeparatorPos = None,
       conditionalCounter = ConditionalCounter.empty
     )
   }
@@ -174,45 +175,7 @@ sealed trait StartedScriptProgram extends ScriptProgram {
   /** The index of the last code separator WITH push operations in the original script */
   def lastCodeSeparator: Option[Int]
 
-  def taprootSerializationOptions: TaprootSerializationOptions = {
-    val empty = TaprootSerializationOptions.empty
-    val annex = empty.copy(annexHashOpt = getAnnexHashOpt)
-
-    val lastCodeSeparatorU32 = calculateRealCodeSepIdx.map(UInt32(_))
-    annex.copy(tapLeafHashOpt = tapLeafHashOpt,
-               codeSeparatorPosOpt = lastCodeSeparatorU32)
-  }
-
-  /** Needs to translate [[OP_CODESEPARATOR]] idx WITH push ops
-    * to [[OP_CODESEPARATOR]] index without push ops
-    */
-  private def calculateRealCodeSepIdx: Option[Int] = {
-
-    lastCodeSeparator match {
-      case Some(lastCodeSeparatorIdx) =>
-        //map original indices to new indices
-        val originalWithIndices =
-          originalScript.take(lastCodeSeparatorIdx).zipWithIndex
-        val vec = Vector(OP_PUSHDATA1, OP_PUSHDATA2, OP_PUSHDATA4)
-        val scriptOpsWithIndices = originalWithIndices
-          .filter { case (op, _) =>
-            op.isInstanceOf[ScriptOperation] && !vec.contains(op)
-          }
-
-        println(s"scriptOPsWithIndices=$scriptOpsWithIndices")
-        //require(opCodeIdxs.length == 1, s"Should be exactly 1 OP_CODESEPARATOR")
-        //calculate the offset without push operations
-        println(s"lastCodeSeparatorIdx=$lastCodeSeparatorIdx")
-        println(s"originalWithIndices.size=${originalWithIndices.size}")
-        println(s"scriptOpsWithIndices.size=${scriptOpsWithIndices.size}")
-        val offset =
-          originalWithIndices.size - scriptOpsWithIndices.size
-        println(s"offset=$offset")
-        Some(offset)
-      case None =>
-        None
-    }
-  }
+  def taprootSerializationOptions: TaprootSerializationOptions
 }
 
 /** Implements the counting required for O(1) handling of conditionals in Bitcoin Script.
@@ -306,8 +269,15 @@ case class ExecutionInProgressScriptProgram(
     altStack: List[ScriptToken],
     flags: Seq[ScriptFlag],
     lastCodeSeparator: Option[Int],
+    codeSeparatorPos: Option[Int],
     conditionalCounter: ConditionalCounter)
     extends StartedScriptProgram {
+
+  def taprootSerializationOptions: TaprootSerializationOptions = {
+    TaprootSerializationOptions(tapLeafHashOpt,
+                                getAnnexHashOpt,
+                                codeSeparatorPos.map(UInt32(_)))
+  }
 
   def toExecutedProgram: ExecutedScriptProgram = {
     val errorOpt = if (conditionalCounter.totalDepth > 0) {
@@ -323,6 +293,7 @@ case class ExecutionInProgressScriptProgram(
       originalScript,
       altStack,
       flags,
+      codeSeparatorPos,
       lastCodeSeparator,
       errorOpt
     )
@@ -420,6 +391,10 @@ case class ExecutionInProgressScriptProgram(
       newLastCodeSeparator: Int): ExecutionInProgressScriptProgram = {
     this.copy(lastCodeSeparator = Some(newLastCodeSeparator))
   }
+
+  def updateCodeSeparatorPos(newPos: Int): ExecutionInProgressScriptProgram = {
+    this.copy(codeSeparatorPos = Some(newPos))
+  }
 }
 
 /** Type for a [[org.bitcoins.core.script.ScriptProgram ScriptProgram]] that has been
@@ -436,9 +411,16 @@ case class ExecutedScriptProgram(
     originalScript: List[ScriptToken],
     altStack: List[ScriptToken],
     flags: Seq[ScriptFlag],
+    codeSeparatorPos: Option[Int],
     lastCodeSeparator: Option[Int],
     error: Option[ScriptError])
     extends StartedScriptProgram {
+
+  def taprootSerializationOptions: TaprootSerializationOptions = {
+    TaprootSerializationOptions(tapLeafHashOpt,
+                                getAnnexHashOpt,
+                                codeSeparatorPos.map(UInt32(_)))
+  }
 
   override def failExecution(error: ScriptError): ExecutedScriptProgram = {
     this.copy(error = Some(error))
