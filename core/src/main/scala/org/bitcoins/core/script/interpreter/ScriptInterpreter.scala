@@ -551,6 +551,7 @@ sealed abstract class ScriptInterpreter {
               altStack = Nil,
               flags = wTxSigComponent.flags,
               lastCodeSeparator = None,
+              codeSeparatorIdx = None,
               error = Some(err)
             )
             Success(program)
@@ -582,6 +583,7 @@ sealed abstract class ScriptInterpreter {
               altStack = Nil,
               flags = wTxSigComponent.flags,
               lastCodeSeparator = None,
+              codeSeparatorIdx = None,
               error = Some(err)
             )
             Success(program)
@@ -1493,6 +1495,7 @@ sealed abstract class ScriptInterpreter {
         altStack = Nil,
         flags = flags,
         lastCodeSeparator = None,
+        codeSeparatorIdx = None,
         error = Some(ScriptErrorDiscourageUpgradeableWitnessProgram)
       )
       Success(executed)
