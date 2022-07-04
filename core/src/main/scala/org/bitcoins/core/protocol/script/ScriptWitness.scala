@@ -399,7 +399,6 @@ object TaprootScriptPath {
     val merkleRoot = computeTaprootMerkleRoot(controlBlock, tapLeafHash)
 
     val parity = (controlBlock.bytes.head & 1) == 1
-    println(s"parity=$parity")
     program.pubKey.checkTapTweak(internal = internalPubKey,
                                  merkleRootOpt = Some(merkleRoot),
                                  parity = parity)
