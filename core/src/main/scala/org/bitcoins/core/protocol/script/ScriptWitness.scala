@@ -185,12 +185,12 @@ object ScriptWitness extends Factory[ScriptWitness] {
       val pubKey = ECPublicKeyBytes(stack.head)
       val sig = ECDigitalSignature(stack(1))
       P2WPKHWitnessV0(pubKey, sig)
-    } else if (isPubKey && stack.size == 1) {
-      val pubKey = ECPublicKeyBytes(stack.head)
-      P2WPKHWitnessV0(pubKey)
     } else if (TaprootKeyPath.isValid(stack.toVector)) {
       //taproot key path spend
       TaprootKeyPath.fromStack(stack.toVector)
+    } else if (isPubKey && stack.size == 1) {
+      val pubKey = ECPublicKeyBytes(stack.head)
+      P2WPKHWitnessV0(pubKey)
     } else if (TaprootScriptPath.isValid(stack.toVector)) {
       TaprootScriptPath.fromStack(stack.toVector)
     } else {
@@ -318,7 +318,7 @@ case class TaprootScriptPath(stack: Vector[ByteVector]) extends TaprootWitness {
     * The annex (or the lack of thereof) is always covered by the signature and contributes to transaction weight,
     * but is otherwise ignored during taproot validation.
     */
-  def annexOpt: Option[ByteVector] = {
+  override def annexOpt: Option[ByteVector] = {
     if (TaprootScriptPath.hasAnnex(stack)) {
       Some(stack.head)
     } else {
@@ -375,14 +375,7 @@ object TaprootScriptPath {
         }
       }
 
-      val m = controlBlock.drop(33).length / 32.0
-      if (m >= 0 && m <= 128) {
-        val pubKeyBytes = controlBlock.slice(1, 33)
-        // if not whole, we do not have correct # of bytes for control block
-        m.isWhole && SchnorrPublicKey.fromBytesOpt(pubKeyBytes).isDefined
-      } else {
-        false
-      }
+      ControlBlock.isValid(controlBlock)
     } else {
       false
     }

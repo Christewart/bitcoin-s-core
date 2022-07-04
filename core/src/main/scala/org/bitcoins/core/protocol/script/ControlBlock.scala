@@ -11,11 +11,7 @@ import scodec.bits.ByteVector
   * @see https://github.com/bitcoin/bips/blob/master/bip-0341.mediawiki#script-validation-rules
   */
 case class ControlBlock(bytes: ByteVector) extends NetworkElement {
-  //invariants from: https://github.com/bitcoin/bitcoin/blob/37633d2f61697fc719390767aae740ece978b074/src/script/interpreter.cpp#L1835
-  require(bytes.size >= TaprootScriptPath.TAPROOT_CONTROL_BASE_SIZE)
-  require(bytes.size <= TaprootScriptPath.TAPROOT_CONTROL_MAX_SIZE)
-  require(
-    (bytes.size - TaprootScriptPath.TAPROOT_CONTROL_BASE_SIZE) % TaprootScriptPath.TAPROOT_CONTROL_NODE_SIZE == 0)
+  require(ControlBlock.isValid(bytes), s"Bytes for control block are not valid")
 
   /** Let p = c[1:33] and let P = lift_x(int(p)) where lift_x and [:] are defined as in BIP340. Fail if this point is not on the curve.
     */
@@ -32,6 +28,14 @@ case class ControlBlock(bytes: ByteVector) extends NetworkElement {
 }
 
 object ControlBlock extends Factory[ControlBlock] {
+
+  /** invariants from: https://github.com/bitcoin/bitcoin/blob/37633d2f61697fc719390767aae740ece978b074/src/script/interpreter.cpp#L1835
+    */
+  def isValid(bytes: ByteVector): Boolean = {
+    bytes.size >= TaprootScriptPath.TAPROOT_CONTROL_BASE_SIZE &&
+    bytes.size <= TaprootScriptPath.TAPROOT_CONTROL_MAX_SIZE &&
+    (bytes.size - TaprootScriptPath.TAPROOT_CONTROL_BASE_SIZE) % TaprootScriptPath.TAPROOT_CONTROL_NODE_SIZE == 0
+  }
 
   override def fromBytes(bytes: ByteVector): ControlBlock = {
     new ControlBlock(bytes)
