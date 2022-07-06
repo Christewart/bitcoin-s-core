@@ -4,6 +4,7 @@ import org.bitcoins.core.protocol.script.{ScriptSignature, TaprootKeyPath}
 import org.bitcoins.core.script.flag.ScriptVerifyTaproot
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.core.script.result.ScriptOk
+import org.bitcoins.core.util.FutureUtil
 import org.bitcoins.testkitcore.util.BitcoinSJvmTest
 import org.scalatest.Assertion
 import org.scalatest.time.Span
@@ -70,7 +71,7 @@ class TaprootTxTests extends BitcoinSJvmTest {
 
   private def executeSuccessTestCases(
       testCases: Vector[TaprootTestCase]): Future[Vector[Assertion]] = {
-    Future {
+    FutureUtil.makeAsync { () =>
       testCases.map { testCase =>
         withClue(testCase.comment) {
           val result = ScriptInterpreter.run(testCase.successProgram)
@@ -80,7 +81,7 @@ class TaprootTxTests extends BitcoinSJvmTest {
     }
   }
 
-  it must "run the failure test cases through the script interpreter" ignore {
+  it must "run the failure test cases through the script interpreter" in {
     testCases.foreach { testCase =>
       testCase.failureTxSigComponentsOpt match {
         case Some(_) =>

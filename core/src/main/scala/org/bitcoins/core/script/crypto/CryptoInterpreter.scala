@@ -81,60 +81,69 @@ sealed abstract class CryptoInterpreter {
       val flags = program.flags
       val restOfStack = program.stack.tail.tail
 
-      program.txSignatureComponent.sigVersion match {
-        case SigVersionWitnessV0 | SigVersionWitnessV0 | SigVersionBase =>
-          val pubKey = ECPublicKeyBytes(program.stack.head.bytes)
-          val signature = ECDigitalSignature(program.stack.tail.head.bytes)
-          val removedOpCodeSeparatorsScript =
-            BitcoinScriptUtil.removeOpCodeSeparator(program)
-          val result = TransactionSignatureChecker.checkSignature(
-            program.txSignatureComponent,
-            removedOpCodeSeparatorsScript,
-            pubKey,
-            signature,
-            flags)
-          handleSignatureValidation(program = program,
-                                    result = result,
-                                    restOfStack = restOfStack,
-                                    numOpt = None)
-        case SigVersionTapscript =>
-          val tapscriptE: Either[
-            ScriptError,
-            TransactionSignatureCheckerResult] = evalChecksigTapscript(program)
-          tapscriptE match {
-            case Left(err) =>
-              if (
-                err == ScriptErrorDiscourageUpgradablePubkeyType && !ScriptFlagUtil
-                  .discourageUpgradablePublicKey(flags)
-              ) {
-                //trivially pass signature validation as required by BIP342
-                //when the public key type is not known and the
-                //SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE is NOT set
-                handleSignatureValidation(program = program,
-                                          result = SignatureValidationSuccess,
+      val sigBytes = program.stack.tail.head.bytes
+
+      if (
+        sigBytes.nonEmpty && program.validationWeightRemaining.forall(_ >= 50)
+      ) {
+        program.failExecution(ScriptErrorSigCount)
+      } else {
+        val updatedProgram = program.decrementValidationWeightRemaining()
+        updatedProgram.txSignatureComponent.sigVersion match {
+          case SigVersionWitnessV0 | SigVersionWitnessV0 | SigVersionBase =>
+            val pubKey = ECPublicKeyBytes(updatedProgram.stack.head.bytes)
+            val signature = ECDigitalSignature(sigBytes)
+            val removedOpCodeSeparatorsScript =
+              BitcoinScriptUtil.removeOpCodeSeparator(updatedProgram)
+            val result = TransactionSignatureChecker.checkSignature(
+              updatedProgram.txSignatureComponent,
+              removedOpCodeSeparatorsScript,
+              pubKey,
+              signature,
+              flags)
+            handleSignatureValidation(program = updatedProgram,
+                                      result = result,
+                                      restOfStack = restOfStack,
+                                      numOpt = None)
+          case SigVersionTapscript =>
+            val tapscriptE: Either[
+              ScriptError,
+              TransactionSignatureCheckerResult] = evalChecksigTapscript(
+              updatedProgram)
+            tapscriptE match {
+              case Left(err) =>
+                if (
+                  err == ScriptErrorDiscourageUpgradablePubkeyType && !ScriptFlagUtil
+                    .discourageUpgradablePublicKey(flags)
+                ) {
+                  //trivially pass signature validation as required by BIP342
+                  //when the public key type is not known and the
+                  //SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_PUBKEYTYPE is NOT set
+                  handleSignatureValidation(program = updatedProgram,
+                                            result = SignatureValidationSuccess,
+                                            restOfStack = restOfStack,
+                                            numOpt = None)
+                } else if (err == ScriptErrorEvalFalse) {
+                  //means signature validation failed, don't increment the stack counter
+                  handleSignatureValidation(
+                    program = updatedProgram,
+                    result = SignatureValidationErrorIncorrectSignatures,
+                    restOfStack = restOfStack,
+                    numOpt = None)
+                } else {
+                  updatedProgram.failExecution(err)
+                }
+
+              case Right(result) =>
+                handleSignatureValidation(program = updatedProgram,
+                                          result = result,
                                           restOfStack = restOfStack,
                                           numOpt = None)
-              } else if (err == ScriptErrorEvalFalse) {
-                //means signature validation failed, don't increment the stack counter
-                handleSignatureValidation(
-                  program = program,
-                  result = SignatureValidationErrorIncorrectSignatures,
-                  restOfStack = restOfStack,
-                  numOpt = None)
-              } else {
-                program.failExecution(err)
-              }
+            }
 
-            case Right(result) =>
-              handleSignatureValidation(program = program,
-                                        result = result,
-                                        restOfStack = restOfStack,
-                                        numOpt = None)
-          }
-
-        case SigVersionTaprootKeySpend =>
-          sys.error(s"Cannot use taproot keyspend with OP_CHECKSIG")
-
+          case SigVersionTaprootKeySpend =>
+            sys.error(s"Cannot use taproot keyspend with OP_CHECKSIG")
+        }
       }
     }
   }
