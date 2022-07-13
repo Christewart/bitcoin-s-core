@@ -12,6 +12,7 @@ import org.bitcoins.rpc.util.{NodePair, NodeTriple}
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.util.BitcoinSAkkaAsyncTest
 
+import java.util.UUID
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{Await, Future}
 
@@ -102,6 +103,8 @@ trait CachedBitcoindNewest extends CachedBitcoindFunded[BitcoindRpcClient] {
 
   override protected lazy val cachedBitcoindWithFundsF: Future[
     BitcoindRpcClient] = {
+    val uuid: UUID = UUID.randomUUID()
+    println(s"Starting cached bitcoind newest $uuid")
     val _ = isBitcoindUsed.set(true)
     BitcoinSFixture
       .createBitcoindWithFunds(Some(BitcoindVersion.newest))
