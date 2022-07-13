@@ -22,6 +22,7 @@ import org.bitcoins.testkit.wallet.BitcoinSWalletTest
 import org.bitcoins.wallet.WalletCallbacks
 import org.scalatest.FutureOutcome
 
+import java.util.UUID
 import scala.concurrent.Future
 
 /** Test trait for using a bitcoin-s [[Node]] that requires a cached bitcoind.
@@ -206,8 +207,10 @@ trait NodeTestWithCachedBitcoind extends BaseNodeTest with CachedTor {
 trait NodeTestWithCachedBitcoindNewest
     extends NodeTestWithCachedBitcoind
     with CachedBitcoindNewest {
+  private val uuid: UUID = UUID.randomUUID()
 
   override def afterAll(): Unit = {
+    println(s"Shutting down $uuid")
     super[CachedBitcoindNewest].afterAll()
     super[NodeTestWithCachedBitcoind].afterAll()
   }
@@ -218,6 +221,7 @@ trait NodeTestWithCachedBitcoindPair
     with CachedBitcoindPairV22 {
 
   override def afterAll(): Unit = {
+
     super[CachedBitcoindPairV22].afterAll()
     super[NodeTestWithCachedBitcoind].afterAll()
   }
