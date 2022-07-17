@@ -1,7 +1,10 @@
 package org.bitcoins.server
 
 import akka.actor.ActorSystem
+
 import akka.stream.OverflowStrategy
+
+import akka.stream.KillSwitches
 import akka.stream.scaladsl.{
   BroadcastHub,
   Keep,
