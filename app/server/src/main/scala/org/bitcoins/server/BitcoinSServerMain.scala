@@ -1,10 +1,7 @@
 package org.bitcoins.server
 
 import akka.actor.ActorSystem
-
 import akka.stream.OverflowStrategy
-
-import akka.stream.KillSwitches
 import akka.stream.scaladsl.{
   BroadcastHub,
   Keep,
@@ -177,6 +174,7 @@ class BitcoinSServerMain(override val serverArgParser: ServerArgParser)(implicit
     val tuple = buildWsSource
 
     val wsQueue: SourceQueueWithComplete[WsNotification[_]] = tuple._1
+
     val wsSource: Source[WsNotification[_], NotUsed] = tuple._2
 
     val callbacksF: Future[Unit] = for {
@@ -341,10 +339,10 @@ class BitcoinSServerMain(override val serverArgParser: ServerArgParser)(implicit
         bitcoind <- bitcoindF
         nodeApi <- nodeApiF
         feeProvider <- feeProviderF
-      } yield DLCWalletBitcoindBackendLoader(walletHolder,
-                                             bitcoind,
-                                             nodeApi,
-                                             feeProvider)
+      } yield DLCWalletBitcoindBackendLoader(walletHolder = walletHolder,
+                                             bitcoind = bitcoind,
+                                             nodeApi = nodeApi,
+                                             feeProvider = feeProvider)
     }
 
     val walletF: Future[(WalletHolder, WalletAppConfig, DLCAppConfig)] = {

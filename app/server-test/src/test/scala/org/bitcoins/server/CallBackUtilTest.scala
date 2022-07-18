@@ -4,7 +4,7 @@ import akka.stream.KillSwitches
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.server.util.CallbackUtil
 import org.bitcoins.testkit.wallet.BitcoinSWalletTest
-import org.bitcoins.testkit.wallet.FundWalletUtil.FundedWallet
+import org.bitcoins.testkit.wallet.FundWalletUtil.{FundedDLCWallet}
 import org.bitcoins.testkitcore.Implicits.GeneratorOps
 import org.bitcoins.testkitcore.gen.TransactionGenerators
 import org.scalatest.FutureOutcome
@@ -15,10 +15,10 @@ class CallBackUtilTest extends BitcoinSWalletTest {
 
   behavior of "CallBackUtil"
 
-  override type FixtureParam = FundedWallet
+  override type FixtureParam = FundedDLCWallet
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome =
-    withFundedWallet(test, getBIP39PasswordOpt())(getFreshWalletAppConfig)
+    withFundedDLCWallet(test, getBIP39PasswordOpt())(getFreshConfig)
 
   it must "have the kill switch kill messages to the createBitcoindNodeCallbacksForWallet callback" in {
     fundedWallet =>
@@ -44,12 +44,12 @@ class CallBackUtilTest extends BitcoinSWalletTest {
         tx2 <- tx2F
         callbacks <- callbacksF
         _ <- callbacks.executeOnTxReceivedCallbacks(logger, tx1)
-        _ <- AsyncUtil.nonBlockingSleep(500.millis)
+        _ <- AsyncUtil.nonBlockingSleep(1500.millis)
         initBalance <- initBalanceF
         balance2 <- wallet.getBalance()
         _ = killSwitch.shutdown()
         _ <- callbacks.executeOnTxReceivedCallbacks(logger, tx2)
-        _ <- AsyncUtil.nonBlockingSleep(500.millis)
+        _ <- AsyncUtil.nonBlockingSleep(1000.millis)
         balance3 <- wallet.getBalance()
       } yield {
         assert(balance2 > initBalance)
@@ -81,12 +81,12 @@ class CallBackUtilTest extends BitcoinSWalletTest {
         tx2 <- tx2F
         callbacks <- callbacksF
         _ <- callbacks.executeOnTxReceivedCallbacks(logger, tx1)
-        _ <- AsyncUtil.nonBlockingSleep(500.millis)
+        _ <- AsyncUtil.nonBlockingSleep(5000.millis)
         initBalance <- initBalanceF
         balance2 <- wallet.getBalance()
         _ = killSwitch.shutdown()
         _ <- callbacks.executeOnTxReceivedCallbacks(logger, tx2)
-        _ <- AsyncUtil.nonBlockingSleep(500.millis)
+        _ <- AsyncUtil.nonBlockingSleep(1000.millis)
         balance3 <- wallet.getBalance()
       } yield {
         assert(balance2 > initBalance)

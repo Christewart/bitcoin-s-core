@@ -1,5 +1,7 @@
 package org.bitcoins.server
 
+import akka.actor.ActorSystem
+import akka.stream.{KillSwitches, SharedKillSwitch}
 import grizzled.slf4j.Logging
 import org.bitcoins.core.api.chain.ChainQueryApi
 import org.bitcoins.core.api.dlc.wallet.AnyDLCHDWalletApi
@@ -22,6 +24,20 @@ sealed trait DLCWalletLoaderApi extends Logging {
 
   protected def conf: BitcoinSAppConfig
 
+  private[this] var currentNodeCallbackKillSwitchOpt: Option[
+    SharedKillSwitch] = {
+    None
+  }
+
+  protected def getNodeCallbackKillSwitch: SharedKillSwitch = {
+    currentNodeCallbackKillSwitchOpt match {
+      case Some(ks) => ks
+      case None =>
+        sys.error(
+          "No killswitch registered for node callbacks, this means loadWallet() was never called")
+    }
+  }
+
   def load(
       walletNameOpt: Option[String],
       aesPasswordOpt: Option[AesPassword]): Future[
@@ -36,8 +52,23 @@ sealed trait DLCWalletLoaderApi extends Logging {
       aesPasswordOpt: Option[AesPassword])(implicit
       ec: ExecutionContext): Future[
     (AnyDLCHDWalletApi, WalletAppConfig, DLCAppConfig)] = {
+
+    //kill previous callbacks
+    currentNodeCallbackKillSwitchOpt match {
+      case Some(callbackKillSwitches) =>
+        callbackKillSwitches.abort(new RuntimeException("loadwallet switch"))
+      case None =>
+      //must be the first wallet we have loaded, so do nothing
+    }
+
+    //set our variable to the current killswitch
+    currentNodeCallbackKillSwitchOpt = Some(
+      KillSwitches.shared(
+        s"nodecallback-killswitch-${System.currentTimeMillis()}"))
+
     logger.info(
       s"Loading wallet with bitcoind backend, walletName=${walletNameOpt.getOrElse("DEFAULT")}")
+
     val walletName =
       walletNameOpt.getOrElse(WalletAppConfig.DEFAULT_WALLET_NAME)
 
@@ -99,26 +130,20 @@ case class DLCWalletNeutrinoBackendLoader(
     nodeApi: NodeApi,
     feeProvider: FeeRateApi)(implicit
     override val conf: BitcoinSAppConfig,
-    ec: ExecutionContext)
+    system: ActorSystem)
     extends DLCWalletLoaderApi {
+  import system.dispatcher
   implicit private val nodeConf = conf.nodeConf
 
   override def load(
       walletNameOpt: Option[String],
       aesPasswordOpt: Option[AesPassword]): Future[
     (WalletHolder, WalletAppConfig, DLCAppConfig)] = {
-    val nodeCallbacksF =
-      CallbackUtil.createNeutrinoNodeCallbacksForWallet(walletHolder)
-    val replacedNodeCallbacks = for {
-      nodeCallbacks <- nodeCallbacksF
-      _ = nodeConf.replaceCallbacks(nodeCallbacks)
-    } yield ()
 
     val nodeApi = walletHolder.nodeApi
     val chainQueryApi = walletHolder.chainQueryApi
     val feeRateApi = walletHolder.feeRateApi
     for {
-      _ <- replacedNodeCallbacks
       (dlcWallet, walletConfig, dlcConfig) <- loadWallet(
         walletHolder = walletHolder,
         chainQueryApi = chainQueryApi,
@@ -127,6 +152,11 @@ case class DLCWalletNeutrinoBackendLoader(
         walletNameOpt = walletNameOpt,
         aesPasswordOpt = aesPasswordOpt
       )
+      nodeCallbacks <-
+        CallbackUtil.createNeutrinoNodeCallbacksForWallet(
+          walletHolder,
+          getNodeCallbackKillSwitch)
+      _ = nodeConf.replaceCallbacks(nodeCallbacks)
       _ <- walletHolder.replaceWallet(dlcWallet)
       _ <- updateWalletName(walletNameOpt)
     } yield (walletHolder, walletConfig, dlcConfig)
@@ -139,8 +169,9 @@ case class DLCWalletBitcoindBackendLoader(
     nodeApi: NodeApi,
     feeProvider: FeeRateApi)(implicit
     override val conf: BitcoinSAppConfig,
-    ec: ExecutionContext)
+    system: ActorSystem)
     extends DLCWalletLoaderApi {
+  import system.dispatcher
   implicit private val nodeConf = conf.nodeConf
 
   override def load(
@@ -157,7 +188,8 @@ case class DLCWalletBitcoindBackendLoader(
         aesPasswordOpt = aesPasswordOpt)
 
       nodeCallbacks <- CallbackUtil.createBitcoindNodeCallbacksForWallet(
-        walletHolder)
+        walletHolder,
+        getNodeCallbackKillSwitch)
       _ = nodeConf.addCallbacks(nodeCallbacks)
       _ <- walletHolder.replaceWallet(dlcWallet)
     } yield (walletHolder, walletConfig, dlcConfig)
