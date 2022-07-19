@@ -12,15 +12,17 @@ import org.bitcoins.core.protocol.blockchain.Block
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.crypto.{DoubleSha256Digest, DoubleSha256DigestBE}
 import org.bitcoins.dlc.wallet.DLCWallet
+import org.bitcoins.node.NodeCallbacks
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.rpc.client.v19.V19BlockFilterRpc
 import org.bitcoins.rpc.config.ZmqConfig
+import org.bitcoins.server.util.{CallbackUtil, DLCWalletWithCallbacks}
 import org.bitcoins.wallet.Wallet
 import org.bitcoins.zmq.ZMQSubscriber
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Useful utilities to use in the wallet project for syncing things against bitcoind */
 object BitcoindRpcBackendUtil extends Logging {
@@ -29,7 +31,8 @@ object BitcoindRpcBackendUtil extends Logging {
   def syncWalletToBitcoind(
       bitcoind: BitcoindRpcClient,
       wallet: Wallet,
-      chainCallbacksOpt: Option[ChainCallbacks])(implicit
+      chainCallbacksOpt: Option[ChainCallbacks],
+      nodeCallbacks: NodeCallbacks)(implicit
       system: ActorSystem): Future[Unit] = {
     logger.info("Syncing wallet to bitcoind")
     import system.dispatcher
@@ -50,7 +53,8 @@ object BitcoindRpcBackendUtil extends Logging {
                   _ <- doSync(walletHeight = bitcoindHeight - 1,
                               bitcoindHeight = bitcoindHeight,
                               bitcoind = bitcoind,
-                              wallet = wallet)
+                              wallet = wallet,
+                              nodeCallbacks = nodeCallbacks)
                 } yield ()
               case Some(txDb) =>
                 for {
@@ -59,14 +63,22 @@ object BitcoindRpcBackendUtil extends Logging {
                     case Some(height) =>
                       logger.info(
                         s"Last tx occurred at block $height, syncing from there")
-                      doSync(height, bitcoindHeight, bitcoind, wallet)
+                      doSync(walletHeight = height,
+                             bitcoindHeight = bitcoindHeight,
+                             bitcoind = bitcoind,
+                             wallet = wallet,
+                             nodeCallbacks = nodeCallbacks)
                     case None => Future.unit
                   }
                 } yield ()
             }
           } yield ()
         case Some(syncHeight) =>
-          doSync(syncHeight.height, bitcoindHeight, bitcoind, wallet)
+          doSync(walletHeight = syncHeight.height,
+                 bitcoindHeight = bitcoindHeight,
+                 bitcoind = bitcoind,
+                 wallet = wallet,
+                 nodeCallbacks = nodeCallbacks)
       }
     } yield ()
     res.onComplete { case _ =>
@@ -91,7 +103,9 @@ object BitcoindRpcBackendUtil extends Logging {
       walletHeight: Int,
       bitcoindHeight: Int,
       bitcoind: BitcoindRpcClient,
-      wallet: Wallet)(implicit system: ActorSystem): Future[Wallet] = {
+      wallet: Wallet,
+      nodeCallbacks: NodeCallbacks)(implicit
+      system: ActorSystem): Future[Wallet] = {
     if (walletHeight > bitcoindHeight) {
       val msg = s"Bitcoind and wallet are in incompatible states, " +
         s"wallet height: $walletHeight, bitcoind height: $bitcoindHeight"
@@ -102,8 +116,11 @@ object BitcoindRpcBackendUtil extends Logging {
 
       import system.dispatcher
 
-      val hasFiltersF = bitcoind
-        .getFilter(wallet.walletConfig.chain.genesisHashBE)
+      val genesisHashBEF = bitcoind.getBlockHash(0)
+      val hasFiltersF = genesisHashBEF
+        .flatMap(hash =>
+          bitcoind
+            .getFilter(hash))
         .map(_ => true)
         .recover { case _: Throwable => false }
 
@@ -124,7 +141,9 @@ object BitcoindRpcBackendUtil extends Logging {
         hasFilters <- hasFiltersF
         _ <- {
           if (hasFilters) {
-            filterSync(hashes, bitcoind.asInstanceOf[V19BlockFilterRpc], wallet)
+            filterSync(hashes,
+                       bitcoind.asInstanceOf[V19BlockFilterRpc],
+                       nodeCallbacks)
           } else wallet.nodeApi.downloadBlocks(hashes)
         }
       } yield wallet
@@ -135,24 +154,28 @@ object BitcoindRpcBackendUtil extends Logging {
       bitcoind: BitcoindRpcClient,
       wallet: Wallet,
       chainCallbacksOpt: Option[ChainCallbacks])(implicit
-      system: ActorSystem): Wallet = {
-    // We need to create a promise so we can inject the wallet with the callback
-    // after we have created it into SyncUtil.getNodeApiWalletCallback
-    // so we don't lose the internal state of the wallet
-    val walletCallbackP = Promise[Wallet]()
-
-    val pairedWallet = Wallet(
-      nodeApi =
-        BitcoindRpcBackendUtil.buildBitcoindNodeApi(bitcoind,
-                                                    walletCallbackP.future,
-                                                    chainCallbacksOpt),
-      chainQueryApi = bitcoind,
-      feeRateApi = wallet.feeRateApi
-    )(wallet.walletConfig, wallet.ec)
-
-    walletCallbackP.success(pairedWallet)
-
-    pairedWallet
+      system: ActorSystem): Future[Wallet] = {
+    import system.dispatcher
+    val nodeCallbacksF =
+      CallbackUtil.createBitcoindNodeCallbacksForWallet(wallet)
+    val nodeApiF = for {
+      nodeCallbacks <- nodeCallbacksF
+    } yield BitcoindRpcBackendUtil.buildBitcoindNodeApi(
+      bitcoindRpcClient = bitcoind,
+      chainCallbacksOpt = chainCallbacksOpt,
+      nodeCallbacks = nodeCallbacks)
+    val pairedWalletF = {
+      for {
+        nodeApi <- nodeApiF
+      } yield {
+        Wallet(
+          nodeApi = nodeApi,
+          chainQueryApi = bitcoind,
+          feeRateApi = wallet.feeRateApi
+        )(wallet.walletConfig, wallet.ec)
+      }
+    }
+    pairedWalletF
   }
 
   def startZMQWalletCallbacks(wallet: Wallet, zmqConfig: ZmqConfig): Unit = {
@@ -197,30 +220,41 @@ object BitcoindRpcBackendUtil extends Logging {
       bitcoind: BitcoindRpcClient,
       wallet: DLCWallet,
       chainCallbacksOpt: Option[ChainCallbacks])(implicit
-      system: ActorSystem): DLCWallet = {
-    // We need to create a promise so we can inject the wallet with the callback
-    // after we have created it into SyncUtil.getNodeApiWalletCallback
-    // so we don't lose the internal state of the wallet
-    val walletCallbackP = Promise[Wallet]()
-
-    val pairedWallet = DLCWallet(
-      nodeApi =
+      system: ActorSystem): Future[DLCWalletWithCallbacks] = {
+    import system.dispatcher
+    val nodeCallbacksF =
+      CallbackUtil.createBitcoindNodeCallbacksForWallet(wallet)
+    val nodeApiF = {
+      for {
+        nodeCallbacks <- nodeCallbacksF
+      } yield {
         BitcoindRpcBackendUtil.buildBitcoindNodeApi(bitcoind,
-                                                    walletCallbackP.future,
-                                                    chainCallbacksOpt),
-      chainQueryApi = bitcoind,
-      feeRateApi = wallet.feeRateApi
-    )(wallet.walletConfig, wallet.dlcConfig, wallet.ec)
+                                                    chainCallbacksOpt,
+                                                    nodeCallbacks)
+      }
 
-    walletCallbackP.success(pairedWallet)
+    }
 
-    pairedWallet
+    val pairedWalletF = for {
+      nodeApi <- nodeApiF
+      nodeCallbacks <- nodeCallbacksF
+    } yield {
+      val w = DLCWallet(
+        nodeApi = nodeApi,
+        chainQueryApi = bitcoind,
+        feeRateApi = wallet.feeRateApi
+      )(wallet.walletConfig, wallet.dlcConfig, wallet.ec)
+
+      DLCWalletWithCallbacks(w, nodeCallbacks)
+    }
+    pairedWalletF
   }
 
   private def filterSync(
       blockHashes: Vector[DoubleSha256Digest],
       bitcoindRpcClient: V19BlockFilterRpc,
-      wallet: Wallet)(implicit system: ActorSystem): Future[Unit] = {
+      nodeCallbacks: NodeCallbacks)(implicit
+      system: ActorSystem): Future[Unit] = {
     import system.dispatcher
 
     logger.info("Starting filter sync")
@@ -234,8 +268,9 @@ object BitcoindRpcBackendUtil extends Logging {
         }
       }
       .batch(1000, filter => Vector(filter))(_ :+ _)
-      .foldAsync(wallet) { case (wallet, filterRes) =>
-        wallet.processCompactFilters(filterRes)
+      .mapAsync(1) { case filterRes =>
+        nodeCallbacks.executeOnCompactFiltersReceivedCallbacks(logger,
+                                                               filterRes)
       }
       .run()
     runStream.map { _ =>
@@ -250,9 +285,8 @@ object BitcoindRpcBackendUtil extends Logging {
     */
   private def buildBitcoindNodeApi(
       bitcoindRpcClient: BitcoindRpcClient,
-      walletF: Future[Wallet],
-      chainCallbacksOpt: Option[ChainCallbacks])(implicit
-      system: ActorSystem): NodeApi = {
+      chainCallbacksOpt: Option[ChainCallbacks],
+      nodeCallbacks: NodeCallbacks)(implicit system: ActorSystem): NodeApi = {
     import system.dispatcher
     new NodeApi {
 
@@ -260,41 +294,37 @@ object BitcoindRpcBackendUtil extends Logging {
           blockHashes: Vector[DoubleSha256Digest]): Future[Unit] = {
         logger.info(s"Fetching ${blockHashes.length} blocks from bitcoind")
         val numParallelism = Runtime.getRuntime.availableProcessors()
-        walletF
-          .flatMap { wallet =>
-            val runStream: Future[Done] = Source(blockHashes)
-              .mapAsync(parallelism = numParallelism) { hash =>
-                val blockF = bitcoindRpcClient.getBlockRaw(hash)
-                val blockHeaderResultF = bitcoindRpcClient.getBlockHeader(hash)
-                for {
-                  block <- blockF
-                  blockHeaderResult <- blockHeaderResultF
-                } yield (block, blockHeaderResult)
-              }
-              .foldAsync(wallet) { case (wallet, (block, blockHeaderResult)) =>
-                val blockProcessedF = wallet.processBlock(block)
-                val executeCallbackF: Future[Wallet] = blockProcessedF.flatMap {
-                  wallet =>
-                    chainCallbacksOpt match {
-                      case None           => Future.successful(wallet)
-                      case Some(callback) =>
-                        //this can be slow as we aren't batching headers at all
-                        val headerWithHeights =
-                          Vector((blockHeaderResult.height, block.blockHeader))
-                        val f = callback
-                          .executeOnBlockHeaderConnectedCallbacks(
-                            logger,
-                            headerWithHeights)
-                        f.map(_ => wallet)
-                    }
-                }
-                executeCallbackF
-              }
-              .run()
-            runStream.map(_ => wallet)
+        val runStream: Future[Done] = Source(blockHashes)
+          .mapAsync(parallelism = numParallelism) { hash =>
+            val blockF = bitcoindRpcClient.getBlockRaw(hash)
+            val blockHeaderResultF = bitcoindRpcClient.getBlockHeader(hash)
+            for {
+              block <- blockF
+              blockHeaderResult <- blockHeaderResultF
+            } yield (block, blockHeaderResult)
           }
-          .flatMap(_.updateUtxoPendingStates())
-          .map(_ => ())
+          .mapAsync(1) { case (block, blockHeaderResult) =>
+            //execute callbacks for a block, this is what triggers a wallet
+            //to process the block
+            val blockProcessedF =
+              nodeCallbacks.executeOnBlockReceivedCallbacks(logger, block)
+            val executeCallbackF: Future[Unit] = blockProcessedF.flatMap { _ =>
+              chainCallbacksOpt match {
+                case None           => Future.unit
+                case Some(callback) =>
+                  //this can be slow as we aren't batching headers at all
+                  val headerWithHeights =
+                    Vector((blockHeaderResult.height, block.blockHeader))
+                  val f = callback
+                    .executeOnBlockHeaderConnectedCallbacks(logger,
+                                                            headerWithHeights)
+                  f
+              }
+            }
+            executeCallbackF
+          }
+          .run()
+        runStream.map(_ => ())
       }
 
       /** Broadcasts the given transaction over the P2P network

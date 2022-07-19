@@ -233,10 +233,9 @@ object FundWalletUtil extends FundWalletUtil {
         chainQueryApi = bitcoind,
         bip39PasswordOpt = bip39PasswordOpt,
         extraConfig = extraConfig)
-      wallet = BitcoindRpcBackendUtil.createDLCWalletWithBitcoindCallbacks(
-        bitcoind,
-        tmp,
-        None)(system)
+      walletWithCallbacks <- BitcoindRpcBackendUtil
+        .createDLCWalletWithBitcoindCallbacks(bitcoind, tmp, None)(system)
+      wallet = walletWithCallbacks.wallet
       funded1 <- fundAccountForWalletWithBitcoind(
         BitcoinSWalletTest.defaultAcctAmts,
         wallet.walletConfig.defaultAccount,

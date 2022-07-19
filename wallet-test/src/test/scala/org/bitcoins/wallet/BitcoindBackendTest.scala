@@ -8,6 +8,7 @@ import org.bitcoins.core.gcs.FilterType
 import org.bitcoins.core.wallet.utxo.TxoState
 import org.bitcoins.rpc.client.v21.BitcoindV21RpcClient
 import org.bitcoins.server.BitcoindRpcBackendUtil
+import org.bitcoins.server.util.CallbackUtil
 import org.bitcoins.testkit.wallet._
 import org.bitcoins.wallet.config.WalletAppConfig
 
@@ -54,9 +55,11 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
 
       syncing <- bitcoind.isSyncing()
       _ = assert(!syncing)
+      nodeCallbacks <- CallbackUtil.createBitcoindNodeCallbacksForWallet(wallet)
       _ <- BitcoindRpcBackendUtil.syncWalletToBitcoind(bitcoind,
                                                        wallet,
-                                                       Some(callbacks))
+                                                       Some(callbacks),
+                                                       nodeCallbacks)
       _ <- AsyncUtil.awaitConditionF { () => bitcoind.isSyncing().map(!_) }
 
       balance <- wallet.getBalance()
@@ -102,7 +105,11 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
       _ <- wallet.stateDescriptorDAO.updateSyncHeight(header.hashBE,
                                                       header.height)
 
-      _ <- BitcoindRpcBackendUtil.syncWalletToBitcoind(bitcoind, wallet, None)
+      nodeCallbacks <- CallbackUtil.createBitcoindNodeCallbacksForWallet(wallet)
+      _ <- BitcoindRpcBackendUtil.syncWalletToBitcoind(bitcoind,
+                                                       wallet,
+                                                       None,
+                                                       nodeCallbacks)
 
       utxos <- wallet.listUtxos(TxoState.ConfirmedReceived)
     } yield {
@@ -188,8 +195,13 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
           wallet.walletConfig.requiredConfirmations,
           bitcoindAddr)
 
+        nodeCallbacks <- CallbackUtil.createBitcoindNodeCallbacksForWallet(
+          wallet)
         // sync wallet
-        _ <- BitcoindRpcBackendUtil.syncWalletToBitcoind(bitcoind, wallet, None)
+        _ <- BitcoindRpcBackendUtil.syncWalletToBitcoind(bitcoind,
+                                                         wallet,
+                                                         None,
+                                                         nodeCallbacks)
 
         unconfirmedBalance <- wallet.getUnconfirmedBalance()
         confirmedBalance <- wallet.getConfirmedBalance()
@@ -209,10 +221,12 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
         nodeApi = bitcoind,
         chainQueryApi = bitcoind,
         bip39PasswordOpt = walletAppConfig.bip39PasswordOpt)
+      wallet <- BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(
+        bitcoind,
+        tmpWallet,
+        None)
     } yield {
-      BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(bitcoind,
-                                                               tmpWallet,
-                                                               None)
+      wallet
     }
   }
 }

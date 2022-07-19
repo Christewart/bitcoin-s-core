@@ -28,7 +28,7 @@ class BitcoindBlockPollingTest
         // Setup wallet
         tmpWallet <-
           BitcoinSWalletTest.createDefaultWallet(bitcoind, bitcoind, None)
-        wallet =
+        wallet <-
           BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(bitcoind,
                                                                    tmpWallet,
                                                                    None)
@@ -73,7 +73,7 @@ class BitcoindBlockPollingTest
         // Setup wallet
         tmpWallet <-
           BitcoinSWalletTest.createDefaultWallet(bitcoind, bitcoind, None)
-        wallet =
+        wallet <-
           BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(bitcoind,
                                                                    tmpWallet,
                                                                    None)

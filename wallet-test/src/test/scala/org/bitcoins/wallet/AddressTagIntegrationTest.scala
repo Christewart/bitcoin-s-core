@@ -7,6 +7,7 @@ import org.bitcoins.core.wallet.builder.RawTxSigner
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.core.wallet.utxo.{InternalAddressTag, StorageLocationTag}
 import org.bitcoins.server.BitcoindRpcBackendUtil
+import org.bitcoins.server.util.CallbackUtil
 import org.bitcoins.testkit.util.AkkaUtil
 import org.bitcoins.testkit.wallet.{
   BitcoinSWalletTest,
@@ -142,7 +143,12 @@ class AddressTagIntegrationTest extends BitcoinSWalletTest {
         bitcoindAddr <- bitcoindAddrF
         _ <- AkkaUtil.nonBlockingSleep(1.second)
         _ <- bitcoind.generateToAddress(1, bitcoindAddr)
-        _ <- BitcoindRpcBackendUtil.syncWalletToBitcoind(bitcoind, wallet, None)
+        nodeCallbacks <- CallbackUtil.createBitcoindNodeCallbacksForWallet(
+          wallet)
+        _ <- BitcoindRpcBackendUtil.syncWalletToBitcoind(bitcoind,
+                                                         wallet,
+                                                         None,
+                                                         nodeCallbacks)
       } yield succeed
   }
 }
