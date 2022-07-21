@@ -45,7 +45,7 @@ class BitcoindBlockPollingTest
         _ = assert(firstBalance == Satoshis.zero)
 
         // Setup block polling
-        _ <- BitcoindRpcBackendUtil.startBitcoindBlockqPolling(wallet,
+        _ <- BitcoindRpcBackendUtil.startBitcoindBlockPolling(wallet,
                                                               bitcoind,
                                                               None,
                                                               1.second)
