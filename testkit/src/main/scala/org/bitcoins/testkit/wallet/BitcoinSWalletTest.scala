@@ -1,10 +1,6 @@
 package org.bitcoins.testkit.wallet
 
 import akka.actor.ActorSystem
-<<<<<<< HEAD
-=======
-import akka.stream.KillSwitches
->>>>>>> 321b7949bc (Use callbacks to feed blockchain data from bitcoind)
 import com.typesafe.config.{Config, ConfigFactory}
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.commons.config.AppConfig
@@ -649,8 +645,7 @@ object BitcoinSWalletTest extends WalletLogger {
         bip39PasswordOpt = bip39PasswordOpt)(config.walletConf, system)
       //add callbacks for wallet
       nodeCallbacks <-
-        BitcoinSWalletTest.createNeutrinoNodeCallbacksForWallet(wallet)(
-          system.dispatcher)
+        BitcoinSWalletTest.createNeutrinoNodeCallbacksForWallet(wallet)(system)
       _ = config.nodeConf.addCallbacks(nodeCallbacks)
       withBitcoind <- createWalletWithBitcoind(wallet, bitcoindRpcClient)
       funded <- FundWalletUtil.fundWalletWithBitcoind(withBitcoind)
@@ -696,7 +691,7 @@ object BitcoinSWalletTest extends WalletLogger {
 
   /** Constructs callbacks for the wallet from the node to process blocks and compact filters */
   def createNeutrinoNodeCallbacksForWallet(wallet: Wallet)(implicit
-      ec: ExecutionContext): Future[NodeCallbacks] = {
+      system: ActorSystem): Future[NodeCallbacks] = {
     CallbackUtil.createNeutrinoNodeCallbacksForWallet(wallet)
   }
 

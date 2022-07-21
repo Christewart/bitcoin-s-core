@@ -1,7 +1,9 @@
 package org.bitcoins.server.util
 
+import akka.actor.ActorSystem
 import grizzled.slf4j.Logging
 import org.bitcoins.node._
+import org.bitcoins.node.callback.NodeCallbackStreamManager
 import org.bitcoins.wallet.Wallet
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -9,15 +11,19 @@ import scala.concurrent.{ExecutionContext, Future}
 object CallbackUtil extends Logging {
 
   def createNeutrinoNodeCallbacksForWallet(wallet: Wallet)(implicit
-      ec: ExecutionContext): Future[NodeCallbacks] = {
+      system: ActorSystem): Future[NodeCallbackStreamManager] = {
+    import system.dispatcher
     val nodeCallbacks = buildNodeCallbacks(wallet)
-    Future.successful(nodeCallbacks)
+    val manager = NodeCallbackStreamManager(nodeCallbacks)
+    Future.successful(manager)
   }
 
   def createBitcoindNodeCallbacksForWallet(wallet: Wallet)(implicit
-      ec: ExecutionContext): Future[NodeCallbacks] = {
+      system: ActorSystem): Future[NodeCallbackStreamManager] = {
+    import system.dispatcher
     val nodeCallbacks = buildNodeCallbacks(wallet)
-    Future.successful(nodeCallbacks)
+    val manager = NodeCallbackStreamManager(nodeCallbacks)
+    Future.successful(manager)
   }
 
   private def buildNodeCallbacks(wallet: Wallet)(implicit
