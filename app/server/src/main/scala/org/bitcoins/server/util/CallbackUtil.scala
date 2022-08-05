@@ -20,7 +20,7 @@ object CallbackUtil extends Logging {
       system: ActorSystem): Future[NodeCallbackStreamManager] = {
     import system.dispatcher
     val txSink = Sink.foreachAsync[Transaction](1) { case tx: Transaction =>
-      logger.debug(s"Receiving transaction txid=${tx.txIdBE.hex} as a callback")
+      logger.info(s"Receiving transaction txid=${tx.txIdBE.hex} as a callback")
       wallet
         .processTransaction(tx, blockHashOpt = None)
         .map(_ => ())
@@ -29,7 +29,7 @@ object CallbackUtil extends Logging {
     val compactFilterSink = {
       Sink.foreachAsync[Vector[(DoubleSha256Digest, GolombFilter)]](1) {
         case blockFilters: Vector[(DoubleSha256Digest, GolombFilter)] =>
-          logger.debug(
+          logger.info(
             s"Executing onCompactFilters callback with filter count=${blockFilters.length}")
           wallet
             .processCompactFilters(blockFilters = blockFilters)
@@ -39,7 +39,7 @@ object CallbackUtil extends Logging {
 
     val blockSink = {
       Sink.foreachAsync[Block](1) { case block: Block =>
-        logger.debug(
+        logger.info(
           s"Executing onBlock callback=${block.blockHeader.hashBE.hex}")
         wallet.processBlock(block).map(_ => ())
       }

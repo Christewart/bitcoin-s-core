@@ -1,20 +1,18 @@
 package org.bitcoins.wallet
 
-import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.chain.{ChainCallbacks, OnSyncFlagChanged}
 import org.bitcoins.core.api.wallet.SyncHeightDescriptor
 import org.bitcoins.core.currency._
 import org.bitcoins.core.gcs.FilterType
 import org.bitcoins.core.wallet.utxo.TxoState
+import org.bitcoins.node.callback.NodeCallbackStreamManager
 import org.bitcoins.rpc.client.v22.BitcoindV22RpcClient
 import org.bitcoins.server.BitcoindRpcBackendUtil
 import org.bitcoins.server.util.CallbackUtil
-import org.bitcoins.testkit.util.AkkaUtil
 import org.bitcoins.testkit.wallet._
 import org.bitcoins.wallet.config.WalletAppConfig
 
 import scala.concurrent.Future
-import scala.concurrent.duration.DurationInt
 
 class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
 
@@ -36,7 +34,7 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
       header <- bitcoind.getBestBlockHeader()
 
       // Setup wallet
-      wallet <- createWallet(walletAppConfigWithBitcoind)
+      (wallet, nodeCallbacks) <- createWallet(walletAppConfigWithBitcoind)
       // Assert wallet is empty
       isEmpty <- wallet.isEmpty()
       _ = assert(isEmpty)
@@ -60,6 +58,7 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
       _ <- BitcoindRpcBackendUtil.syncWalletToBitcoindSync(bitcoind,
                                                            wallet,
                                                            Some(callbacks))
+      _ <- nodeCallbacks.stop()
       balance <- wallet.getBalance()
 
       height <- bitcoind.getBlockCount
@@ -82,7 +81,7 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
       header <- bitcoind.getBestBlockHeader()
 
       // Setup wallet
-      wallet <- createWallet(walletAppConfigWithBitcoind)
+      (wallet, nodeCallbacks) <- createWallet(walletAppConfigWithBitcoind)
 
       // Assert wallet is empty
       isEmpty <- wallet.isEmpty()
@@ -123,7 +122,7 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
     val amountToSend = Bitcoins.one
     for {
       // Setup wallet
-      wallet <- createWallet(walletAppConfigWithBitcoind)
+      (wallet, nodeCallbacks) <- createWallet(walletAppConfigWithBitcoind)
 
       // Assert wallet is empty
       isEmpty <- wallet.isEmpty()
@@ -159,7 +158,7 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
       val amountToSend = Bitcoins.one
       for {
         // Setup wallet
-        wallet <- createWallet(walletAppConfigWithBitcoind)
+        (wallet, nodeCallbacks) <- createWallet(walletAppConfigWithBitcoind)
 
         // Assert wallet is empty
         isEmpty <- wallet.isEmpty()
@@ -204,8 +203,8 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
       }
   }
 
-  private def createWallet(
-      params: WalletAppConfigWithBitcoindRpc): Future[Wallet] = {
+  private def createWallet(params: WalletAppConfigWithBitcoindRpc): Future[
+    (Wallet, NodeCallbackStreamManager)] = {
     val bitcoind = params.bitcoind
     implicit val walletAppConfig: WalletAppConfig = params.walletAppConfig
 
@@ -220,7 +219,7 @@ class BitcoindBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
                                                             None)
       wallet <- BitcoinSWalletTest.createDefaultWallet(nodeApi, bitcoind)
     } yield {
-      wallet
+      (wallet, nodeCallbacks)
     }
   }
 }

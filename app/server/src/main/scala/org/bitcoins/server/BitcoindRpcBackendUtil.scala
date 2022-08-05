@@ -175,7 +175,6 @@ object BitcoindRpcBackendUtil extends Logging {
     //will sync our wallet with those blockchain hashes
     val syncWalletSinkF: Future[
       Sink[DoubleSha256Digest, Future[NeutrinoHDWalletApi]]] = {
-
       for {
         hasFilters <- hasFiltersF
       } yield {
@@ -286,32 +285,43 @@ object BitcoindRpcBackendUtil extends Logging {
           bitcoindRpcClient = bitcoindRpcClient,
           parallelism = numParallelism)
 
-        val stream = source.via(flow).mapAsync(1) {
-          case (block: Block, blockHeaderResult: GetBlockHeaderResult) =>
-            val blockProcessedF =
-              nodeCallbacks.executeOnBlockReceivedCallbacks(logger, block)
-            val executeCallbackF: Future[Unit] =
-              blockProcessedF.flatMap { _ =>
-                chainCallbacksOpt match {
-                  case None           => Future.unit
-                  case Some(callback) =>
-                    //this can be slow as we aren't batching headers at all
-                    val headerWithHeights =
-                      Vector((blockHeaderResult.height, block.blockHeader))
-                    val f = callback
-                      .executeOnBlockHeaderConnectedCallbacks(logger,
-                                                              headerWithHeights)
-                    f
+        val sink: Sink[(Block, GetBlockHeaderResult), Future[Done]] = {
+          Sink.foreachAsync(1) {
+            case (block: Block, blockHeaderResult: GetBlockHeaderResult) =>
+              val blockProcessedF =
+                nodeCallbacks.executeOnBlockReceivedCallbacks(logger, block)
+              blockProcessedF.map(_ => logger.info(s"Done blockProcessedF"))
+              val executeCallbackF: Future[Unit] =
+                blockProcessedF.flatMap { _ =>
+                  chainCallbacksOpt match {
+                    case None           => Future.unit
+                    case Some(callback) =>
+                      //this can be slow as we aren't batching headers at all
+                      val headerWithHeights =
+                        Vector((blockHeaderResult.height, block.blockHeader))
+                      val f = callback
+                        .executeOnBlockHeaderConnectedCallbacks(
+                          logger,
+                          headerWithHeights)
+                      f
+                  }
                 }
-              }
-            executeCallbackF
+              executeCallbackF
+          }
+
         }
+        val stream = source
+          .via(flow)
+          .toMat(sink)(Keep.right)
 
         val runStream: Future[Done] =
           stream
             .run()
 
-        runStream.map(_ => ())
+        runStream.map { _ =>
+          logger.info(s"Done running stream downloadBlocks")
+          ()
+        }
       }
 
       /** Broadcasts the given transaction over the P2P network
