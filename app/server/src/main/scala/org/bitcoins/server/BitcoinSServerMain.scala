@@ -1,6 +1,7 @@
 package org.bitcoins.server
 
 import akka.actor.ActorSystem
+import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{
   BroadcastHub,
   Keep,
@@ -8,7 +9,6 @@ import akka.stream.scaladsl.{
   Source,
   SourceQueueWithComplete
 }
-import akka.stream.OverflowStrategy
 import akka.{Done, NotUsed}
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.asyncutil.AsyncUtil.Exponential
@@ -336,13 +336,6 @@ class BitcoinSServerMain(override val serverArgParser: ServerArgParser)(implicit
     } yield {
       WebsocketUtil.buildChainCallbacks(wsQueue, bitcoind)
     }
-    val nodeApiF = for {
-      bitcoind <- bitcoindF
-      chainCallbacks <- chainCallbacksF
-    } yield BitcoindRpcBackendUtil.buildBitcoindNodeApi(
-      bitcoind,
-      Future.successful(walletHolder),
-      Some(chainCallbacks))
 
     val feeProviderF = bitcoindF.map { bitcoind =>
       FeeProviderFactory.getFeeProviderOrElse(
@@ -357,12 +350,11 @@ class BitcoinSServerMain(override val serverArgParser: ServerArgParser)(implicit
     val loadWalletApiF = {
       for {
         bitcoind <- bitcoindF
-        nodeApi <- nodeApiF
         feeProvider <- feeProviderF
       } yield {
         val l = DLCWalletBitcoindBackendLoader(walletHolder,
                                                bitcoind,
-                                               nodeApi,
+                                               bitcoind,
                                                feeProvider)
 
         walletLoaderApiOpt = Some(l)
@@ -545,7 +537,7 @@ class BitcoinSServerMain(override val serverArgParser: ServerArgParser)(implicit
         interval = 1.second,
         maxTries = 12
       )
-      syncF = BitcoindRpcBackendUtil.syncWalletToBitcoind(
+      syncF = BitcoindRpcBackendUtil.syncWalletToBitcoindAsync(
         bitcoind,
         wallet,
         chainCallbacksOpt)(system)
@@ -554,8 +546,12 @@ class BitcoinSServerMain(override val serverArgParser: ServerArgParser)(implicit
       //don't start polling until initial sync is done
       pollingCancellable <- syncF.flatMap { _ =>
         if (bitcoindRpcConf.zmqConfig == ZmqConfig.empty) {
+          //comeback and check this usage of conf.nodeConf.callBacks
           val blockingPollingCancellable = BitcoindRpcBackendUtil
-            .startBitcoindBlockPolling(wallet, bitcoind, chainCallbacksOpt)
+            .startBitcoindBlockPolling(wallet,
+                                       bitcoind,
+                                       conf.nodeConf.callBacks,
+                                       chainCallbacksOpt)
           val mempoolCancellable = BitcoindRpcBackendUtil
             .startBitcoindMempoolPolling(wallet, bitcoind) { tx =>
               nodeConf.callBacks

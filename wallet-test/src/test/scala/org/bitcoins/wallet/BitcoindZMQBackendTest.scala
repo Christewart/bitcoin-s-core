@@ -3,6 +3,7 @@ package org.bitcoins.wallet
 import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.server.BitcoindRpcBackendUtil
+import org.bitcoins.server.util.CallbackUtil
 import org.bitcoins.testkit.async.TestAsyncUtil
 import org.bitcoins.testkit.wallet._
 import org.bitcoins.testkitcore.util.TestUtil.bech32Address
@@ -43,13 +44,9 @@ class BitcoindZMQBackendTest extends WalletAppConfigWithBitcoindNewestFixtures {
 
     for {
       // Setup wallet
-      tmpWallet <-
+      wallet <-
         BitcoinSWalletTest.createDefaultWallet(bitcoind, bitcoind)
-      wallet =
-        BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(
-          bitcoind = bitcoind,
-          wallet = tmpWallet,
-          chainCallbacksOpt = None)
+      _ <- CallbackUtil.createBitcoindNodeCallbacksForWallet(wallet)
       // Assert wallet is empty
       isEmpty <- wallet.isEmpty()
       _ = assert(isEmpty)

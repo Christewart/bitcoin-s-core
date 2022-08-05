@@ -11,7 +11,8 @@ import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.dlc.wallet.DLCWallet
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
-import org.bitcoins.server.{BitcoinSAppConfig, BitcoindRpcBackendUtil}
+import org.bitcoins.server.util.CallbackUtil
+import org.bitcoins.server.BitcoinSAppConfig
 import org.bitcoins.testkit.wallet.BitcoinSWalletTest.{
   account1Amt,
   defaultAcctAmts
@@ -214,22 +215,14 @@ object FundWalletUtil extends FundWalletUtil {
       system: ActorSystem): Future[FundedDLCWallet] = {
     import system.dispatcher
     for {
-      tmp <- BitcoinSWalletTest.createDLCWallet2Accounts(nodeApi = bitcoind,
-                                                         chainQueryApi =
-                                                           bitcoind)
-      wallet = BitcoindRpcBackendUtil.createDLCWalletWithBitcoindCallbacks(
-        bitcoind,
-        tmp,
-        None)(system)
-      funded1 <- fundAccountForWalletWithBitcoind(
-        BitcoinSWalletTest.defaultAcctAmts,
-        wallet.walletConfig.defaultAccount,
-        wallet,
-        bitcoind)
-      hdAccount1 = WalletTestUtil.getHdAccount1(wallet.walletConfig)
+      wallet <- BitcoinSWalletTest.createDLCWallet2Accounts(nodeApi = bitcoind,
+                                                            chainQueryApi =
+                                                              bitcoind)
+      streamManager = CallbackUtil.createBitcoindNodeCallbacksForWallet(wallet)
+      hdAccount1 = WalletTestUtil.getHdAccount1(config.walletConf)
       funded <- fundAccountForWalletWithBitcoind(BitcoinSWalletTest.account1Amt,
                                                  hdAccount1,
-                                                 funded1,
+                                                 wallet,
                                                  bitcoind)
     } yield {
       FundedDLCWallet(funded.asInstanceOf[DLCWallet])

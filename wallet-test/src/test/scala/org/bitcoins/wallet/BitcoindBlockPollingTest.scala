@@ -5,6 +5,7 @@ import org.bitcoins.core.currency._
 import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.util.FutureUtil
 import org.bitcoins.server.BitcoindRpcBackendUtil
+import org.bitcoins.server.util.CallbackUtil
 import org.bitcoins.testkit.wallet.{
   BitcoinSWalletTest,
   WalletAppConfigWithBitcoindNewestFixtures
@@ -26,12 +27,10 @@ class BitcoindBlockPollingTest
 
       for {
         // Setup wallet
-        tmpWallet <-
+        wallet <-
           BitcoinSWalletTest.createDefaultWallet(bitcoind, bitcoind)
-        wallet =
-          BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(bitcoind,
-                                                                   tmpWallet,
-                                                                   None)
+        nodeCallbacks <- CallbackUtil.createBitcoindNodeCallbacksForWallet(
+          wallet)
         // Assert wallet is empty
         isEmpty <- wallet.isEmpty()
         _ = assert(isEmpty)
@@ -45,10 +44,12 @@ class BitcoindBlockPollingTest
         _ = assert(firstBalance == Satoshis.zero)
 
         // Setup block polling
-        _ = BitcoindRpcBackendUtil.startBitcoindBlockPolling(wallet,
-                                                             bitcoind,
-                                                             None,
-                                                             1.second)
+        _ = BitcoindRpcBackendUtil.startBitcoindBlockPolling(
+          wallet = wallet,
+          bitcoind = bitcoind,
+          nodeCallbacks,
+          chainCallbacksOpt = None,
+          interval = 1.second)
         _ <- bitcoind.generateToAddress(6, bech32Address)
 
         // Wait for it to process
@@ -57,6 +58,7 @@ class BitcoindBlockPollingTest
           1.second)
 
         balance <- wallet.getConfirmedBalance()
+        _ <- nodeCallbacks.stop() // stop the callbacks
       } yield assert(balance == amountToSend)
   }
 
@@ -71,12 +73,9 @@ class BitcoindBlockPollingTest
 
       for {
         // Setup wallet
-        tmpWallet <-
+        wallet <-
           BitcoinSWalletTest.createDefaultWallet(bitcoind, bitcoind)
-        wallet =
-          BitcoindRpcBackendUtil.createWalletWithBitcoindCallbacks(bitcoind,
-                                                                   tmpWallet,
-                                                                   None)
+        _ <- CallbackUtil.createBitcoindNodeCallbacksForWallet(wallet)
 
         // populate initial mempool
         addr <- wallet.getNewAddress()

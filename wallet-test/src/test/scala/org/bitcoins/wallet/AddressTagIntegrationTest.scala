@@ -141,7 +141,9 @@ class AddressTagIntegrationTest extends BitcoinSWalletTest {
         bitcoindAddr <- bitcoindAddrF
         _ <- AkkaUtil.nonBlockingSleep(1.second)
         _ <- bitcoind.generateToAddress(1, bitcoindAddr)
-        _ <- BitcoindRpcBackendUtil.syncWalletToBitcoind(bitcoind, wallet, None)
+        _ <- BitcoindRpcBackendUtil.syncWalletToBitcoindAsync(bitcoind,
+                                                              wallet,
+                                                              None)
       } yield succeed
   }
 }
