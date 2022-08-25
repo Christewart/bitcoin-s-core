@@ -3,9 +3,9 @@ import com.typesafe.sbt.SbtNativePackager.Docker
 import com.typesafe.sbt.SbtNativePackager.autoImport.packageName
 
 import java.nio.file.Paths
-import com.typesafe.sbt.packager.Keys.{daemonUser, daemonUserUid, dockerAlias, dockerAliases, dockerRepository, dockerUpdateLatest, maintainer}
+import com.typesafe.sbt.packager.Keys.{daemonUser, daemonUserUid, dockerAlias, dockerAliases, dockerCommands, dockerRepository, dockerUpdateLatest, maintainer}
 import com.typesafe.sbt.packager.archetypes.jlink.JlinkPlugin.autoImport.JlinkIgnore
-import com.typesafe.sbt.packager.docker.DockerChmodType
+import com.typesafe.sbt.packager.docker.{DockerChmodType, ExecCmd}
 import com.typesafe.sbt.packager.docker.DockerPlugin.autoImport.{dockerAdditionalPermissions, dockerBaseImage}
 import sbt._
 import sbt.Keys._
@@ -197,9 +197,10 @@ object CommonSettings {
       //needed for umbrel environment, container uids and host uids must matchup so we can
       //properly write to volumes on the host machine
       //see: https://medium.com/@mccode/understanding-how-uid-and-gid-work-in-docker-containers-c37a01d01cf
-      Docker / daemonUserUid := Some("1000"),
+      Docker / daemonUserUid := Some("$APP_BITCOIN_S_USER"),
       Docker / packageName := packageName.value,
       Docker / version := version.value,
+      dockerCommands ++= Vector(ExecCmd("RUN", "echo", "hello world")),
       dockerUpdateLatest := isSnapshot.value
     )
   }
