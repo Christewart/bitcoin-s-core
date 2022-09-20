@@ -2746,6 +2746,10 @@ object OracleAnnouncementV1TLV extends Factory[OracleAnnouncementV1TLV] {
                             metadata = metadata)
   }
 
+  private val oracleName = NormalizedString("oracle_name")
+  private val oracleDescription = NormalizedString("oracle_description")
+  private val creationTime = UInt32.zero
+
   def dummyForEventsAndKeys(
       privKey: ECPrivateKey,
       nonce: SchnorrNonce,
@@ -2760,9 +2764,6 @@ object OracleAnnouncementV1TLV extends Factory[OracleAnnouncementV1TLV] {
                                                privKey.schnorrPublicKey,
                                                OrderedNonces(Vector(nonce)))
 
-    val oracleName = NormalizedString("oracle_name")
-    val oracleDescription = NormalizedString("oracle_description")
-    val creationTime = UInt32.zero
     val metadataSignature = OracleMetadataSignature.buildSignature(
       privKey,
       oracleName,
@@ -2795,9 +2796,6 @@ object OracleAnnouncementV1TLV extends Factory[OracleAnnouncementV1TLV] {
                                                privKey.schnorrPublicKey,
                                                OrderedNonces(nonces))
 
-    val oracleName = NormalizedString("oracle_name")
-    val oracleDescription = NormalizedString("oracle_description")
-    val creationTime = UInt32.zero
     val metadataSignature = OracleMetadataSignature.buildSignature(
       privKey,
       oracleName,
