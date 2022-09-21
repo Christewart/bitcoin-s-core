@@ -358,6 +358,9 @@ object Deps {
     }
   }
 
+  val dlcCommons = Vector(
+
+  )
   val dlcWallet =
     List(
       Compile.newMicroJson,
