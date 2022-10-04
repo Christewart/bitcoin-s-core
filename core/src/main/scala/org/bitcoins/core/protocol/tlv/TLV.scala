@@ -2713,6 +2713,10 @@ case class OracleAnnouncementV1TLV(
   override val announcementPublicKey: SchnorrPublicKey =
     metadata.announcementPublicKey
 
+  require(
+    validateSignature,
+    s"Announcement signature invalid for name=${metadata.oracleName} description=${metadata.oracleDescription}")
+
   val attestationPublicKey: SchnorrPublicKey = {
     metadata.attestationPublicKey
   }
@@ -2721,7 +2725,7 @@ case class OracleAnnouncementV1TLV(
 
   override def validateSignature: Boolean = {
     val hash =
-      CryptoUtil.sha256DLCAnnouncementV1(eventTLV.bytes ++ metadata.bytes)
+      CryptoUtil.sha256DLCAnnouncementV1(eventTLV.bytes)
     announcementPublicKey.verify(hash, announcementSignature) &&
     metadata.verifySignature
   }
@@ -2755,10 +2759,9 @@ object OracleAnnouncementV1TLV extends Factory[OracleAnnouncementV1TLV] {
   def buildAnnouncementSignature(
       announcementPrivKey: ECPrivateKey,
       signingVersion: SigningVersion,
-      eventTLV: OracleEventV1TLV,
-      metadata: OracleMetadata): SchnorrDigitalSignature = {
+      eventTLV: OracleEventV1TLV): SchnorrDigitalSignature = {
     val announcementBytes =
-      signingVersion.calcAnnouncementHash(eventTLV, metadata)
+      signingVersion.calcAnnouncementHash(eventTLV)
     val announcementSignature =
       announcementPrivKey.schnorrSign(announcementBytes)
 
@@ -2813,10 +2816,7 @@ object OracleAnnouncementV1TLV extends Factory[OracleAnnouncementV1TLV] {
                                   creationTime,
                                   attestation,
                                   metadataSignature)
-    val sig = buildAnnouncementSignature(privKey,
-                                         SigningVersion.latest,
-                                         event,
-                                         metadata)
+    val sig = buildAnnouncementSignature(privKey, SigningVersion.latest, event)
     OracleAnnouncementV1TLV(sig, event, metadata)
   }
 
@@ -2853,8 +2853,7 @@ object OracleAnnouncementV1TLV extends Factory[OracleAnnouncementV1TLV] {
     val signature = buildAnnouncementSignature(announcementPrivKey = privKey,
                                                signingVersion =
                                                  SigningVersion.latest,
-                                               eventTLV = event,
-                                               metadata = metadata)
+                                               eventTLV = event)
     OracleAnnouncementV1TLV(signature, event, metadata)
   }
 
@@ -2892,11 +2891,8 @@ object OracleAnnouncementV1TLV extends Factory[OracleAnnouncementV1TLV] {
       schnorrAttestation,
       metadataSignature
     )
-    val announcementSignature = buildAnnouncementSignature(
-      dummyPrivKey,
-      SigningVersion.latest,
-      event,
-      metadata)
+    val announcementSignature =
+      buildAnnouncementSignature(dummyPrivKey, SigningVersion.latest, event)
 
     OracleAnnouncementV1TLV(announcementSignature = announcementSignature,
                             event,
@@ -3090,8 +3086,8 @@ object OracleMetadataSignature extends Factory[OracleMetadataSignature] {
       oracleDescription: NormalizedString,
       creationTime: UInt32,
       schnorrAttestation: SchnorrAttestation): OracleMetadataSignature = {
-    val bytes = oracleName.bytes ++
-      oracleDescription.bytes ++
+    val bytes = TLVUtil.strBytes(oracleName) ++
+      TLVUtil.strBytes(oracleDescription) ++
       creationTime.bytes ++
       schnorrAttestation.bytes
 
