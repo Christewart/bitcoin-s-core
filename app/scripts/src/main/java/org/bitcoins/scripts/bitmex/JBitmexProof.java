@@ -2,19 +2,20 @@ package org.bitcoins.scripts.bitmex;
 
 import java.util.List;
 
-public class BitmexProof {
+public class JBitmexProof {
 
-  private long height = 0;
+  private long height;
   private String blockhash;
   private String chain;
   private Long total;
 
   private List<String> keys;
 
-  private BitmexClaim claim;
+  private JBitmexClaim claim;
 
-  private String xpub;
+  private List<String> xpub;
 
+  private List<JBitmexUtxo> address;
 
   public void setHeight(Long h) {
     height = h;
@@ -56,19 +57,27 @@ public class BitmexProof {
     return keys;
   }
 
-  public void setXpub(String pub) {
-    xpub = pub;
+  public void setXpub(List<String> pubs) {
+    xpub = pubs;
   }
 
-  public String getXpub() {
+  public List<String> getXpub() {
     return xpub;
   }
 
-  public void setClaim(BitmexClaim c) {
+  public void setClaim(JBitmexClaim c) {
     claim = c;
   }
 
-  public BitmexClaim getClaim() {
+  public JBitmexClaim getClaim() {
     return claim;
+  }
+
+  public void setAddress(List<JBitmexUtxo> addrs) {
+    address = addrs;
+  }
+
+  public List<JBitmexUtxo> getAddress() {
+    return address;
   }
 }

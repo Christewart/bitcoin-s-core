@@ -4,12 +4,13 @@ import akka.actor.ActorSystem
 import akka.stream.IOResult
 import akka.stream.scaladsl.{FileIO, Source}
 import akka.util.ByteString
-import com.fasterxml.jackson.databind.{ObjectMapper}
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import org.bitcoins.rpc.config.BitcoindRpcAppConfig
+import org.bitcoins.scripts.bitmex.{BitmexProof, JBitmexProof}
 import org.bitcoins.server.routes.BitcoinSRunner
 import org.bitcoins.server.util.BitcoinSAppScalaDaemon
-import org.bitcoins.scripts.bitmex.BitmexProof
+
 import java.nio.file.Paths
 import scala.concurrent.Future
 
@@ -26,8 +27,9 @@ class BitMEXProofOfReserves()(implicit
     val source: Source[ByteString, Future[IOResult]] =
       FileIO.fromPath(proofOfReservesFile)
     val mapper: ObjectMapper = new YAMLMapper()
-    val proof =
-      mapper.readValue(proofOfReservesFile.toFile, classOf[BitmexProof])
+    val jproof =
+      mapper.readValue(proofOfReservesFile.toFile, classOf[JBitmexProof])
+    val proof = BitmexProof(jproof)
     println(s"proof=$proof")
     Future.unit
   }

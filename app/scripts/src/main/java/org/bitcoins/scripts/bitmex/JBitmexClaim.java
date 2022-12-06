@@ -1,6 +1,6 @@
 package org.bitcoins.scripts.bitmex;
 
-public class BitmexClaim {
+public class JBitmexClaim {
 
     private int m;
     private int n;
