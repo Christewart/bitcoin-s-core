@@ -31,7 +31,7 @@ trait BitcoinSRunner[T] extends StartStopAsync[T] with Logging {
       logger.error(s"Failed to startup server!", err)
     }(scala.concurrent.ExecutionContext.Implicits.global)
 
-    runner
+    runner.flatMap(_ => stop())
   }
 }
 

@@ -79,6 +79,8 @@ object Deps {
     val javaxJmsV = "2.0.1"
     val javaxMailV = "1.4.7"
 
+    val jacksonV = "2.13.4"
+
     val gsonV = "2.10"
     val jnaV = "5.12.1"
     val waffleJnaV = "3.2.0"
@@ -125,6 +127,9 @@ object Deps {
 
     val gson =
       "com.google.code.gson" % "gson" % V.gsonV //https://github.com/google/gson
+
+    //https://github.com/FasterXML/jackson-dataformats-text/tree/master/yaml#maven-dependency
+    val jacksonDataFormatYaml = "com.fasterxml.jackson.dataformat" % "jackson-dataformat-yaml" % V.jacksonV
 
     val jUnixSocket =
       "com.kohlschutter.junixsocket" % "junixsocket-core" % V.jUnixSocketV
@@ -682,5 +687,9 @@ object Deps {
     Compile.akkaHttp,
     Compile.akkaStream,
     Compile.playJson
+  )
+
+  val scripts = Vector(
+    Compile.jacksonDataFormatYaml
   )
 }

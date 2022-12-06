@@ -818,6 +818,7 @@ lazy val oracleExplorerClient = project
 lazy val scripts = project
   .in(file("app/scripts"))
   .settings(CommonSettings.settings: _*)
+  .settings(libraryDependencies ++= Deps.scripts)
   .settings(
     name := "bitcoin-s-scripts",
     publishArtifact := false //do not want to publish our scripts
