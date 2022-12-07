@@ -25,4 +25,8 @@ case class BitmexProof(JBitmexProof: JBitmexProof) {
     JBitmexProof.getAddress.asScala.toVector
       .map(BitmexUtxo(_))
   }
+
+  override def toString: String = {
+    s"BitmexProof($blockHash,$chain,$total,$claim,$xpub,addressCount=${addresses.length})"
+  }
 }
