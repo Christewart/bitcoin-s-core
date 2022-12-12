@@ -4,7 +4,12 @@ import akka.actor.ActorSystem
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLMapper
 import org.bitcoins.core.currency.Satoshis
-import org.bitcoins.crypto.DoubleSha256DigestBE
+import org.bitcoins.crypto.{
+  CryptoUtil,
+  DoubleSha256Digest,
+  DoubleSha256DigestBE,
+  Sha256Digest
+}
 import org.bitcoins.rpc.config.BitcoindRpcAppConfig
 import org.bitcoins.scripts.bitmex.{
   BitmexLiabilities,
@@ -14,6 +19,7 @@ import org.bitcoins.scripts.bitmex.{
 }
 import org.bitcoins.server.routes.BitcoinSRunner
 import org.bitcoins.server.util.BitcoinSAppScalaDaemon
+import scodec.bits.ByteVector
 
 import java.nio.file.Paths
 import scala.concurrent.Future
@@ -22,6 +28,15 @@ class BitMEXProofOfReserves()(implicit
     override val system: ActorSystem,
     rpcAppConfig: BitcoindRpcAppConfig)
     extends BitcoinSRunner[Unit] {
+
+  //from: https://blog.bitmex.com/proof-of-reserves-liabilities-bitmex-demonstration/
+  private val insuranceFundNonce = {
+    ByteVector.fromValidHex(
+      "d25a3b153f6a66d77077a195de783bddd58625350482bf874d4439e7f766c6d4")
+  }
+
+  private val insuranceFundAccountNumber: BigInt = BigInt(
+    "18446744073709551615")
 
   override def start(): Future[Unit] = {
     val reserveFileName =
@@ -41,9 +56,16 @@ class BitMEXProofOfReserves()(implicit
     for {
       proof <- proofF
       liabilities <- liabilitiesF
+      insuranceFundSubNonce = getInsuranceFundSubNonce(liabilities.blockHeight)
+      insuranceFundLeafHash = getMerkleTreeLeafHash(
+        accountId = insuranceFundAccountNumber,
+        subNonce = insuranceFundSubNonce,
+        balance = ???,
+        leafPositionIndex = ???)
     } yield {
       println(s"proof=$proof")
       println(s"liabilities=$liabilities")
+      println(s"insuranceFundSubNonce=${insuranceFundSubNonce.hex}")
       ()
     }
   }
@@ -60,7 +82,7 @@ class BitMEXProofOfReserves()(implicit
         "/home/chris/Downloads/20221109-liabilities-762408-20221109D101503.455087000.csv"
       val proofOfLiabilityFile = scala.io.Source.fromFile(liabilityFileName)
       val lines = proofOfLiabilityFile.getLines()
-      //1st line is height
+      //1st line is block height
       val height: Int = {
         lines.take(1).toVector.head.dropWhile(char => !char.isDigit).toInt
       }
@@ -75,6 +97,22 @@ class BitMEXProofOfReserves()(implicit
 
       BitmexLiabilities(height, liabilities.toVector)
     }
+  }
+
+  def getInsuranceFundSubNonce(blockHeight: Long): Sha256Digest = {
+    val bytes = insuranceFundNonce ++ ByteVector.fromLong(blockHeight)
+    CryptoUtil.sha256(bytes)
+  }
+
+  def getMerkleTreeLeafHash(
+      accountId: BigInt,
+      subNonce: Sha256Digest,
+      balance: Satoshis,
+      leafPositionIndex: Int): Sha256Digest = {
+    val bytes = ByteVector(accountId.toByteArray) ++ subNonce.bytes ++
+      balance.bytes ++ ByteVector.fromInt(leafPositionIndex)
+
+    CryptoUtil.sha256(bytes)
   }
 }
 
