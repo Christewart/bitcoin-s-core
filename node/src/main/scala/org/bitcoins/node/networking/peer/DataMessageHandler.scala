@@ -57,7 +57,7 @@ case class DataMessageHandler(
       payload: DataPayload,
       peerMsgSender: PeerMessageSender,
       peer: Peer): Future[Unit] = {
-    val msg = DataMessageWrapper(payload, peerMsgSender, peer)
+    val msg = DataPayloadWrapper(payload, peerMsgSender, peer)
     manager.dataMessageStream.offer(msg).map(_ => ())
   }
 
@@ -838,12 +838,27 @@ case class DataMessageHandler(
   }
 }
 
-sealed trait StreamDataMessageWrapper
+sealed trait StreamNetworkPayloadWrapper
 
-case class DataMessageWrapper(
+sealed trait NetworkPayloadWrapper extends StreamNetworkPayloadWrapper {
+  def payload: NetworkPayload
+
+  def peerMsgSender: PeerMessageSender
+
+  def peerMessageReceiver: PeerMessageReceiver
+  def peer: Peer = peerMessageReceiver.peer
+}
+
+case class DataPayloadWrapper(
     payload: DataPayload,
     peerMsgSender: PeerMessageSender,
-    peer: Peer)
-    extends StreamDataMessageWrapper
+    peerMessageReceiver: PeerMessageReceiver)
+    extends NetworkPayloadWrapper
 
-case class HeaderTimeoutWrapper(peer: Peer) extends StreamDataMessageWrapper
+case class ControlPayloadWrapper(
+    payload: ControlPayload,
+    peerMsgSender: PeerMessageSender,
+    peerMessageReceiver: PeerMessageReceiver)
+    extends NetworkPayloadWrapper
+
+case class HeaderTimeoutWrapper(peer: Peer) extends StreamNetworkPayloadWrapper

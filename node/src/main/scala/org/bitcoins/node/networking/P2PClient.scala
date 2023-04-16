@@ -400,8 +400,9 @@ case class P2PClientActor(
         peerConnection ! Tcp.Register(self)
         peerConnection ! Tcp.ResumeReading
 
-        currentPeerMsgHandlerRecv =
-          currentPeerMsgHandlerRecv.connect(P2PClient(self, peer))
+        currentPeerMsgHandlerRecv = Await.result(
+          currentPeerMsgHandlerRecv.connect(P2PClient(self, peer)),
+          timeout)
         context.become(awaitNetworkRequest(peerConnection, unalignedBytes))
         unalignedBytes
 

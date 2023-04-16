@@ -3,6 +3,7 @@ package org.bitcoins.node
 import akka.actor.{ActorRef, ActorSystem, Cancellable}
 import monix.execution.atomic.AtomicBoolean
 import org.bitcoins.asyncutil.AsyncUtil
+import org.bitcoins.chain.config.ChainAppConfig
 import org.bitcoins.core.p2p.ServiceIdentifier
 import org.bitcoins.core.util.{NetworkUtil, StartStopAsync}
 import org.bitcoins.node.config.NodeAppConfig
@@ -22,7 +23,8 @@ case class PeerFinder(
     supervisor: ActorRef)(implicit
     ec: ExecutionContext,
     system: ActorSystem,
-    nodeAppConfig: NodeAppConfig)
+    nodeAppConfig: NodeAppConfig,
+    chainAppConfig: ChainAppConfig)
     extends StartStopAsync[PeerFinder]
     with P2PLogger {
 
@@ -201,7 +203,8 @@ case class PeerFinder(
 
   /** creates and initialises a new test peer */
   private def tryPeer(peer: Peer): Future[Unit] = {
-    _peerData.put(peer, PeerData(peer, node, supervisor))
+    _peerData.put(peer,
+                  PeerData(peer, peerManager = node.peerManager, supervisor))
     _peerData(peer).peerMessageSender.map(_.connect())
   }
 

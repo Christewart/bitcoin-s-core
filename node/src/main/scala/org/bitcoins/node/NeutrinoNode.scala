@@ -43,8 +43,6 @@ case class NeutrinoNode(
 
   implicit override def chainAppConfig: ChainAppConfig = chainConfig
 
-  val controlMessageHandler: ControlMessageHandler = ControlMessageHandler(this)
-
   private var dataMessageHandler: DataMessageHandler = {
     val result = for {
       chainApi <- chainApiFromDb()
@@ -72,6 +70,9 @@ case class NeutrinoNode(
   }
 
   override val peerManager: PeerManager = PeerManager(paramPeers, this)
+
+  override val controlMessageHandler: ControlMessageHandler =
+    ControlMessageHandler(peerManager)
 
   override def start(): Future[NeutrinoNode] = {
     val res = for {

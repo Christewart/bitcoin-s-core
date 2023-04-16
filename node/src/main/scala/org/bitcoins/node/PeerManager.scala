@@ -4,20 +4,21 @@ import akka.actor.{ActorRef, ActorSystem, Cancellable, Props}
 import akka.stream.OverflowStrategy
 import akka.stream.scaladsl.{Sink, Source, SourceQueueWithComplete}
 import org.bitcoins.asyncutil.AsyncUtil
+import org.bitcoins.chain.config.ChainAppConfig
 import org.bitcoins.core.api.node.NodeType
 import org.bitcoins.core.p2p._
 import org.bitcoins.core.util.{NetworkUtil, StartStopAsync}
 import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.node.models.{Peer, PeerDAO, PeerDb}
 import org.bitcoins.node.networking.peer._
-import org.bitcoins.node.networking.{P2PClientSupervisor}
+import org.bitcoins.node.networking.P2PClientSupervisor
 import org.bitcoins.node.util.BitcoinSNodeUtil
 import scodec.bits.ByteVector
 
 import java.net.InetAddress
 import java.time.Duration
 import scala.collection.mutable
-import scala.concurrent.duration.{DurationInt}
+import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.Random
 
@@ -26,7 +27,8 @@ case class PeerManager(
     node: NeutrinoNode)(implicit
     ec: ExecutionContext,
     system: ActorSystem,
-    nodeAppConfig: NodeAppConfig)
+    nodeAppConfig: NodeAppConfig,
+    chainAppConfig: ChainAppConfig)
     extends StartStopAsync[PeerManager]
     with P2PLogger {
 
@@ -435,37 +437,66 @@ case class PeerManager(
     newNode.sync().map(_ => node.getDataMessageHandler)
   }
 
-  private val dataMessageStreamSource = Source
-    .queue[StreamDataMessageWrapper](1500,
-                                     overflowStrategy =
-                                       OverflowStrategy.backpressure)
-    .mapAsync(1) {
-      case msg @ DataMessageWrapper(payload, peerMsgSender, peer) =>
-        logger.debug(s"Got ${payload.commandName} from peer=${peer} in stream")
-        node.getDataMessageHandler
-          .handleDataPayload(payload, peerMsgSender, peer)
-          .map { newDmh =>
-            node.updateDataMessageHandler(newDmh)
-            msg
+  private val dataMessageStreamSource: Source[
+    StreamNetworkPayloadWrapper,
+    SourceQueueWithComplete[StreamNetworkPayloadWrapper]] = {
+    val initState = StreamPeerState(
+      dataMessageHandler = node.getDataMessageHandler,
+      controlMessageHandler = node.controlMessageHandler,
+      peerMsgRecv = ???)
+    Source
+      .queue[StreamNetworkPayloadWrapper](1500,
+                                          overflowStrategy =
+                                            OverflowStrategy.backpressure)
+      .foldAsync(initState) {
+        case (streamPeerState: StreamPeerState,
+              DataPayloadWrapper(payload, peerMsgSender, peerMsgReceiver)) =>
+          logger.debug(
+            s"Got ${payload.commandName} from peer=${peerMsgReceiver.peer} in stream")
+          val dmh = streamPeerState.dataMessageHandler
+          dmh
+            .handleDataPayload(payload, peerMsgSender, peerMsgReceiver.peer)
+            .map { newDmh =>
+              streamPeerState.copy(dataMessageHandler = newDmh)
+            }
+
+        case (streamPeerState: StreamPeerState, msg: ControlPayloadWrapper) =>
+          val cph = streamPeerState.controlMessageHandler
+          cph
+            .handleControlPayload(payload = msg.payload,
+                                  sender = msg.peerMsgSender,
+                                  peer = msg.peer,
+                                  peerMessageReceiver =
+                                    streamPeerState.peerMsgRecv)
+            .map { peerMsgRecv =>
+              streamPeerState.copy(peerMsgRecv = peerMsgRecv)
+            }
+        case (streamPeerState: StreamPeerState, HeaderTimeoutWrapper(peer)) =>
+          logger.debug(s"Processing timeout header for $peer")
+          streamPeerState.dataMessageHandler.onHeaderRequestTimeout(peer).map {
+            newDmh =>
+              node.updateDataMessageHandler(newDmh)
+              logger.debug(s"Done processing timeout header for $peer")
+              streamPeerState.copy(dataMessageHandler = newDmh)
           }
-      case msg @ HeaderTimeoutWrapper(peer) =>
-        logger.debug(s"Processing timeout header for $peer")
-        node.getDataMessageHandler.onHeaderRequestTimeout(peer).map { newDmh =>
-          node.updateDataMessageHandler(newDmh)
-          logger.debug(s"Done processing timeout header for $peer")
-          msg
-        }
-    }
+      }
+  }
 
   private val dataMessageStreamSink =
-    Sink.foreach[StreamDataMessageWrapper] {
-      case DataMessageWrapper(payload, _, peer) =>
-        logger.debug(s"Done processing ${payload.commandName} in peer=${peer}")
+    Sink.foreach[StreamNetworkPayloadWrapper] {
+      case wrapper: NetworkPayloadWrapper =>
+        logger.debug(
+          s"Done processing ${wrapper.payload} in peer=${wrapper.peer}")
       case HeaderTimeoutWrapper(_) =>
     }
 
-  val dataMessageStream: SourceQueueWithComplete[StreamDataMessageWrapper] =
+  val dataMessageStream: SourceQueueWithComplete[StreamNetworkPayloadWrapper] =
     dataMessageStreamSource.to(dataMessageStreamSink).run()
 }
 
 case class ResponseTimeout(payload: NetworkPayload)
+
+case class StreamPeerState(
+    dataMessageHandler: DataMessageHandler,
+    controlMessageHandler: ControlMessageHandler,
+    peerMsgRecv: PeerMessageReceiver)

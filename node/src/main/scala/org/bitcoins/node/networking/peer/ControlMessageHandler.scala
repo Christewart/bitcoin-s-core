@@ -2,14 +2,17 @@ package org.bitcoins.node.networking.peer
 
 import org.bitcoins.core.p2p._
 import org.bitcoins.core.util.NetworkUtil
+import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.node.models.Peer
 import org.bitcoins.node.networking.peer.PeerMessageReceiverState._
-import org.bitcoins.node.{Node, P2PLogger}
+import org.bitcoins.node.{P2PLogger, PeerManager}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
-case class ControlMessageHandler(node: Node)(implicit ec: ExecutionContext)
+case class ControlMessageHandler(peerManager: PeerManager)(implicit
+    ec: ExecutionContext,
+    nodeAppConfig: NodeAppConfig)
     extends P2PLogger {
 
   def handleControlPayload(
@@ -36,7 +39,7 @@ case class ControlMessageHandler(node: Node)(implicit ec: ExecutionContext)
 
             val newRecv = peerMessageReceiver.toState(newState)
 
-            node.peerManager.onVersionMessage(peer, versionMsg)
+            peerManager.onVersionMessage(peer, versionMsg)
 
             sender.sendVerackMessage().map(_ => newRecv)
         }
@@ -54,7 +57,7 @@ case class ControlMessageHandler(node: Node)(implicit ec: ExecutionContext)
             val newState = good.toNormal(VerAckMessage)
             val newRecv = peerMessageReceiver.toState(newState)
 
-            node.peerManager.onInitialization(peer).map(_ => newRecv)
+            peerManager.onInitialization(peer).map(_ => newRecv)
         }
 
       case ping: PingMessage =>
@@ -96,8 +99,8 @@ case class ControlMessageHandler(node: Node)(implicit ec: ExecutionContext)
             NetworkUtil.parseInetSocketAddress(bytes, networkAddress.port)
           val peer = Peer.fromSocket(socket = inetAddress,
                                      socks5ProxyParams =
-                                       node.nodeAppConfig.socks5ProxyParams)
-          node.peerManager.addPeerToTry(Vector(peer), 0)
+                                       nodeAppConfig.socks5ProxyParams)
+          peerManager.addPeerToTry(Vector(peer), 0)
         }
       case addr: AddrV2Message =>
         val bytes = addr.bytes
@@ -107,14 +110,14 @@ case class ControlMessageHandler(node: Node)(implicit ec: ExecutionContext)
           NetworkUtil.parseInetSocketAddress(bytes, port)
         val peer = Peer.fromSocket(socket = inetAddress,
                                    socks5ProxyParams =
-                                     node.nodeAppConfig.socks5ProxyParams)
+                                     nodeAppConfig.socks5ProxyParams)
         val priority = if (services.nodeCompactFilters) 1 else 0
         addr match {
           case IPv4AddrV2Message(_, _, _, _) | IPv6AddrV2Message(_, _, _, _) =>
-            node.peerManager.addPeerToTry(Vector(peer), priority = priority)
+            peerManager.addPeerToTry(Vector(peer), priority = priority)
           case TorV3AddrV2Message(_, _, _, _) =>
-            if (node.nodeAppConfig.torConf.enabled)
-              node.peerManager.addPeerToTry(Vector(peer), priority)
+            if (nodeAppConfig.torConf.enabled)
+              peerManager.addPeerToTry(Vector(peer), priority)
           case _ => logger.debug(s"Unsupported network. Skipping.")
         }
     }

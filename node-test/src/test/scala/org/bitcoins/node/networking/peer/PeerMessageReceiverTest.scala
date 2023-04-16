@@ -72,7 +72,9 @@ class PeerMessageReceiverTest extends NodeTestWithCachedBitcoindNewest {
                                                    verackMsgP = verackMsgP)
 
       val peerMsgReceiver =
-        PeerMessageReceiver(normal, node, peer)(system, node.nodeAppConfig)
+        PeerMessageReceiver(normal, peer, node.peerManager)(system,
+                                                            node.nodeAppConfig,
+                                                            node.chainAppConfig)
 
       val newMsgReceiverF = peerMsgReceiver.disconnect()
 
@@ -114,7 +116,9 @@ class PeerMessageReceiverTest extends NodeTestWithCachedBitcoindNewest {
                                                    verackMsgP = verackMsgP)
 
       val peerMsgReceiver =
-        PeerMessageReceiver(normal, node, peer)(system, node.nodeAppConfig)
+        PeerMessageReceiver(normal, peer, node.peerManager)(system,
+                                                            node.nodeAppConfig,
+                                                            node.chainAppConfig)
 
       val newMsgReceiver = peerMsgReceiver.initializeDisconnect()
 

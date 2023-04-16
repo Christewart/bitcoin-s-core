@@ -1,6 +1,7 @@
 package org.bitcoins.node
 
 import akka.actor.{ActorRef, ActorSystem}
+import org.bitcoins.chain.config.ChainAppConfig
 import org.bitcoins.core.p2p.ServiceIdentifier
 import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.node.models.Peer
@@ -17,9 +18,12 @@ import scala.concurrent.duration.DurationInt
   */
 case class PeerData(
     peer: Peer,
-    node: Node,
+    peerManager: PeerManager,
     supervisor: ActorRef
-)(implicit system: ActorSystem, nodeAppConfig: NodeAppConfig) {
+)(implicit
+    system: ActorSystem,
+    nodeAppConfig: NodeAppConfig,
+    chainAppConfig: ChainAppConfig) {
   import system.dispatcher
 
   lazy val peerMessageSender: Future[PeerMessageSender] = {
@@ -28,12 +32,12 @@ case class PeerData(
 
   private lazy val client: Future[P2PClient] = {
     val peerMessageReceiver =
-      PeerMessageReceiver.newReceiver(node = node, peer = peer)
+      PeerMessageReceiver.newReceiver(peer = peer, peerManager)
     P2PClient(
       peer = peer,
       peerMessageReceiver = peerMessageReceiver,
-      onReconnect = node.peerManager.onReconnect,
-      onStop = node.peerManager.onP2PClientStopped,
+      onReconnect = peerManager.onReconnect,
+      onStop = peerManager.onP2PClientStopped,
       maxReconnectionTries = 4,
       supervisor = supervisor
     )
