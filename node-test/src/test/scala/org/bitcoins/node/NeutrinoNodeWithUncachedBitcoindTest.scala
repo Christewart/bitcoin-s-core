@@ -183,6 +183,8 @@ class NeutrinoNodeWithUncachedBitcoindTest extends NodeUnitTest with CachedTor {
           FutureUtil.sequentially[Int, Unit](count) { _ =>
             node.peerManager.getDataMessageHandler
               .addToStream(invalidHeaderMessage, peer)
+              //add a delay to not overwhelm queue so other messages can be processed
+              .flatMap(_ => AsyncUtil.nonBlockingSleep(100.millis))
           }
         }
 
@@ -192,8 +194,11 @@ class NeutrinoNodeWithUncachedBitcoindTest extends NodeUnitTest with CachedTor {
       for {
         _ <- AsyncUtil.retryUntilSatisfied(peerManager.peers.size == 2)
         peers <- bitcoinPeersF
-        peer = peers(0)
+        peer = peers(1)
         _ <- node.peerManager.isConnected(peer).map(assert(_))
+        _ <- node.sync()
+        bitcoinds <- bitcoindsF
+        _ <- NodeTestUtil.awaitAllSync(node, bitcoinds(1))
         _ = node.peerManager.updateDataMessageHandler(
           node.peerManager.getDataMessageHandler.copy(state =
             DataMessageHandlerState.HeaderSync(peer))(executionContext,

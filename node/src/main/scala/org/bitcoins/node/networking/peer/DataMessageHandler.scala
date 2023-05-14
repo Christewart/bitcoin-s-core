@@ -859,3 +859,6 @@ case class DataMessageWrapper(payload: DataPayload, peer: Peer)
     extends StreamDataMessageWrapper
 
 case class HeaderTimeoutWrapper(peer: Peer) extends StreamDataMessageWrapper
+
+case class SendToPeer(msg: NetworkMessage, peerOpt: Option[Peer])
+    extends StreamDataMessageWrapper

@@ -111,16 +111,10 @@ case class PeerManager(
   override def sendMsg(
       msg: NetworkPayload,
       peerOpt: Option[Peer]): Future[Unit] = {
-    val peerMsgSenderF = peerOpt match {
-      case Some(peer) =>
-        val peerMsgSenderF = peerDataMap(peer).peerMessageSender
-        peerMsgSenderF
-      case None =>
-        val peerMsgSenderF = randomPeerMsgSenderWithService(
-          ServiceIdentifier.NODE_NETWORK)
-        peerMsgSenderF
-    }
-    peerMsgSenderF.flatMap(_.sendMsg(msg))
+    val networkMessage = NetworkMessage(nodeAppConfig.network, msg)
+    dataMessageStream
+      .offer(SendToPeer(msg = networkMessage, peerOpt = peerOpt))
+      .map(_ => ())
   }
 
   /** Gossips the given message to all peers except the excluded peer. If None given as excluded peer, gossip message to all peers */
@@ -143,36 +137,22 @@ case class PeerManager(
   override def sendGetHeadersMessage(
       hashes: Vector[DoubleSha256DigestBE],
       peerOpt: Option[Peer]): Future[Unit] = {
-    val peerMsgSenderF = peerOpt match {
-      case Some(peer) =>
-        val peerMsgSenderF = peerDataMap(peer).peerMessageSender
-        peerMsgSenderF
-      case None =>
-        val peerMsgSenderF = randomPeerMsgSenderWithService(
-          ServiceIdentifier.NODE_NETWORK)
-        peerMsgSenderF
-    }
-    peerMsgSenderF.flatMap(_.sendGetHeadersMessage(hashes.map(_.flip)))
+    val headersMsg = GetHeadersMessage(hashes.distinct.take(101).map(_.flip))
+    sendMsg(headersMsg, peerOpt)
   }
 
   override def sendGetDataMessages(
       typeIdentifier: TypeIdentifier,
       hashes: Vector[DoubleSha256DigestBE],
       peerOpt: Option[Peer]): Future[Unit] = {
-    peerOpt match {
-      case Some(peer) =>
-        val peerMsgSenderF = peerDataMap(peer).peerMessageSender
-        val flip = hashes.map(_.flip)
-        peerMsgSenderF
-          .flatMap(_.sendGetDataMessage(typeIdentifier, flip: _*))
-      case None =>
-        val peerMsgSenderF = randomPeerMsgSenderWithService(
-          ServiceIdentifier.NODE_NETWORK)
-        peerMsgSenderF.flatMap(
-          _.sendGetDataMessage(TypeIdentifier.MsgWitnessBlock,
-                               hashes.map(_.flip): _*))
-
+    val msg: NetworkPayload = {
+      val inventories =
+        hashes.map(hash => Inventory(typeIdentifier, hash.flip))
+      val message = GetDataMessage(inventories)
+      message
     }
+
+    sendMsg(msg, peerOpt)
   }
 
   /** Starts sync compact filer headers.
@@ -261,7 +241,7 @@ case class PeerManager(
     }
   }
 
-  def randomPeerMsgSenderWithService(
+  private def randomPeerMsgSenderWithService(
       services: ServiceIdentifier): Future[PeerMessageSender] = {
     val randomPeerF = randomPeerWithService(services)
     randomPeerF.flatMap(peer => peerDataMap(peer).peerMessageSender)
@@ -532,8 +512,7 @@ case class PeerManager(
       //actor stopped for one of the persistent peers, can happen in case a reconnection attempt failed due to
       //reconnection tries exceeding the max limit in which the client was stopped to disconnect from it, remove it
       _peerDataMap.remove(peer)
-      //getDataMesageHandler.state is already mutated from another thread
-      //this will be set to the new sync peer not the old one.
+
       val state = getDataMessageHandler.state
       val syncPeerOpt = state match {
         case s: SyncDataMessageHandlerState =>
@@ -640,12 +619,39 @@ case class PeerManager(
     }
   }
 
-  private val dataMessageStreamSource = Source
+  private val dataMessageStreamSource: Source[
+    StreamDataMessageWrapper,
+    SourceQueueWithComplete[StreamDataMessageWrapper]] = Source
     .queue[StreamDataMessageWrapper](
       8,
       overflowStrategy = OverflowStrategy.backpressure,
       maxConcurrentOffers = nodeAppConfig.maxConnectedPeers)
     .mapAsync(1) {
+      case sendToPeer: SendToPeer =>
+        logger.debug(
+          s"Sending message ${sendToPeer.msg.payload.commandName} to peerOpt=${sendToPeer.peerOpt}")
+        val peerMsgSenderOptF = sendToPeer.peerOpt match {
+          case Some(peer) => getPeerMsgSender(peer)
+          case None =>
+            getDataMessageHandler.state match {
+              case s: SyncDataMessageHandlerState =>
+                getPeerMsgSender(s.syncPeer)
+              case DoneSyncing | _: MisbehavingPeer =>
+                //pick a random peer to sync with
+                randomPeerMsgSenderWithService(ServiceIdentifier.NODE_NETWORK)
+                  .map(Some(_))
+            }
+        }
+
+        peerMsgSenderOptF.flatMap {
+          case Some(peerMsgSender) =>
+            peerMsgSender
+              .sendMsg(sendToPeer.msg)
+              .map(_ => sendToPeer)
+          case None =>
+            Future.failed(new RuntimeException(
+              s"Unable to find peer message sender to send msg=${sendToPeer.msg.header.commandName} to"))
+        }
       case msg @ DataMessageWrapper(payload, peer) =>
         logger.debug(s"Got ${payload.commandName} from peer=${peer} in stream")
         val peerMsgSenderOptF = getPeerMsgSender(peer)
@@ -687,6 +693,9 @@ case class PeerManager(
     Sink.foreach[StreamDataMessageWrapper] {
       case DataMessageWrapper(payload, peer) =>
         logger.debug(s"Done processing ${payload.commandName} in peer=${peer}")
+      case stp: SendToPeer =>
+        logger.debug(
+          s"Done processing ${stp.msg.header.commandName} in peerOpt=${stp.peerOpt}")
       case HeaderTimeoutWrapper(_) =>
     }
 
