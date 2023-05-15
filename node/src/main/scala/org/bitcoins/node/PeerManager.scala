@@ -112,8 +112,7 @@ case class PeerManager(
       msg: NetworkPayload,
       peerOpt: Option[Peer]): Future[Unit] = {
     val networkMessage = NetworkMessage(nodeAppConfig.network, msg)
-    dataMessageStream
-      .offer(SendToPeer(msg = networkMessage, peerOpt = peerOpt))
+    offer(SendToPeer(msg = networkMessage, peerOpt = peerOpt))
       .map(_ => ())
   }
 
