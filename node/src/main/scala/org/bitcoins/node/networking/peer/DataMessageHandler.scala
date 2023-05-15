@@ -483,7 +483,7 @@ case class DataMessageHandler(
               s"Cannot find peer we are syncing with in PeerManager, peer=$peer")
         }
         peerData.updateInvalidMessageCount()
-        if (peerData.exceededMaxInvalidMessages && peerManager.peers.size > 1) {
+        if (peerData.exceededMaxInvalidMessages) {
           logger.warn(
             s"$peer exceeded max limit of invalid messages. Disconnecting.")
 
