@@ -329,10 +329,7 @@ case class DataMessageHandler(
           val getHeadersF: Future[DataMessageHandler] = {
             for {
               newDmh <- chainApiHeaderProcessF
-              dmh <- getHeaders(newDmh = newDmh,
-                                headers = headers,
-                                peerMsgSender = peerMsgSender,
-                                peer = peer)
+              dmh <- getHeaders(newDmh = newDmh, headers = headers, peer = peer)
             } yield dmh
           }
           val recoveredDmhF = getHeadersF.recoverWith {
@@ -343,7 +340,7 @@ case class DataMessageHandler(
             case _: InvalidBlockHeader =>
               logger.warn(
                 s"Invalid headers of count $count sent from ${peer} in state=$state")
-              recoverInvalidHeader(peerMsgSender)
+              recoverInvalidHeader()
             case e: Throwable => throw e
           }
 
@@ -478,8 +475,7 @@ case class DataMessageHandler(
   }
 
   /** Recover the data message handler if we received an invalid block header from a peer */
-  private def recoverInvalidHeader(
-      peerMsgSender: PeerMessageSender): Future[DataMessageHandler] = {
+  private def recoverInvalidHeader(): Future[DataMessageHandler] = {
     val result = state match {
       case HeaderSync(peer) =>
         val peerDataOpt = peerManager.getPeerData(peer)
@@ -501,8 +497,8 @@ case class DataMessageHandler(
             blockchains <- BlockHeaderDAO().getBlockchains()
             cachedHeaders = blockchains
               .flatMap(_.headers)
-              .map(_.hashBE.flip)
-            _ <- peerMsgSender.sendGetHeadersMessage(cachedHeaders)
+              .map(_.hashBE)
+            _ <- peerManager.sendGetHeadersMessage(cachedHeaders, Some(peer))
           } yield this
         }
 
@@ -725,7 +721,6 @@ case class DataMessageHandler(
   private def getHeaders(
       newDmh: DataMessageHandler,
       headers: Vector[BlockHeader],
-      peerMsgSender: PeerMessageSender,
       peer: Peer): Future[DataMessageHandler] = {
     val state = newDmh.state
     val count = headers.length
@@ -747,8 +742,8 @@ case class DataMessageHandler(
               logger.info(
                 s"Received maximum amount of headers in one header message. This means we are not synced, requesting more")
               //ask for headers more from the same peer
-              peerMsgSender
-                .sendGetHeadersMessage(lastHash)
+              peerManager
+                .sendGetHeadersMessage(lastHash.flip, Some(peer))
                 .map(_ => newDmh)
 
             case ValidatingHeaders(_, inSyncWith, _, _) =>
@@ -758,8 +753,8 @@ case class DataMessageHandler(
                 inSyncWith.map(p => peerManager.removePeer(p))
 
               //ask for more headers now
-              val askF = peerMsgSender
-                .sendGetHeadersMessage(lastHash)
+              val askF = peerManager
+                .sendGetHeadersMessage(lastHash.flip, Some(peer))
                 .map(_ => syncing)
 
               for {
