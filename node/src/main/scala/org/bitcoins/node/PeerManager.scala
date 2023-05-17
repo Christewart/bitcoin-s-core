@@ -89,7 +89,7 @@ case class PeerManager(
 
   def connectedPeerCount: Int = _peerDataMap.size
 
-  def addPeer(peer: Peer): Future[Unit] = {
+  private def addPeer(peer: Peer): Future[Unit] = {
     require(finder.hasPeer(peer), s"Unknown $peer marked as usable")
     val curPeerData = finder.popFromCache(peer).get
     _peerDataMap.put(peer, curPeerData)
@@ -706,7 +706,20 @@ case class PeerManager(
         logger.debug(
           s"Sending message ${sendToPeer.msg.payload.commandName} to peerOpt=${sendToPeer.peerOpt}")
         val peerMsgSenderOptF = sendToPeer.peerOpt match {
-          case Some(peer) => getPeerMsgSender(peer)
+          case Some(peer) =>
+            getPeerMsgSender(peer).flatMap {
+              case Some(peerMsgSender) => Future.successful(Some(peerMsgSender))
+              case None =>
+                sendToPeer.msg.payload match {
+                  case _: ControlPayload =>
+                    //peer may not be fully initialized, we may be doing the handshake with a peer
+                    finder.getData(peer).peerMessageSender.map(Some(_))
+                  case _: DataPayload =>
+                    //peer must be fully initialized to send a data payload
+                    Future.failed(new RuntimeException(
+                      s"Cannot find peer message sender to send message=${sendToPeer.msg.payload.commandName} to peerOpt=${sendToPeer.peerOpt}"))
+                }
+            }
           case None =>
             getDataMessageHandler.state match {
               case s: SyncDataMessageHandlerState =>
