@@ -10,6 +10,7 @@ import org.bitcoins.node.networking.peer.{
   PeerMessageReceiver,
   PeerMessageReceiverState
 }
+import org.bitcoins.node.util.PeerMessageSenderApi
 import org.bitcoins.node.{NeutrinoNode, Node, P2PLogger}
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.testkit.async.TestAsyncUtil
@@ -25,6 +26,7 @@ abstract class NodeTestUtil extends P2PLogger {
   def client(
       peer: Peer,
       peerMsgReceiver: PeerMessageReceiver,
+      peerMessageSenderApi: PeerMessageSenderApi,
       supervisor: ActorRef)(implicit
       nodeAppConfig: NodeAppConfig,
       chainAppConfig: ChainAppConfig,
@@ -35,6 +37,7 @@ abstract class NodeTestUtil extends P2PLogger {
       peerMessageReceiver = peerMsgReceiver,
       peerMsgRecvState = PeerMessageReceiverState.fresh(),
       p2pClientCallbacks = P2PClientCallbacks.empty,
+      peerMessageSenderApi = peerMessageSenderApi,
       maxReconnectionTries = 16,
       supervisor = supervisor
     )

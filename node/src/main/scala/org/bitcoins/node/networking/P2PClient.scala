@@ -27,6 +27,7 @@ import org.bitcoins.node.networking.peer.{
   PeerMessageReceiver,
   PeerMessageReceiverState
 }
+import org.bitcoins.node.util.PeerMessageSenderApi
 import org.bitcoins.node.{P2PLogger, ResponseTimeout}
 import org.bitcoins.tor.Socks5Connection.{Socks5Connect, Socks5Connected}
 import org.bitcoins.tor.{Socks5Connection, Socks5ProxyParams}
@@ -72,6 +73,7 @@ case class P2PClientActor(
     peerMsgHandlerReceiver: PeerMessageReceiver,
     initPeerMsgRecvState: PeerMessageReceiverState,
     p2pClientCallbacks: P2PClientCallbacks,
+    peerMessageSenderApi: PeerMessageSenderApi,
     maxReconnectionTries: Int
 )(implicit nodeAppConfig: NodeAppConfig, chainAppConfig: ChainAppConfig)
     extends Actor
@@ -407,8 +409,9 @@ case class P2PClientActor(
         peerConnection ! Tcp.ResumeReading
         val client = P2PClient(self, peer)
         currentPeerMsgRecvState = currentPeerMsgRecvState.connect(
-          client,
-          p2pClientCallbacks.onInitializationTimeout)(context.system,
+          client = client,
+          peerMessageSenderApi = peerMessageSenderApi,
+          onInitializationTimeout = p2pClientCallbacks.onInitializationTimeout)(context.system,
                                                       nodeAppConfig,
                                                       chainAppConfig)
         context.become(awaitNetworkRequest(peerConnection, unalignedBytes))
@@ -485,7 +488,8 @@ case class P2PClientActor(
         case _ @(_: Normal | _: Waiting | Preconnection | _: Initializing) =>
           peerMsgHandlerReceiver.handleNetworkMessageReceived(
             msg,
-            currentPeerMsgRecvState)
+            currentPeerMsgRecvState,
+            peerMessageSenderApi)
         case _: Disconnected | _: InitializedDisconnectDone |
             _: InitializedDisconnect | _: StoppedReconnect =>
           logger.debug(
@@ -663,6 +667,7 @@ object P2PClient extends P2PLogger {
       peerMsgHandlerReceiver: PeerMessageReceiver,
       peerMsgRecvState: PeerMessageReceiverState,
       p2pClientCallbacks: P2PClientCallbacks,
+      peerMessageSenderApi: PeerMessageSenderApi,
       maxReconnectionTries: Int)(implicit
       nodeAppConfig: NodeAppConfig,
       chainAppConfig: ChainAppConfig
@@ -673,6 +678,7 @@ object P2PClient extends P2PLogger {
       peerMsgHandlerReceiver,
       peerMsgRecvState,
       p2pClientCallbacks,
+      peerMessageSenderApi,
       maxReconnectionTries,
       nodeAppConfig,
       chainAppConfig
@@ -684,6 +690,7 @@ object P2PClient extends P2PLogger {
       peerMessageReceiver: PeerMessageReceiver,
       peerMsgRecvState: PeerMessageReceiverState,
       p2pClientCallbacks: P2PClientCallbacks,
+      peerMessageSenderApi: PeerMessageSenderApi,
       maxReconnectionTries: Int = 16,
       supervisor: ActorRef)(implicit
       nodeAppConfig: NodeAppConfig,
@@ -694,6 +701,7 @@ object P2PClient extends P2PLogger {
       peerMsgHandlerReceiver = peerMessageReceiver,
       peerMsgRecvState = peerMsgRecvState,
       p2pClientCallbacks,
+      peerMessageSenderApi,
       maxReconnectionTries = maxReconnectionTries
     )
 

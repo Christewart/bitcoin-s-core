@@ -23,6 +23,7 @@ import org.bitcoins.node.networking.peer.PeerMessageReceiverState.{
   StoppedReconnect,
   Waiting
 }
+import org.bitcoins.node.util.PeerMessageSenderApi
 
 import scala.concurrent.{ExecutionContext, Future, Promise}
 
@@ -102,6 +103,7 @@ sealed abstract class PeerMessageReceiverState extends Logging {
     */
   protected[networking] def connect(
       client: P2PClient,
+      peerMessageSenderApi: PeerMessageSenderApi,
       onInitializationTimeout: Peer => Future[Unit])(implicit
       system: ActorSystem,
       nodeAppConfig: NodeAppConfig,
@@ -126,9 +128,8 @@ sealed abstract class PeerMessageReceiverState extends Logging {
         val newState =
           Preconnection.toInitializing(client, initializationTimeoutCancellable)
 
-        val peerMsgSender = PeerMessageSender(client)
         val chainApi = ChainHandler.fromDatabase()
-        peerMsgSender.sendVersionMessage(chainApi)
+        peerMessageSenderApi.sendVersionMessage(chainApi, peer)
 
         newState
     }

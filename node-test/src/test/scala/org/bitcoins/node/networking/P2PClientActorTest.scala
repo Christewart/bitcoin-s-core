@@ -98,6 +98,7 @@ class P2PClientActorTest
   def buildP2PClient(peer: Peer)(implicit
       chainAppConfig: ChainAppConfig,
       nodeAppConfig: NodeAppConfig): Future[P2PClient] = {
+    val nodeF = NodeUnitTest.buildNode(peer, None)
     val peerMessageReceiverF =
       for {
         node <- NodeUnitTest.buildNode(peer, None)
@@ -110,19 +111,25 @@ class P2PClientActorTest
                                     node.peerManager.getDataMessageHandler,
                                   peer = peer)
 
-    val clientActorF: Future[TestActorRef[P2PClientActor]] =
-      peerMessageReceiverF.map { peerMsgRecv =>
+    val clientActorF: Future[TestActorRef[P2PClientActor]] = {
+
+      for {
+        node <- nodeF
+        peerMsgRecv <- peerMessageReceiverF
+      } yield {
         TestActorRef(
           P2PClient.props(
             peer = peer,
             peerMsgHandlerReceiver = peerMsgRecv,
             peerMsgRecvState = PeerMessageReceiverState.fresh(),
             p2pClientCallbacks = P2PClientCallbacks.empty,
+            node.peerManager,
             maxReconnectionTries = 16
           ),
           probe.ref
         )
       }
+    }
     val p2pClientF: Future[P2PClient] = clientActorF.map {
       client: TestActorRef[P2PClientActor] =>
         P2PClient(client, peer)

@@ -44,6 +44,7 @@ case class PeerData(
       peerMessageReceiver = peerMessageReceiver,
       peerMsgRecvState = PeerMessageReceiverState.fresh(),
       p2pClientCallbacks,
+      peerMessageSenderApi = peerManager,
       maxReconnectionTries = 4,
       supervisor = supervisor
     )
