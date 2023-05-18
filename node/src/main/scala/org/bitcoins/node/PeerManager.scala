@@ -698,7 +698,7 @@ case class PeerManager(
     StreamDataMessageWrapper,
     SourceQueueWithComplete[StreamDataMessageWrapper]] = Source
     .queue[StreamDataMessageWrapper](
-      8,
+      8 * nodeAppConfig.maxConnectedPeers,
       overflowStrategy = OverflowStrategy.backpressure,
       maxConcurrentOffers = nodeAppConfig.maxConnectedPeers)
     .mapAsync(1) {
