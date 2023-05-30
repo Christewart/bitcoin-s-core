@@ -61,14 +61,13 @@ case class DataMessageHandler(
 
   def handleDataPayload(
       payload: DataPayload,
-      peerMsgSender: PeerMessageSender,
       peer: Peer): Future[DataMessageHandler] = {
     state match {
       case syncState: SyncDataMessageHandlerState =>
         syncState match {
           case _: ValidatingHeaders =>
             val resultF =
-              handleDataPayloadValidState(payload, peerMsgSender, peer)
+              handleDataPayloadValidState(payload, peer)
             //process messages from all peers
             resultF.failed.foreach { err =>
               logger.error(
@@ -86,7 +85,7 @@ case class DataMessageHandler(
               Future.successful(this)
             } else {
               val resultF =
-                handleDataPayloadValidState(payload, peerMsgSender, peer)
+                handleDataPayloadValidState(payload, peer)
               resultF.failed.foreach { err =>
                 logger.error(
                   s"Failed to handle data payload=${payload} from $peer in state=$state errMsg=${err.getMessage}")
@@ -97,7 +96,7 @@ case class DataMessageHandler(
             }
         }
       case DoneSyncing =>
-        val resultF = handleDataPayloadValidState(payload, peerMsgSender, peer)
+        val resultF = handleDataPayloadValidState(payload, peer)
 
         resultF.failed.foreach { err =>
           logger.error(
@@ -116,9 +115,7 @@ case class DataMessageHandler(
         } else {
           //re-review this, we should probably pattern match on old state so we can continue syncing
           //from where we left off?
-          copy(state = DoneSyncing).handleDataPayload(payload,
-                                                      peerMsgSender,
-                                                      peer)
+          copy(state = DoneSyncing).handleDataPayload(payload, peer)
         }
     }
 
@@ -129,7 +126,6 @@ case class DataMessageHandler(
     */
   private def handleDataPayloadValidState(
       payload: DataPayload,
-      peerMsgSender: PeerMessageSender,
       peer: Peer): Future[DataMessageHandler] = {
 
     val wrappedFuture: Future[Future[DataMessageHandler]] = Future {
@@ -274,7 +270,9 @@ case class DataMessageHandler(
                         tx.toBaseTx
                       } else tx // send normal serialization
 
-                    peerMsgSender.sendTransactionMessage(txToBroadcast)
+                    peerManager.sendTransactionMessage(transaction =
+                                                         txToBroadcast,
+                                                       peerOpt = Some(peer))
                   case None =>
                     logger.warn(
                       s"Got request to send data with hash=${inv.hash}, but found nothing")
@@ -375,9 +373,7 @@ case class DataMessageHandler(
                     newMsgHandler <- {
                       // if in IBD, do not process this header, just execute callbacks
                       if (!isIBD) {
-                        handleDataPayload(payload = headersMessage,
-                                          peerMsgSender = peerMsgSender,
-                                          peer = peer)
+                        handleDataPayload(payload = headersMessage, peer = peer)
                       } else {
                         appConfig.callBacks
                           .executeOnBlockHeadersReceivedCallbacks(
@@ -410,7 +406,7 @@ case class DataMessageHandler(
           logger.warn(s"Merkleblock is not supported")
           Future.successful(this)
         case invMsg: InventoryMessage =>
-          handleInventoryMsg(invMsg = invMsg, peerMsgSender = peerMsgSender)
+          handleInventoryMsg(invMsg = invMsg, peer = peer)
       }
     }
 
@@ -576,7 +572,7 @@ case class DataMessageHandler(
 
   private def handleInventoryMsg(
       invMsg: InventoryMessage,
-      peerMsgSender: PeerMessageSender): Future[DataMessageHandler] = {
+      peer: Peer): Future[DataMessageHandler] = {
     logger.debug(s"Received inv=${invMsg}")
     val getData = GetDataMessage(invMsg.inventories.flatMap {
       case Inventory(TypeIdentifier.MsgBlock, hash) =>
@@ -593,7 +589,7 @@ case class DataMessageHandler(
         Some(Inventory(TypeIdentifier.MsgWitnessTx, hash))
       case other: Inventory => Some(other)
     })
-    peerMsgSender.sendMsg(getData).map(_ => this)
+    peerManager.sendMsg(getData, Some(peer)).map(_ => this)
   }
 
   private def getCompactFilterStartHeight(

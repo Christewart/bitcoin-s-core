@@ -45,7 +45,6 @@ class DataMessageHandlerTest extends NodeTestWithCachedBitcoindNewest {
       val node = param.node
       val peer = node.peerManager.peers.head
 
-      val senderF = node.peerMsgSendersF.map(_.head)
       for {
         chainApi <- node.chainApiFromDb()
         dataMessageHandler = DataMessageHandler(
@@ -63,10 +62,8 @@ class DataMessageHandlerTest extends NodeTestWithCachedBitcoindNewest {
         // Validate that it causes a failure
         _ <- recoverToSucceededIf[RuntimeException](
           chainApi.processHeaders(invalidPayload.headers))
-
-        sender <- senderF
         // Verify we handle the payload correctly
-        _ <- dataMessageHandler.handleDataPayload(invalidPayload, sender, peer)
+        _ <- dataMessageHandler.handleDataPayload(invalidPayload, peer)
       } yield succeed
   }
 
@@ -84,7 +81,6 @@ class DataMessageHandlerTest extends NodeTestWithCachedBitcoindNewest {
           ()
         }
       }
-      val senderF = node.peerMsgSendersF.map(_.head)
 
       for {
         hash <- bitcoind.generateToAddress(blocks = 1, junkAddress).map(_.head)
@@ -103,8 +99,7 @@ class DataMessageHandlerTest extends NodeTestWithCachedBitcoindNewest {
             state = HeaderSync(peer),
             filterBatchCache = Set.empty
           )(node.executionContext, node.nodeAppConfig, node.chainConfig)
-        sender <- senderF
-        _ <- dataMessageHandler.handleDataPayload(payload, sender, peer)
+        _ <- dataMessageHandler.handleDataPayload(payload, peer)
         result <- resultP.future
       } yield assert(result == block)
   }
@@ -126,7 +121,6 @@ class DataMessageHandlerTest extends NodeTestWithCachedBitcoindNewest {
         }
       }
 
-      val senderF = node.peerMsgSendersF.map(_.head)
       for {
         hash <- bitcoind.generateToAddress(blocks = 1, junkAddress).map(_.head)
         header <- bitcoind.getBlockHeaderRaw(hash)
@@ -146,8 +140,7 @@ class DataMessageHandlerTest extends NodeTestWithCachedBitcoindNewest {
             node.executionContext,
             node.nodeAppConfig,
             node.chainConfig)
-        sender <- senderF
-        _ <- dataMessageHandler.handleDataPayload(payload, sender, peer)
+        _ <- dataMessageHandler.handleDataPayload(payload, peer)
         result <- resultP.future
       } yield assert(result == Vector(header))
   }
@@ -190,7 +183,6 @@ class DataMessageHandlerTest extends NodeTestWithCachedBitcoindNewest {
           ()
         }
       }
-      val senderF = node.peerMsgSendersF.map(_.head)
 
       for {
 
@@ -210,8 +202,7 @@ class DataMessageHandlerTest extends NodeTestWithCachedBitcoindNewest {
             state = HeaderSync(peer),
             filterBatchCache = Set.empty
           )(node.executionContext, node.nodeAppConfig, node.chainConfig)
-        sender <- senderF
-        _ <- dataMessageHandler.handleDataPayload(payload, sender, peer)
+        _ <- dataMessageHandler.handleDataPayload(payload, peer)
         result <- resultP.future
       } yield assert(result == tx)
   }

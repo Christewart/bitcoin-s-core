@@ -411,9 +411,10 @@ case class P2PClientActor(
         currentPeerMsgRecvState = currentPeerMsgRecvState.connect(
           client = client,
           peerMessageSenderApi = peerMessageSenderApi,
-          onInitializationTimeout = p2pClientCallbacks.onInitializationTimeout)(context.system,
-                                                      nodeAppConfig,
-                                                      chainAppConfig)
+          onInitializationTimeout = p2pClientCallbacks.onInitializationTimeout)(
+          context.system,
+          nodeAppConfig,
+          chainAppConfig)
         context.become(awaitNetworkRequest(peerConnection, unalignedBytes))
         unalignedBytes
 

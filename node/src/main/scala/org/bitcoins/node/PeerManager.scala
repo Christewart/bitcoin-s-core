@@ -103,12 +103,6 @@ case class PeerManager(
 
   def peers: Vector[Peer] = _peerDataMap.keys.toVector
 
-  def peerMsgSendersF: Future[Vector[PeerMessageSender]] = {
-    Future
-      .traverse(_peerDataMap.values)(_.peerMessageSender)
-      .map(_.toVector)
-  }
-
   override def sendMsg(
       msg: NetworkPayload,
       peerOpt: Option[Peer]): Future[Unit] = {
@@ -750,9 +744,9 @@ case class PeerManager(
           case None =>
             Future.failed(new RuntimeException(
               s"Couldn't find PeerMessageSender that corresponds with peer=$peer msg=${payload.commandName}. Was it disconnected?"))
-          case Some(peerMsgSender) =>
+          case Some(_) => //this match should be able to be removed
             getDataMessageHandler
-              .handleDataPayload(payload, peerMsgSender, peer)
+              .handleDataPayload(payload, peer)
               .flatMap { newDmh =>
                 newDmh.state match {
                   case m: MisbehavingPeer =>
