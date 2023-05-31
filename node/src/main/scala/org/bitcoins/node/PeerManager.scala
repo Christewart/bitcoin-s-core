@@ -745,7 +745,7 @@ case class PeerManager(
           case None =>
             Future.failed(new RuntimeException(
               s"Couldn't find PeerMessageSender that corresponds with peer=$peer msg=${payload.commandName}. Was it disconnected?"))
-          case Some(_) => //this match should be able to be removed
+          case Some(_) =>
             getDataMessageHandler
               .handleDataPayload(payload, peer)
               .flatMap { newDmh =>
