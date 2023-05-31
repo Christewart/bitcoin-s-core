@@ -146,6 +146,7 @@ case class NeutrinoNode(
     for {
       syncPeer <- peerManager.randomPeerWithService(
         ServiceIdentifier.NODE_COMPACT_FILTERS)
+      _ = logger.info(s"Syncing from new peer=$syncPeer")
       _ <- syncHelper(syncPeer)
     } yield ()
   }
