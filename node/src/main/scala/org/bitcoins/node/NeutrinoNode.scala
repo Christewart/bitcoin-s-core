@@ -142,13 +142,13 @@ case class NeutrinoNode(
     }
   }
 
-  override def syncFromNewPeer(): Future[Unit] = {
+  override def syncFromNewPeer(): Future[Peer] = {
     for {
       syncPeer <- peerManager.randomPeerWithService(
         ServiceIdentifier.NODE_COMPACT_FILTERS)
       _ = logger.info(s"Syncing from new peer=$syncPeer")
       _ <- syncHelper(syncPeer)
-    } yield ()
+    } yield syncPeer
   }
 
   /** Gets the number of compact filters in the database */

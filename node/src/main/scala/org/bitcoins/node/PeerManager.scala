@@ -592,7 +592,18 @@ case class PeerManager(
           None
       }
       if (peers.exists(_ != peer) && syncPeerOpt.isDefined) {
-        node.syncFromNewPeer().map(_ => ())
+        node.syncFromNewPeer().map { newPeer =>
+          val newState = node.peerManager.getDataMessageHandler.state match {
+            case s @ (DoneSyncing | _: MisbehavingPeer) => s //do nothing s
+            case h: HeaderSync                          => h.copy(syncPeer = newPeer)
+            case fh: FilterHeaderSync                   => fh.copy(syncPeer = newPeer)
+            case f: FilterSync                          => f.copy(syncPeer = newPeer)
+            case v: ValidatingHeaders                   => v.copy(syncPeer = newPeer)
+          }
+          node.peerManager.updateDataMessageHandler(
+            node.peerManager.getDataMessageHandler.copy(state = newState))
+          ()
+        }
       } else if (syncPeerOpt.isDefined) {
         //means we aren't syncing with anyone, so do nothing?
         val exn = new RuntimeException(
@@ -699,7 +710,7 @@ case class PeerManager(
     .mapAsync(1) {
       case sendToPeer: SendToPeer =>
         logger.debug(
-          s"Sending message ${sendToPeer.msg.payload.commandName} to peerOpt=${sendToPeer.peerOpt}")
+          s"Sending message ${sendToPeer.msg.payload.commandName} to peerOpt=${sendToPeer.peerOpt} dmh.state=${getDataMessageHandler.state}")
         val peerMsgSenderOptF = sendToPeer.peerOpt match {
           case Some(peer) =>
             getPeerMsgSender(peer).flatMap {
@@ -758,7 +769,33 @@ case class PeerManager(
                       _ <- node.syncFromNewPeer()
                     } yield msg
                   case _: SyncDataMessageHandlerState | DoneSyncing =>
-                    updateDataMessageHandler(newDmh)
+                    val currentSyncPeer = getDataMessageHandler.state match {
+                      case DoneSyncing | _: MisbehavingPeer =>
+                        peers.head //just pick a random peer?
+                      case s: SyncDataMessageHandlerState => s.syncPeer
+                    }
+                    val newDmhWithAdjustedSyncPeer = newDmh.state match {
+                      case DoneSyncing | _: MisbehavingPeer => newDmh
+                      case s: SyncDataMessageHandlerState =>
+                        if (peers.exists(_ == s.syncPeer)) {
+                          newDmh
+                        } else {
+                          //this means the syncPeer got disconnected asynchronously
+                          //while processing a message, we want to keep the new syncPeer
+                          val newState = s match {
+                            case h: HeaderSync =>
+                              h.copy(syncPeer = currentSyncPeer)
+                            case fh: FilterHeaderSync =>
+                              fh.copy(syncPeer = currentSyncPeer)
+                            case f: FilterSync =>
+                              f.copy(syncPeer = currentSyncPeer)
+                            case v: ValidatingHeaders =>
+                              v.copy(syncPeer = currentSyncPeer)
+                          }
+                          newDmh.copy(state = newState)
+                        }
+                    }
+                    updateDataMessageHandler(newDmhWithAdjustedSyncPeer)
                     Future.successful(msg)
                 }
 
@@ -778,10 +815,11 @@ case class PeerManager(
   private val dataMessageStreamSink =
     Sink.foreach[StreamDataMessageWrapper] {
       case DataMessageWrapper(payload, peer) =>
-        logger.debug(s"Done processing ${payload.commandName} in peer=${peer}")
+        logger.debug(
+          s"Done processing ${payload.commandName} in peer=${peer} dmh.state=${getDataMessageHandler.state}")
       case stp: SendToPeer =>
         logger.debug(
-          s"Done processing ${stp.msg.header.commandName} in peerOpt=${stp.peerOpt}")
+          s"Done processing ${stp.msg.header.commandName} in peerOpt=${stp.peerOpt} dmh.state=${getDataMessageHandler.state}")
       case HeaderTimeoutWrapper(_) =>
     }
 
@@ -853,6 +891,8 @@ case class PeerManager(
 
   def updateDataMessageHandler(
       dataMessageHandler: DataMessageHandler): PeerManager = {
+    logger.debug(
+      s"Updating datamessagehandler with state=${dataMessageHandler.state}")
     this.dataMessageHandler = dataMessageHandler
     this
   }
