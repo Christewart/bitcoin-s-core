@@ -805,8 +805,11 @@ case class PeerManager(
             }
         }
       case (dmh, ControlMessageWrapper(payload, peer)) =>
+        logger.debug(s"Got ${payload.commandName} from peer=${peer} in stream")
         val controlMessageHandler = ControlMessageHandler(this)
         controlMessageHandler.handleControlPayload(payload, peer).map { _ =>
+          logger.debug(
+            s"Done processing ${payload.commandName} in peer=${peer}")
           dmh
         }
       case (dmh, HeaderTimeoutWrapper(peer)) =>
@@ -819,18 +822,41 @@ case class PeerManager(
             }
           }
         } yield newDmh
-      case (dmh, DisconnectedPeer(peer, forceReconnect)) =>
+      case (dmh, d @ DisconnectedPeer(peer, forceReconnect)) =>
+        logger.debug(s"Got ${d} from peer=${peer} in stream")
         onP2PClientDisconnected(peer, forceReconnect, dmh.state)
-          .map(newState => dmh.copy(state = newState))
+          .map { newState =>
+            logger.debug(s"Done processing disconnected peer for peer=$peer")
+            dmh.copy(state = newState)
+          }
       case (dmh, i: Initialized) =>
+        logger.debug(s"Got ${i} from peer=${i.peer} in stream")
         onInitialization(i.peer, dmh.state)
-          .map(newState => dmh.copy(state = newState))
+          .map { newState =>
+            logger.debug(s"Done processing Initialized from peer=${i.peer}")
+            dmh.copy(state = newState)
+          }
       case (dmh, i: InitializationTimeout) =>
-        onInitializationTimeout(i.peer).map(_ => dmh)
+        logger.debug(s"Got ${i} from peer=${i.peer} in stream")
+        onInitializationTimeout(i.peer).map { _ =>
+          logger.debug(
+            s"Done processing InitializedTimeout from peer=${i.peer} in stream")
+          dmh
+        }
       case (dmh, q: QueryTimeout) =>
-        onQueryTimeout(q.payload, q.peer, dmh.state).map(_ => dmh)
+        logger.debug(s"Got ${q} from peer=${q.peer} in stream")
+        onQueryTimeout(q.payload, q.peer, dmh.state).map { _ =>
+          logger.debug(
+            s"Done processing QueryTimeout from peer=${q.peer} in stream")
+          dmh
+        }
       case (dmh, srt: SendResponseTimeout) =>
-        sendResponseTimeout(srt.peer, srt.payload).map(_ => dmh)
+        logger.debug(s"Got ${srt} from peer=${srt.peer} in stream")
+        sendResponseTimeout(srt.peer, srt.payload).map { _ =>
+          logger.debug(
+            s"Done processing SendResponseTimeout from peer=${srt.peer} in stream")
+          dmh
+        }
     }
   }
 

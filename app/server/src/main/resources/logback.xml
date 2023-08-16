@@ -64,7 +64,7 @@
     <logger name="org.bitcoins.node.networking.peer.PeerMessageReceiver" level="INFO"/>
 
     <!-- See outgoing message names and the peer it's sent to -->
-    <logger name="org.bitcoins.node.networking.peer.PeerMessageSender" level="INFO"/>
+    <logger name="org.bitcoins.node.networking.peer.PeerMessageSender" level="DEBUG"/>
 
     <!-- Inspect handling of headers and inventory messages  -->
     <logger name="org.bitcoins.node.networking.peer.DataMessageHandler" level="INFO"/>
@@ -73,7 +73,7 @@
     <logger name="org.bitcoins.node.networking.P2PClientActor" level="INFO"/>
 
     <!-- See peer details -->
-    <logger name="org.bitcoins.node.PeerManager" level="INFO"/>
+    <logger name="org.bitcoins.node.PeerManager" level="DEBUG"/>
 
     <!-- See node status messages  -->
     <logger name="org.bitcoins.node.NeutrinoNode" level="INFO"/>
