@@ -765,6 +765,7 @@ case class PeerManager(
         100 * nodeAppConfig.maxConnectedPeers,
         overflowStrategy = OverflowStrategy.backpressure,
         maxConcurrentOffers = Runtime.getRuntime.availableProcessors())
+      .backpressureTimeout(1.minute)
   }
 
   private def buildDataMessageStreamSink(initDmh: DataMessageHandler): Sink[

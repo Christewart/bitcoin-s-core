@@ -119,4 +119,6 @@
     <logger name="akka.actor.RepointableActorRef" level="OFF"/>
     <logger name="akka.actor.LocalActorRef" level="OFF"/>
 
+    <logger name="akka.stream" level="DEBUG"/>
+
 </configuration>

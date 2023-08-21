@@ -1,7 +1,6 @@
 package org.bitcoins.node.networking.peer
 
 import akka.actor.{ActorSystem, Cancellable}
-import akka.event.Logging
 import akka.io.Inet.SocketOption
 import akka.io.Tcp.SO.KeepAlive
 import akka.stream.scaladsl.{
@@ -15,7 +14,7 @@ import akka.stream.scaladsl.{
   SourceQueueWithComplete,
   Tcp
 }
-import akka.stream.{Attributes, KillSwitches, UniqueKillSwitch}
+import akka.stream.{KillSwitches, UniqueKillSwitch}
 import akka.util.ByteString
 import akka.{Done, NotUsed}
 import org.bitcoins.chain.blockchain.ChainHandler
@@ -127,12 +126,12 @@ case class PeerMessageSender(
     Flow[ByteString]
       .statefulMap(() => ByteString.empty)(parseHelper,
                                            { _: ByteString => None })
-      .log(
-        "parseToNetworkMsgFlow",
-        { case msgs: Vector[NetworkMessage] =>
-          s"received msgs=${msgs.map(_.payload.commandName)} from peer=$peer socket=$socket"
-        })
-      .withAttributes(Attributes.logLevels(onFailure = Logging.DebugLevel))
+//      .log(
+//        "parseToNetworkMsgFlow",
+//        { case msgs: Vector[NetworkMessage] =>
+//          s"received msgs=${msgs.map(_.payload.commandName)} from peer=$peer socket=$socket"
+//        })
+//      .withAttributes(Attributes.logLevels(onFailure = Logging.DebugLevel))
   }
 
   private val writeNetworkMsgFlow: Flow[ByteString, ByteString, NotUsed] = {

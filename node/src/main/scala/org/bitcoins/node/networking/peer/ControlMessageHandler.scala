@@ -25,8 +25,12 @@ case class ControlMessageHandler(peerManager: PeerManager)(implicit
         peerManager.sendVerackMessage(peer)
 
       case VerAckMessage =>
+        logger.warn(s"offering verack message to peer=$peer")
         val i = NodeStreamMessage.Initialized(peer)
-        peerManager.offer(i).map(_ => ())
+        peerManager.offer(i).map { _ =>
+          logger.warn(s"done offering verack message to peer=$peer")
+          ()
+        }
 
       case ping: PingMessage =>
         peerManager.sendPong(ping, peer)
