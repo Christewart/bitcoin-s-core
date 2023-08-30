@@ -20,7 +20,7 @@
         </encoder>
     </appender>
 
-    <root level="OFF">
+    <root level="DEBUG">
         <appender-ref ref="FILE"/>
         <appender-ref ref="STDOUT"/>
     </root>
@@ -98,7 +98,7 @@
     <logger name="slick.jdbc.JdbcBackend.statement" level="OFF"/>
 
     <!-- see what slick is compiling to in sql -->
-    <logger name="slick.compiler" level="OFF"/>
+    <logger name="slick" level="OFF"/>
 
     <!-- see what's returned by Slick -->
     <logger name="slick.jdbc.StatementInvoker.result" level="OFF"/>
@@ -114,5 +114,7 @@
 
     <!-- get rid of "Setting level of logger" messages -->
     <logger name="ch.qos.logback" level="DEBUG"/>
+
+    <logger name="akka" level="DEBUG"/>
 
 </configuration>

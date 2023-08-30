@@ -10,6 +10,7 @@ import akka.http.scaladsl.model.ws.{
 }
 import akka.http.scaladsl.model.{HttpHeader, StatusCodes}
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
+import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.cli.ConsoleCli.exec
 import org.bitcoins.cli.{CliCommand, Config, ConsoleCli}
 import org.bitcoins.commons.jsonmodels.ws.ChainNotification.{
@@ -32,13 +33,11 @@ import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.util.NetworkUtil
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto.{CryptoUtil, DoubleSha256DigestBE}
-import org.bitcoins.testkit.server.{
-  BitcoinSServerMainBitcoindFixture,
-  ServerWithBitcoind
-}
+import org.bitcoins.testkit.server.{BitcoinSServerMainBitcoindFixture}
 import org.bitcoins.testkit.util.AkkaUtil
 
 import java.net.InetSocketAddress
+import scala.collection.immutable.Seq
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 import scala.util.Try
@@ -121,7 +120,7 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
   val offer: LnMessage[DLCOfferTLV] = LnMessage(DLCOfferTLV.fromHex(str))
 
   it must "fail if RPC password is incorrect" in { serverWithBitcoind =>
-    val ServerWithBitcoind(_, server) = serverWithBitcoind
+    val server = serverWithBitcoind.server
     val req = buildReq(server.conf, Some("wrong password"))
     val notificationsF = Http().singleWebSocketRequest(req, websocketFlow)
 
@@ -142,7 +141,7 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
 
   it must "receive updates when an address is generated" in {
     serverWithBitcoind =>
-      val ServerWithBitcoind(_, server) = serverWithBitcoind
+      val server = serverWithBitcoind.server
       val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
                              rpcPassword = server.conf.rpcPassword)
 
@@ -174,7 +173,8 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
 
   it must "receive updates when a transaction is broadcast" in {
     serverWithBitcoind =>
-      val ServerWithBitcoind(bitcoind, server) = serverWithBitcoind
+      val bitcoind = serverWithBitcoind.bitcoind
+      val server = serverWithBitcoind.server
       val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
                              rpcPassword = server.conf.rpcPassword)
 
@@ -213,7 +213,8 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
 
   it must "receive updates when a transaction is processed" in {
     serverWithBitcoind =>
-      val ServerWithBitcoind(bitcoind, server) = serverWithBitcoind
+      val bitcoind = serverWithBitcoind.bitcoind
+      val server = serverWithBitcoind.server
       val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
                              rpcPassword = server.conf.rpcPassword)
 
@@ -251,7 +252,8 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
   }
 
   it must "receive updates when a block is processed" in { serverWithBitcoind =>
-    val ServerWithBitcoind(bitcoind, server) = serverWithBitcoind
+    val bitcoind = serverWithBitcoind.bitcoind
+    val server = serverWithBitcoind.server
     val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
                            rpcPassword = server.conf.rpcPassword)
 
@@ -288,7 +290,7 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
 
   it must "get notifications for reserving and unreserving utxos" in {
     serverWithBitcoind =>
-      val ServerWithBitcoind(_, server) = serverWithBitcoind
+      val server = serverWithBitcoind.server
       val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
                              rpcPassword = server.conf.rpcPassword)
 
@@ -323,7 +325,7 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
 
   it must "receive updates when an offer is added and removed" in {
     serverWithBitcoind =>
-      val ServerWithBitcoind(_, server) = serverWithBitcoind
+      val server = serverWithBitcoind.server
       val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
                              rpcPassword = server.conf.rpcPassword)
 
@@ -372,7 +374,7 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
   }
 
   it must "receive updates when a rescan is complete" in { serverWithBitcoind =>
-    val ServerWithBitcoind(_, server) = serverWithBitcoind
+    val server = serverWithBitcoind.server
     val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
                            rpcPassword = server.conf.rpcPassword)
 
@@ -402,7 +404,7 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
   }
 
   it must "receive updates when sync flag changes" in { serverWithBitcoind =>
-    val ServerWithBitcoind(_, server) = serverWithBitcoind
+    val server = serverWithBitcoind.server
 
     val req = buildReq(server.conf)
     val tuple: (
@@ -425,7 +427,7 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
   }
 
   it must "receive updates when fee rate changes" in { serverWithBitcoind =>
-    val ServerWithBitcoind(_, server) = serverWithBitcoind
+    val server = serverWithBitcoind.server
 
     val req = buildReq(server.conf)
     val tuple: (
@@ -448,7 +450,7 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
   }
 
   it must "receive dlc node updates" in { serverWithBitcoind =>
-    val ServerWithBitcoind(_, server) = serverWithBitcoind
+    val server = serverWithBitcoind.server
     val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
                            rpcPassword = server.conf.rpcPassword)
 
@@ -492,6 +494,59 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
           case _ => false
         }))
     }
+  }
+
+  it must "not drop elements from the callback system" in {
+    serverWithBitcoind =>
+      val server = serverWithBitcoind.server
+      val walletHolder = serverWithBitcoind.walletHolder
+      val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
+                             rpcPassword = server.conf.rpcPassword,
+                             debug = true)
+
+      val req = buildReq(server.conf)
+      val notificationsF: (
+          Future[WebSocketUpgradeResponse],
+          (Future[Seq[WsNotification[_]]], Promise[Option[Message]])) = {
+        Http()
+          .singleWebSocketRequest(req, websocketFlow)
+      }
+
+      val walletNotificationsF: Future[Seq[WsNotification[_]]] =
+        notificationsF._2._1
+
+      val promise: Promise[Option[Message]] = notificationsF._2._2
+
+      val count = 10
+
+      var counter = 0
+      0.until(count).map {
+        logger.info(s"counter=$counter")
+        val result = exec(GetNewAddress(labelOpt = None), cliConfig).get
+        counter += 1
+        result
+      }
+      for {
+        _ <- AsyncUtil.nonBlockingSleep(10.second)
+        _ <- AsyncUtil.retryUntilSatisfiedF(() => {
+          for {
+            unusedAddresses <- walletHolder.listAddresses().map(_.length)
+          } yield {
+            logger.info(s"unusedAddresses.length=${unusedAddresses}")
+            unusedAddresses == count
+          }
+        })
+        _ = promise.success(None)
+        notifications <- walletNotificationsF
+      } yield {
+        val addrNotificationCount =
+          notifications.count(_.isInstanceOf[NewAddressNotification])
+        if (addrNotificationCount != count) {
+          logger.info(
+            s"notifications.length=${addrNotificationCount} count=$count totalCount=${notifications.length}")
+        }
+        assert(addrNotificationCount == count)
+      }
   }
 
   /* TODO implement a real test for this case

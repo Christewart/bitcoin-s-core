@@ -42,7 +42,7 @@ trait BitcoinSServerMainBitcoindFixture
                                                    config.walletConf)
         _ <- FundWalletUtil.fundWalletWithBitcoind(walletWithBitcoind)
       } yield {
-        ServerWithBitcoind(bitcoind, server)
+        ServerWithBitcoind(bitcoind, server, walletHolder)
       }
     }
 
