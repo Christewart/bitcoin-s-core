@@ -20,7 +20,7 @@
         </encoder>
     </appender>
 
-    <root level="DEBUG">
+    <root level="INFO">
         <appender-ref ref="FILE"/>
         <appender-ref ref="STDOUT"/>
     </root>
@@ -116,5 +116,7 @@
     <logger name="ch.qos.logback" level="DEBUG"/>
 
     <logger name="akka" level="DEBUG"/>
+
+    <logger name="sttp" level="DEBUG"/>
 
 </configuration>

@@ -33,7 +33,7 @@ import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.util.NetworkUtil
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto.{CryptoUtil, DoubleSha256DigestBE}
-import org.bitcoins.testkit.server.{BitcoinSServerMainBitcoindFixture}
+import org.bitcoins.testkit.server.BitcoinSServerMainBitcoindFixture
 import org.bitcoins.testkit.util.AkkaUtil
 
 import java.net.InetSocketAddress
@@ -85,6 +85,17 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
     Message,
     Message,
     (Future[Seq[WsNotification[_]]], Promise[Option[Message]])] = {
+    Flow
+      .fromSinkAndSourceCoupledMat(sink, Source.maybe[Message])(Keep.both)
+  }
+
+  /** A flow that throttles websocket events to 1 event per second */
+  val websocketFlowThrottled: Flow[
+    Message,
+    Message,
+    (Future[Seq[WsNotification[_]]], Promise[Option[Message]])] = {
+    //val throttled = Flow[Message].throttle(1, 1.second).toMat(sink)(Keep.right)
+
     Flow
       .fromSinkAndSourceCoupledMat(sink, Source.maybe[Message])(Keep.both)
   }
@@ -501,15 +512,14 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
       val server = serverWithBitcoind.server
       val walletHolder = serverWithBitcoind.walletHolder
       val cliConfig = Config(rpcPortOpt = Some(server.conf.rpcPort),
-                             rpcPassword = server.conf.rpcPassword,
-                             debug = true)
+                             rpcPassword = server.conf.rpcPassword)
 
       val req = buildReq(server.conf)
       val notificationsF: (
           Future[WebSocketUpgradeResponse],
           (Future[Seq[WsNotification[_]]], Promise[Option[Message]])) = {
         Http()
-          .singleWebSocketRequest(req, websocketFlow)
+          .singleWebSocketRequest(req, websocketFlowThrottled)
       }
 
       val walletNotificationsF: Future[Seq[WsNotification[_]]] =
@@ -517,23 +527,34 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
 
       val promise: Promise[Option[Message]] = notificationsF._2._2
 
+      val connectionF = notificationsF._1
+      val initCountF = walletHolder.listUnusedAddresses().map(_.length)
       val count = 10
 
-      var counter = 0
-      0.until(count).map {
-        logger.info(s"counter=$counter")
-        val result = exec(GetNewAddress(labelOpt = None), cliConfig).get
-        counter += 1
-        result
+      val generateAddressesF: Future[Vector[Try[String]]] = {
+        for {
+          _ <- initCountF
+          _ <- connectionF
+          results <- Future.traverse(0.until(count).toVector) { case _ =>
+            Future {
+              scala.concurrent.blocking {
+                ConsoleCli.exec(GetNewAddress(labelOpt = None), cliConfig)
+              }
+            }
+          }
+        } yield {
+          results
+        }
       }
+
       for {
-        _ <- AsyncUtil.nonBlockingSleep(10.second)
+        _ <- generateAddressesF
+        initCount <- initCountF
         _ <- AsyncUtil.retryUntilSatisfiedF(() => {
           for {
-            unusedAddresses <- walletHolder.listAddresses().map(_.length)
+            unusedAddresses <- walletHolder.listUnusedAddresses().map(_.length)
           } yield {
-            logger.info(s"unusedAddresses.length=${unusedAddresses}")
-            unusedAddresses == count
+            (unusedAddresses - initCount) == count
           }
         })
         _ = promise.success(None)
