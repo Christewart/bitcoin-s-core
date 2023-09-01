@@ -661,7 +661,7 @@ class BitcoinSServerMain(override val serverArgParser: ServerArgParser)(implicit
   private def buildWsSource: (
       SourceQueueWithComplete[WsNotification[_]],
       Source[WsNotification[_], NotUsed]) = {
-    val maxBufferSize: Int = 5
+    val maxBufferSize: Int = 1
 
     /** This will queue [[maxBufferSize]] elements in the queue. Once the buffer size is reached,
       * we will drop the first element in the buffer
@@ -671,13 +671,15 @@ class BitcoinSServerMain(override val serverArgParser: ServerArgParser)(implicit
       //the BroadcastHub.sink is needed to avoid these errors
       // 'Websocket handler failed with Processor actor'
       Source
-        .queue[WsNotification[_]](maxBufferSize, OverflowStrategy.dropHead)
-        .toMat(BroadcastHub.sink)(Keep.both)
+        .queue[WsNotification[_]](maxBufferSize, OverflowStrategy.backpressure)
+        .log("buildWsSource")
+        .toMat(BroadcastHub.sink(maxBufferSize))(Keep.both)
         .run()
     }
 
     //need to drain the websocket queue if no one is connected
-    val _: Future[Done] = tuple._2.runWith(Sink.ignore)
+    val _: Future[Done] =
+      tuple._2.runWith(Sink.foreach(i => logger.info(s"ignore=$i")))
 
     tuple
   }

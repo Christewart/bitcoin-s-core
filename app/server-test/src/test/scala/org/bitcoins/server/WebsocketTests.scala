@@ -94,10 +94,13 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
     Message,
     Message,
     (Future[Seq[WsNotification[_]]], Promise[Option[Message]])] = {
-    //val throttled = Flow[Message].throttle(1, 1.second).toMat(sink)(Keep.right)
+    val throttled = Flow[Message]
+      .log("before throttle")
+      .throttle(1, 100.millis)
+      .toMat(sink)(Keep.right)
 
     Flow
-      .fromSinkAndSourceCoupledMat(sink, Source.maybe[Message])(Keep.both)
+      .fromSinkAndSourceCoupledMat(throttled, Source.maybe[Message])(Keep.both)
   }
 
   val str =
@@ -557,14 +560,17 @@ class WebsocketTests extends BitcoinSServerMainBitcoindFixture {
             (unusedAddresses - initCount) == count
           }
         })
+        _ <- AsyncUtil.nonBlockingSleep(3.second)
         _ = promise.success(None)
         notifications <- walletNotificationsF
       } yield {
-        val addrNotificationCount =
-          notifications.count(_.isInstanceOf[NewAddressNotification])
+        val addrNotifications = notifications.collect {
+          case a: NewAddressNotification => a
+        }
+        val addrNotificationCount = addrNotifications.length
         if (addrNotificationCount != count) {
           logger.info(
-            s"notifications.length=${addrNotificationCount} count=$count totalCount=${notifications.length}")
+            s"notifications.length=${addrNotificationCount} count=$count totalCount=${notifications.length} notifications=$addrNotifications")
         }
         assert(addrNotificationCount == count)
       }
