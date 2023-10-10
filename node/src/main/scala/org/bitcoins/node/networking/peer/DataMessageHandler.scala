@@ -60,7 +60,7 @@ case class DataMessageHandler(
             val syncPeer = state.syncPeer
             if (peerData.peer != syncPeer) {
               //ignore message from peers that we aren't syncing with during IBD
-              logger.warn(
+              logger.debug(
                 s"Ignoring message ${payload.commandName} from peer=${peerData.peer} in state=$state because we are syncing with this peer currently. syncPeer=$syncPeer")
               Future.successful(this)
             } else {
