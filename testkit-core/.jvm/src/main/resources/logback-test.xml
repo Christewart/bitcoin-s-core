@@ -25,36 +25,15 @@
         <appender-ref ref="STDOUT"/>
     </root>
 
-    <!-- ╔═══════════════════════╗ -->
-    <!-- ║   Bitcoin-S logging   ║-->
-    <!-- ╚═══════════════════════╝ -->
-
-    <!-- ╔═══════════════════╗ -->
-    <!-- ║   Configuration   ║ -->
-    <!-- ╚═══════════════════╝ -->
-
     <!-- inspect resolved DB connection -->
     <logger name="org.bitcoins.db.SafeDatabase" level="WARN"/>
 
-    <!-- inspect resolved config -->
-    <logger name="org.bitcoins.chain.config" level="WARN"/>
     <logger name="org.bitcoins.wallet.config" level="WARN"/>
-
-    <!-- inspect table creation, etc -->
-    <logger name="org.bitcoins.chain.db" level="WARN"/>
     <logger name="org.bitcoins.wallet.db" level="WARN"/>
 
+    <logger name="org.bitcoins.node" level="INFO"/>
 
-    <logger name="org.bitcoins.node" level="WARN"/>
-    <!-- ╔════════════════════╗ -->
-    <!-- ║   Chain module     ║ -->
-    <!-- ╚════════════════════╝ -->
-
-    <!-- See queries received by chain handler, as well as result of  -->
-    <!-- connecting new block headers to chain -->
-    <logger name="org.bitcoins.chain.blockchain.ChainHandler" level="WARN"/>
-
-    <logger name="org.bitcoins.chain.validation" level="WARN"/>
+    <logger name="org.bitcoins.chain" level="WARN"/>
 
     <!-- ╔═════════════════════╗ -->
     <!-- ║   Wallet module     ║ -->

@@ -46,12 +46,8 @@
     <!-- inspect resolved DB connection -->
     <logger name="org.bitcoins.db.SafeDatabase" level="WARN"/>
 
-    <!-- inspect resolved config -->
-    <logger name="org.bitcoins.chain.config" level="INFO"/>
     <logger name="org.bitcoins.wallet.config" level="INFO"/>
 
-    <!-- inspect table creation, etc -->
-    <logger name="org.bitcoins.chain.db" level="WARN" />
     <logger name="org.bitcoins.wallet.db" level="WARN" />
 
     <!-- ╔═════════════════╗ -->
@@ -61,15 +57,7 @@
     <!-- See incoming message names and the peer it's sent from -->
     <logger name="org.bitcoins.node" level="INFO"/>
 
-    <!-- ╔════════════════════╗ -->
-    <!-- ║   Chain module     ║ -->
-    <!-- ╚════════════════════╝ -->
-
-    <!-- See queries received by chain handler, as well as result of  -->
-    <!-- connecting new block headers to chain -->
-    <logger name="org.bitcoins.chain.blockchain.ChainHandler" level="INFO"/>
-
-    <logger name="org.bitcoins.chain.validation" level="INFO"/>
+    <logger name="org.bitcoins.chain" level="INFO"/>
 
     <!-- ╔═════════════════════╗ -->
     <!-- ║   Wallet module     ║ -->

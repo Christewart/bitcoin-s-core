@@ -26,7 +26,9 @@ class ChainCallbacksTest extends ChainDbUnitTest {
       val callback: OnBlockHeaderConnected = {
         case _: Vector[(Int, BlockHeader)] => {
           Future {
-            resultP.success(true)
+            if (!resultP.isCompleted) {
+              resultP.success(true)
+            }
             ()
           }
         }
@@ -51,7 +53,9 @@ class ChainCallbacksTest extends ChainDbUnitTest {
       val callback: OnCompactFilterHeaderConnected = {
         case _: Vector[CompactFilterHeaderDb] => {
           Future {
-            resultP.success(true)
+            if (!resultP.isCompleted) {
+              resultP.success(true)
+            }
             ()
           }
         }
@@ -89,7 +93,9 @@ class ChainCallbacksTest extends ChainDbUnitTest {
       val callback: OnCompactFilterConnected = {
         case _: Vector[CompactFilterDb] => {
           Future {
-            resultP.success(true)
+            if (!resultP.isCompleted) {
+              resultP.success(true)
+            }
             ()
           }
         }
