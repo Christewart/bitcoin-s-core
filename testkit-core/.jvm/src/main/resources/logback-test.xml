@@ -28,24 +28,11 @@
     <!-- inspect resolved DB connection -->
     <logger name="org.bitcoins.db.SafeDatabase" level="WARN"/>
 
-    <logger name="org.bitcoins.wallet.config" level="WARN"/>
-    <logger name="org.bitcoins.wallet.db" level="WARN"/>
+    <logger name="org.bitcoins.wallet" level="WARN"/>
 
     <logger name="org.bitcoins.node" level="INFO"/>
 
     <logger name="org.bitcoins.chain" level="WARN"/>
-
-    <!-- ╔═════════════════════╗ -->
-    <!-- ║   Wallet module     ║ -->
-    <!-- ╚═════════════════════╝ -->
-
-    <!-- ╔═══════════════════════════╗ -->
-    <!-- ║   Bitcoin-S logging end   ║-->
-    <!-- ╚═══════════════════════════╝ -->
-
-    <!-- ╔═════════════════════════╗ -->
-    <!-- ║   External libraries    ║ -->
-    <!-- ╚═════════════════════════╝ -->
 
     <!-- see what slick is compiling to in sql -->
     <logger name="slick" level="OFF"/>

@@ -35,41 +35,15 @@
         <appender-ref ref="ASYNC-FILE"/>
     </root>
 
-    <!-- ╔═══════════════════════╗ -->
-    <!-- ║   Bitcoin-S logging   ║-->
-    <!-- ╚═══════════════════════╝ -->
-
-    <!-- ╔═══════════════════╗ -->
-    <!-- ║   Configuration   ║ -->
-    <!-- ╚═══════════════════╝ -->
-
     <!-- inspect resolved DB connection -->
     <logger name="org.bitcoins.db.SafeDatabase" level="WARN"/>
-
-    <logger name="org.bitcoins.wallet.config" level="INFO"/>
-
-    <logger name="org.bitcoins.wallet.db" level="WARN" />
-
-    <!-- ╔═════════════════╗ -->
-    <!-- ║   Node module   ║ -->
-    <!-- ╚═════════════════╝ -->
 
     <!-- See incoming message names and the peer it's sent from -->
     <logger name="org.bitcoins.node" level="INFO"/>
 
     <logger name="org.bitcoins.chain" level="INFO"/>
 
-    <!-- ╔═════════════════════╗ -->
-    <!-- ║   Wallet module     ║ -->
-    <!-- ╚═════════════════════╝ -->
-
-    <!-- ╔═══════════════════════════╗ -->
-    <!-- ║   Bitcoin-S logging end   ║-->
-    <!-- ╚═══════════════════════════╝ -->
-
-    <!-- ╔═════════════════════════╗ -->
-    <!-- ║   External libraries    ║ -->
-    <!-- ╚═════════════════════════╝ -->
+    <logger name="org.bitcoins.wallet" level="WARN" />
 
     <!-- Disable slick logging in server -->
     <logger name="slick" level="OFF"/>
