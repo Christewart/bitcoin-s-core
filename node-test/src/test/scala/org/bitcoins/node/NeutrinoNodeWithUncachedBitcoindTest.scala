@@ -114,17 +114,24 @@ class NeutrinoNodeWithUncachedBitcoindTest extends NodeUnitTest with CachedTor {
       val bitcoinds = nodeConnectedWithBitcoinds.bitcoinds
       for {
         _ <- node.start()
-        _ <- AsyncUtil.retryUntilSatisfied(node.peerManager.peers.size == 2)
         peers <- bitcoinPeersF
-        peer = peers.head
+        _ = logger.info(s"bitcoind(0)=${peers(0)} bitcoind(1)=${peers(1)}")
+        _ <- AsyncUtil.retryUntilSatisfied(node.peerManager.peers.size == 2)
+        peer = peers(1)
         _ <- NodeTestUtil.awaitAllSync(node, bitcoinds(1))
         // generating 6 blocks will cause bitcoind(1) NOT to gossip them on the p2p network
         //this means we can test our re-query logic by sending an invalid header from bitcoinds(0)
-        _ <- bitcoinds(1).generate(6)
-        _ <- AsyncUtil.nonBlockingSleep(2.second)
+        _ = logger.info(
+          s"Done NodeTestUtil.awaitAllSync bitcoinds(0)=${bitcoinds(
+            0).instance.p2pPort} bitcoinds(1)=${bitcoinds(1).instance.p2pPort}")
+        numBlocks = 6
+        hashesF = bitcoinds(1).generate(numBlocks)
         invalidHeaderMessage = HeadersMessage(headers = Vector(invalidHeader))
         msg = NodeStreamMessage.DataMessageWrapper(invalidHeaderMessage, peer)
+        _ <- AsyncUtil.nonBlockingSleep(1.second)
         _ <- node.offer(msg)
+        hashes <- hashesF
+        _ = logger.info(s"Mined hashes=$hashes")
         bestChain = bitcoinds(1)
         _ <- NodeTestUtil.awaitSync(node, bestChain)
       } yield {
