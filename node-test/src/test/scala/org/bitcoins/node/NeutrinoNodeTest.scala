@@ -89,24 +89,14 @@ class NeutrinoNodeTest extends NodeTestWithCachedBitcoindPair {
         inits <- Future.sequence(peers.map(peerManager.isInitialized))
       } yield assert(inits.forall(_ == true))
 
-      def allDisconn: Future[Unit] = AsyncUtil.retryUntilSatisfied(
-        peers
-          .map(p =>
-            !peerManager
-              .getPeerData(p)
-              .isDefined)
-          .forall(_ == true),
-        maxTries = 5,
-        interval = 1.second
-      )
-
+      //val bitcoind0 = nodeConnectedWithBitcoind.bitcoinds(0)
       for {
         _ <- has2Peers
         _ <- bothOurs
         _ <- allConnected
         _ <- allInitialized
-        _ <- Future.sequence(peers.map(peerManager.disconnectPeer))
-        _ <- allDisconn
+        _ <- node.stop()
+        _ <- node.getConnectionCount.map(count => assert(count == 0))
       } yield {
         succeed
       }
@@ -338,6 +328,7 @@ class NeutrinoNodeTest extends NodeTestWithCachedBitcoindPair {
         bitcoind0 = bitcoinds(0)
         nodeUri0 <- NodeTestUtil.getNodeURIFromBitcoind(bitcoind0)
         peer0 <- NodeTestUtil.getBitcoindPeer(bitcoind0)
+        _ <- NodeTestUtil.awaitAllSync(node, bitcoind0)
         _ <- bitcoind0.disconnectNode(nodeUri0)
         _ <- AsyncUtil.retryUntilSatisfiedF(
           () => node.peerManager.isDisconnected(peer0),

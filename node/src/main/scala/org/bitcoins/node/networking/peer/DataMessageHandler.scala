@@ -148,10 +148,7 @@ case class DataMessageHandler(
                 s"Incorrect state for handling filter header messages, got=$x")
           }
 
-          handleFilterHeadersMessage(filterHeaderSync,
-                                     filterHeader,
-                                     chainApi,
-                                     peer)
+          handleFilterHeadersMessage(filterHeaderSync, filterHeader, chainApi)
             .map(s => copy(state = s))
 
         case filter: CompactFilterMessage =>
@@ -471,12 +468,10 @@ case class DataMessageHandler(
 
   private def sendNextGetCompactFilterHeadersCommand(
       peerMessageSenderApi: PeerMessageSenderApi,
-      syncPeer: Peer,
       prevStopHash: DoubleSha256DigestBE): Future[Boolean] =
     PeerManager.sendNextGetCompactFilterHeadersCommand(
       peerMessageSenderApi = peerMessageSenderApi,
       chainApi = chainApi,
-      peer = syncPeer,
       filterHeaderBatchSize = chainConfig.filterHeaderBatchSize,
       prevStopHash = prevStopHash
     )
@@ -754,8 +749,7 @@ case class DataMessageHandler(
   private def handleFilterHeadersMessage(
       filterHeaderSync: FilterHeaderSync,
       filterHeader: CompactFilterHeadersMessage,
-      chainApi: ChainApi,
-      peer: Peer): Future[NodeState] = {
+      chainApi: ChainApi): Future[NodeState] = {
     val filterHeaders = filterHeader.filterHeaders
     val blockCountF = chainApi.getBlockCount()
     for {
@@ -769,7 +763,6 @@ case class DataMessageHandler(
             s"Received maximum amount of filter headers in one header message. This means we are not synced, requesting more")
           sendNextGetCompactFilterHeadersCommand(
             peerMessageSenderApi = peerMessageSenderApi,
-            syncPeer = peer,
             prevStopHash = filterHeader.stopHash.flip).map(_ =>
             filterHeaderSync)
         } else {
