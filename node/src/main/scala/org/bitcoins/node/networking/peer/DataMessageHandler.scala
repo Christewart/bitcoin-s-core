@@ -157,7 +157,7 @@ case class DataMessageHandler(
             .map(s => copy(state = s))
 
         case filter: CompactFilterMessage =>
-          logger.debug(
+          logger.info(
             s"Received ${filter.commandName}, filter.blockHash=${filter.blockHash.flip} state=$state")
           val filterSyncState = state match {
             case f: FilterSync => f
@@ -789,8 +789,7 @@ case class DataMessageHandler(
     val blockCountF = chainApi.getBlockCount()
     val bestBlockHashF = chainApi.getBestBlockHash()
     for {
-      _ <- chainApi.processFilterHeaders(filterHeaders,
-                                         filterHeader.stopHash.flip)
+      _ <- chainApi.processFilterHeaders(filterHeaders, filterHeader.stopHashBE)
       filterHeaderCount <- chainApi.getFilterHeaderCount()
       blockCount <- blockCountF
       bestBlockHash <- bestBlockHashF
@@ -801,7 +800,7 @@ case class DataMessageHandler(
           sendNextGetCompactFilterHeadersCommand(
             peerMessageSenderApi = peerMessageSenderApi,
             syncPeer = peer,
-            prevStopHash = filterHeader.stopHash.flip,
+            prevStopHash = filterHeader.stopHashBE,
             stopHash = bestBlockHash).map(_ => filterHeaderSync)
         } else {
           for {
@@ -811,7 +810,7 @@ case class DataMessageHandler(
             bestBlockHash <- bestBlockHashF
             filterSyncStateOpt <- sendFirstGetCompactFilterCommand(
               peerMessageSenderApi = peerMessageSenderApi,
-              stopBlockHash = bestBlockHash,
+              stopBlockHash = filterHeader.stopHashBE,
               startHeight = startHeight,
               syncNodeState = filterHeaderSync)
           } yield {
