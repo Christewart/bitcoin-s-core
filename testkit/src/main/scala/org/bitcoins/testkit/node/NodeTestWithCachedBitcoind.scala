@@ -46,8 +46,8 @@ trait NodeTestWithCachedBitcoind extends BaseNodeTest with CachedTor {
                                                             appConfig.chainConf,
                                                             appConfig.nodeConf)
         started <- node.start()
-        _ <- AsyncUtil.retryUntilSatisfied(
-          node.peerManager.connectedPeerCount == 1,
+        _ <- AsyncUtil.retryUntilSatisfiedF(
+          () => node.getConnectionCount.map(_ == 1),
           interval = 1.second,
           maxTries = 30)
       } yield NeutrinoNodeConnectedWithBitcoind(started, bitcoind)
@@ -98,8 +98,8 @@ trait NodeTestWithCachedBitcoind extends BaseNodeTest with CachedTor {
           appConfig.chainConf,
           appConfig.nodeConf)
         startedNode <- node.start()
-        _ <- AsyncUtil.retryUntilSatisfied(
-          node.peerManager.connectedPeerCount == 1,
+        _ <- AsyncUtil.retryUntilSatisfiedF(
+          () => node.getConnectionCount.map(_ == 1),
           interval = 1.second,
           maxTries = 30)
       } yield NeutrinoNodeConnectedWithBitcoinds(startedNode, bitcoinds)
@@ -127,9 +127,9 @@ trait NodeTestWithCachedBitcoind extends BaseNodeTest with CachedTor {
           appConfig.nodeConf)
         startedNode <- node.start()
         _ <- AsyncUtil
-          .retryUntilSatisfied(node.peerManager.connectedPeerCount == 2,
-                               interval = 1.second,
-                               maxTries = 30)
+          .retryUntilSatisfiedF(() => node.getConnectionCount.map(_ == 2),
+                                interval = 1.second,
+                                maxTries = 30)
       } yield NeutrinoNodeConnectedWithBitcoinds(startedNode, bitcoinds)
     }
     makeDependentFixture[NeutrinoNodeConnectedWithBitcoinds](

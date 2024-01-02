@@ -302,9 +302,9 @@ object NodeUnitTest extends P2PLogger {
 
       startedNode <- node.start()
       _ <- AsyncUtil
-        .retryUntilSatisfied(node.peerManager.connectedPeerCount == 1,
-                             interval = 1.second,
-                             maxTries = 30)
+        .retryUntilSatisfiedF(() => node.getConnectionCount.map(_ == 1),
+                              interval = 1.second,
+                              maxTries = 30)
       //callbacks are executed asynchronously, which is how we fund the wallet
       //so we need to wait until the wallet balances are correct
       _ <- BitcoinSWalletTest.awaitWalletBalances(fundedWallet)(
