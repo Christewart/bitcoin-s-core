@@ -14,20 +14,30 @@ import akka.stream.{
   QueueOfferResult,
   Supervision
 }
-import akka.{Done, NotUsed}
+import akka.Done
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.chain.config.ChainAppConfig
 import org.bitcoins.core.api.chain.ChainQueryApi.FilterResponse
 import org.bitcoins.core.api.node.NodeState.DoneSyncing
 import org.bitcoins.core.api.node.{NodeState, NodeType, Peer}
 import org.bitcoins.core.config.{MainNet, RegTest, SigNet, TestNet3}
+import org.bitcoins.core.p2p.{
+  GetDataMessage,
+  Inventory,
+  InventoryMessage,
+  TypeIdentifier
+}
 import org.bitcoins.core.protocol.BlockStamp
+import org.bitcoins.core.protocol.transaction.Transaction
+import org.bitcoins.crypto.DoubleSha256Digest
 import org.bitcoins.node.config.NodeAppConfig
+import org.bitcoins.node.models.BroadcastAbleTransaction
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Await, Future}
+import scala.util.{Failure, Success}
 
 case class NeutrinoNode(
     walletCreationTimeOpt: Option[Instant],
@@ -63,7 +73,7 @@ case class NeutrinoNode(
                                                        skipPeers =
                                                          () => Set.empty)
 
-  override lazy val peerManager: PeerManager = {
+  lazy val peerManager: PeerManager = {
     PeerManager(paramPeers = paramPeers,
                 walletCreationTimeOpt = walletCreationTimeOpt,
                 queue = this,
@@ -81,43 +91,64 @@ case class NeutrinoNode(
     Supervision.Resume
   }
 
-  private def buildDataMessageStreamGraph(
+  private def buildStreamGraph(
       initState: NodeState,
-      source: Source[NodeStreamMessage, NotUsed]): RunnableGraph[
-    Future[NodeState]] = {
+      source: Source[
+        NodeStreamMessage,
+        SourceQueueWithComplete[NodeStreamMessage]]): RunnableGraph[
+    (SourceQueueWithComplete[NodeStreamMessage], Future[NodeState])] = {
+
     val graph = source
-      .toMat(peerManager.buildP2PMessageHandlerSink(initState))(Keep.right)
+      .toMat(peerManager.buildP2PMessageHandlerSink(initState))(Keep.both)
       .withAttributes(ActorAttributes.supervisionStrategy(decider))
     graph
   }
 
   override def start(): Future[NeutrinoNode] = {
+    logger.info("Starting NeutrinoNode")
     isStarted.set(true)
+    val start = System.currentTimeMillis()
     val initState =
       DoneSyncing(peersWithServices = Set.empty,
                   waitingForDisconnection = Set.empty)
-    val (queue, source) =
-      dataMessageStreamSource.preMaterialize()
 
-    queueOpt = Some(queue)
     val graph =
-      buildDataMessageStreamGraph(initState = initState, source = source)
-    val stateF = graph.run()
+      buildStreamGraph(initState = initState, source = dataMessageStreamSource)
+    val (queue, stateF) = graph.run()
+    queueOpt = Some(queue)
     streamDoneFOpt = Some(stateF)
-    val res = for {
-      node <- super.start()
+    val startedNodeF = for {
+      _ <- peerManager.start()
       _ <- peerFinder.start()
       _ = {
         val inactivityCancellable = startInactivityChecksJob()
         inactivityCancellableOpt = Some(inactivityCancellable)
       }
     } yield {
-      node.asInstanceOf[NeutrinoNode]
+      this
     }
 
-    res.failed.foreach(logger.error("Cannot start Neutrino node", _))
+    startedNodeF.failed.foreach(logger.error("Cannot start Neutrino node", _))
 
-    res
+    val chainApiF = chainApiFromDb()
+
+    val bestHashF = chainApiF.flatMap(_.getBestBlockHash())
+    val bestHeightF = chainApiF.flatMap(_.getBestHashBlockHeight())
+    val filterHeaderCountF = chainApiF.flatMap(_.getFilterHeaderCount())
+    val filterCountF = chainApiF.flatMap(_.getFilterCount())
+
+    for {
+      node <- startedNodeF
+      bestHash <- bestHashF
+      bestHeight <- bestHeightF
+      filterHeaderCount <- filterHeaderCountF
+      filterCount <- filterCountF
+    } yield {
+      logger.info(
+        s"Started node, best block hash ${bestHash.hex} at height $bestHeight, with $filterHeaderCount filter headers and $filterCount filters. It took=${System
+          .currentTimeMillis() - start}ms")
+      node
+    }
   }
 
   override def stop(): Future[NeutrinoNode] = {
@@ -180,6 +211,63 @@ case class NeutrinoNode(
       startHeight: Int,
       endHeight: Int): Future[Vector[FilterResponse]] =
     chainApiFromDb().flatMap(_.getFiltersBetweenHeights(startHeight, endHeight))
+
+  /** Broadcasts the given transaction over the P2P network */
+  override def broadcastTransactions(
+      transactions: Vector[Transaction]): Future[Unit] = {
+    val broadcastTxDbs = transactions.map(tx => BroadcastAbleTransaction(tx))
+
+    val addToDbF = txDAO.upsertAll(broadcastTxDbs)
+
+    val txIds = transactions.map(_.txIdBE.hex)
+
+    addToDbF.onComplete {
+      case Failure(exception) =>
+        logger.error(s"Error when writing broadcastable TXs to DB", exception)
+      case Success(written) =>
+        logger.debug(
+          s"Wrote tx=${written.map(_.transaction.txIdBE.hex)} to broadcastable table")
+    }
+
+    for {
+      _ <- addToDbF
+      _ <- {
+        val connected = peerManager.peers.nonEmpty
+        if (connected) {
+          logger.info(s"Sending out tx message for tx=$txIds")
+          val inventories =
+            transactions.map(t => Inventory(TypeIdentifier.MsgTx, t.txId))
+          val invMsg = InventoryMessage(inventories)
+          peerManager.sendToRandomPeer(invMsg)
+        } else {
+          Future.failed(
+            new RuntimeException(
+              s"Error broadcasting transaction $txIds, no peers connected"))
+        }
+      }
+    } yield ()
+  }
+
+  /** Fetches the given blocks from the peers and calls the appropriate [[callbacks]] when done.
+    */
+  override def downloadBlocks(
+      blockHashes: Vector[DoubleSha256Digest]): Future[Unit] = {
+    if (blockHashes.isEmpty) {
+      Future.unit
+    } else {
+      val typeIdentifier = TypeIdentifier.MsgWitnessBlock
+      val inventories =
+        blockHashes.map(hash => Inventory(typeIdentifier, hash))
+      val message = GetDataMessage(inventories)
+      for {
+        _ <- peerManager.sendToRandomPeer(message)
+      } yield ()
+    }
+  }
+
+  override def getConnectionCount: Future[Int] = {
+    Future.successful(peerManager.connectedPeerCount)
+  }
 
   private[this] val INACTIVITY_CHECK_TIMEOUT = 60.seconds
 

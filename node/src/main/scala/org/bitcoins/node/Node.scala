@@ -11,15 +11,12 @@ import org.bitcoins.chain.models.{
 }
 import org.bitcoins.core.api.chain._
 import org.bitcoins.core.api.node.NodeApi
-import org.bitcoins.core.p2p._
-import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.util.StartStopAsync
-import org.bitcoins.crypto.{DoubleSha256Digest, DoubleSha256DigestBE}
+import org.bitcoins.crypto.DoubleSha256DigestBE
 import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.node.models._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
 
 /**  This a base trait for various kinds of nodes. It contains house keeping methods required for all nodes.
   */
@@ -37,8 +34,6 @@ trait Node
 
   implicit def executionContext: ExecutionContext = system.dispatcher
 
-  def peerManager: PeerManager
-
   def nodeCallbacks: NodeCallbacks = nodeAppConfig.callBacks
 
   lazy val txDAO: BroadcastAbleTransactionDAO = BroadcastAbleTransactionDAO()
@@ -55,37 +50,6 @@ trait Node
                                     ChainStateDescriptorDAO())
   }
 
-  /** Starts our node */
-  override def start(): Future[Node] = {
-    logger.info("Starting node")
-    val start = System.currentTimeMillis()
-
-    val chainApiF = chainApiFromDb()
-    val startNodeF = for {
-      _ <- peerManager.start()
-    } yield {
-      this
-    }
-
-    val bestHashF = chainApiF.flatMap(_.getBestBlockHash())
-    val bestHeightF = chainApiF.flatMap(_.getBestHashBlockHeight())
-    val filterHeaderCountF = chainApiF.flatMap(_.getFilterHeaderCount())
-    val filterCountF = chainApiF.flatMap(_.getFilterCount())
-
-    for {
-      node <- startNodeF
-      bestHash <- bestHashF
-      bestHeight <- bestHeightF
-      filterHeaderCount <- filterHeaderCountF
-      filterCount <- filterCountF
-    } yield {
-      logger.info(
-        s"Started node, best block hash ${bestHash.hex} at height $bestHeight, with $filterHeaderCount filter headers and $filterCount filters. It took=${System
-          .currentTimeMillis() - start}ms")
-      node
-    }
-  }
-
   /** Starts to sync our node with our peer
     * If our local best block hash is the same as our peers
     * we will not sync, otherwise we will keep syncing
@@ -94,63 +58,6 @@ trait Node
     * @return the peer we are syncing with, or a failed Future if we could not find a peer to sync with after 5 seconds
     */
   def sync(): Future[Unit]
-
-  /** Broadcasts the given transaction over the P2P network */
-  override def broadcastTransactions(
-      transactions: Vector[Transaction]): Future[Unit] = {
-    val broadcastTxDbs = transactions.map(tx => BroadcastAbleTransaction(tx))
-
-    val addToDbF = txDAO.upsertAll(broadcastTxDbs)
-
-    val txIds = transactions.map(_.txIdBE.hex)
-
-    addToDbF.onComplete {
-      case Failure(exception) =>
-        logger.error(s"Error when writing broadcastable TXs to DB", exception)
-      case Success(written) =>
-        logger.debug(
-          s"Wrote tx=${written.map(_.transaction.txIdBE.hex)} to broadcastable table")
-    }
-
-    for {
-      _ <- addToDbF
-      _ <- {
-        val connected = peerManager.peers.nonEmpty
-        if (connected) {
-          logger.info(s"Sending out tx message for tx=$txIds")
-          val inventories =
-            transactions.map(t => Inventory(TypeIdentifier.MsgTx, t.txId))
-          val invMsg = InventoryMessage(inventories)
-          peerManager.sendToRandomPeer(invMsg)
-        } else {
-          Future.failed(
-            new RuntimeException(
-              s"Error broadcasting transaction $txIds, no peers connected"))
-        }
-      }
-    } yield ()
-  }
-
-  /** Fetches the given blocks from the peers and calls the appropriate [[callbacks]] when done.
-    */
-  override def downloadBlocks(
-      blockHashes: Vector[DoubleSha256Digest]): Future[Unit] = {
-    if (blockHashes.isEmpty) {
-      Future.unit
-    } else {
-      val typeIdentifier = TypeIdentifier.MsgWitnessBlock
-      val inventories =
-        blockHashes.map(hash => Inventory(typeIdentifier, hash))
-      val message = GetDataMessage(inventories)
-      for {
-        _ <- peerManager.sendToRandomPeer(message)
-      } yield ()
-    }
-  }
-
-  override def getConnectionCount: Future[Int] = {
-    Future.successful(peerManager.connectedPeerCount)
-  }
 
   /** Gets the height of the given block */
   override def getBlockHeight(
