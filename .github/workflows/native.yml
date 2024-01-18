@@ -19,7 +19,6 @@ jobs:
       fail-fast: false
       matrix:
         os: [macOS-latest, ubuntu-latest]
-        simple-os: [mac,linux]
         include:
           - os: macOS-latest
             uploaded_filename: bitcoin-s-cli-x86_64-apple-darwin
@@ -34,7 +33,7 @@ jobs:
           fetch-depth: 0
       - uses: olafurpg/setup-scala@v13
         with:
-          java-version: graalvm@21.0.2=tgz+https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-21.0.2/graalvm-community-jdk-21.0.2_${{matrix.simple-os}}-x64_bin.tar.gz
+          java-version: graalvm@21.0.2=tgz+https://github.com/graalvm/graalvm-ce-builds/releases/download/jdk-21.0.2/graalvm-community-jdk-21.0.2_${{runner.os}}-x64_bin.tar.gz
       - run: git fetch --tags || true
       - run: sbt cli/nativeImage
         shell: bash
