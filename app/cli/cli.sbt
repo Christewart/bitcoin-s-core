@@ -4,7 +4,7 @@ Universal / packageName := CommonSettings.buildPackageName((Universal /packageNa
 
 libraryDependencies ++= Deps.cli.value
 
-nativeImageJvm := "graalvm-java17"
+nativeImageJvm := "graalvm-java21"
 
 nativeImageVersion := "21.1.0"
 
