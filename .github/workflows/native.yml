@@ -5,7 +5,7 @@ env:
   DISABLE_SECP256K1: "true"
 on:
   push:
-    branches: [master, main]
+    branches: [master, main, 2024-01-18-fix-native-image]
     tags: ["*"]
   release:
     types: [published]

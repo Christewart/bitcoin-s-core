@@ -4,6 +4,10 @@ Universal / packageName := CommonSettings.buildPackageName((Universal /packageNa
 
 libraryDependencies ++= Deps.cli.value
 
+nativeImageJvm := "graalvm-java17"
+
+nativeImageVersion := "21.1.0"
+
 nativeImageOptions ++= Seq(
   "-H:+ReportExceptionStackTraces",
   "--initialize-at-build-time",
