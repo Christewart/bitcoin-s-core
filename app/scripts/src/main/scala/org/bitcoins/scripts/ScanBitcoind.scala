@@ -169,7 +169,7 @@ class ScanBitcoind()(implicit
   }
 
   def countAllScriptNums(bitcoind: BitcoindRpcClient): Future[Unit] = {
-    val blockCountF = Future.successful(50000) //bitcoind.getBlockCount()
+    val blockCountF = bitcoind.getBlockCount()
     val sourceF = blockCountF.map(h => Source((1.until(h))))
     val fn: Block => Vector[ScriptNumHelper] = { block =>
       block.transactions.map(findScriptNum).flatten.toVector
