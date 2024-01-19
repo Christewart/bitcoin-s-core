@@ -11,11 +11,7 @@ import org.bitcoins.core.protocol.transaction.{
   Transaction,
   WitnessTransaction
 }
-import org.bitcoins.core.script.constant.{
-  ScriptNumber,
-  ScriptNumberOperation,
-  ScriptToken
-}
+import org.bitcoins.core.script.constant.{ScriptConstant, ScriptToken}
 import org.bitcoins.core.util.FutureUtil
 import org.bitcoins.crypto.DoubleSha256DigestBE
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
@@ -153,19 +149,27 @@ class ScanBitcoind()(implicit
 
   private case class ScriptNumHelper(
       tx: Transaction,
-      scriptNums: Vector[ScriptNumber]) {
+      scriptConstants: Vector[ScriptConstant]) {
 
     def toJson: String = {
+      val scriptConstantsStr =
+        scriptConstants
+          .map(s => "\"" + s.toString + "\"")
+          .mkString(",")
+      val scriptConstantsBytesStr =
+        scriptConstants
+          .map(s => "\"" + s.bytes.toHex + "\"")
+          .mkString(",")
       s"""{
-         |"txId" : ${tx.txIdBE.hex},
-         |"scriptNums: [${scriptNums.map(_.toInt)}],
-         |"scriptNumsBytes" : [${scriptNums.map(_.bytes)}],
+         |"txId" : "${tx.txIdBE.hex}",
+         |"scriptConstants": [${scriptConstantsStr}],
+         |"scriptConstantsBytes" : [${scriptConstantsBytesStr}]
          |}""".stripMargin
     }
   }
 
   def countAllScriptNums(bitcoind: BitcoindRpcClient): Future[Unit] = {
-    val blockCountF = bitcoind.getBlockCount()
+    val blockCountF = Future.successful(50000) //bitcoind.getBlockCount()
     val sourceF = blockCountF.map(h => Source((1.until(h))))
     val fn: Block => Vector[ScriptNumHelper] = { block =>
       block.transactions.map(findScriptNum).flatten.toVector
@@ -235,11 +239,13 @@ class ScanBitcoind()(implicit
       vec: Vector[ScriptToken]): Option[ScriptNumHelper] = {
     //we want ScriptNums, but we don't want literals (we call the ScriptNumberOperations like OP_0,OP_1,OP_2...)
     val scriptNums = vec.filter(asm =>
-      asm.isInstanceOf[ScriptNumber] && !asm
-        .isInstanceOf[ScriptNumberOperation])
+      asm.isInstanceOf[ScriptConstant] && !asm
+        .asInstanceOf[ScriptConstant]
+        .isShortestEncoding)
     if (scriptNums.isEmpty) None
     else {
-      val s = ScriptNumHelper(tx, scriptNums.map(_.asInstanceOf[ScriptNumber]))
+      val s =
+        ScriptNumHelper(tx, scriptNums.map(_.asInstanceOf[ScriptConstant]))
       Some(s)
     }
   }
@@ -250,7 +256,7 @@ class ScanBitcoind()(implicit
     logger.info(
       s"Writing ${vec.size} scriptNumbers to ${path.toAbsolutePath.toString}")
     val bytes =
-      vec.map(_.toJson).mkString("\n").getBytes(StandardCharsets.UTF_8)
+      vec.map(_.toJson).mkString(",\n").getBytes(StandardCharsets.UTF_8)
     Files.write(path, bytes)
     ()
   }
