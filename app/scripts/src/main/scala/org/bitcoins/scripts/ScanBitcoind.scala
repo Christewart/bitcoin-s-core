@@ -11,7 +11,11 @@ import org.bitcoins.core.protocol.transaction.{
   Transaction,
   WitnessTransaction
 }
-import org.bitcoins.core.script.constant.{ScriptConstant, ScriptToken}
+import org.bitcoins.core.script.constant.{
+  ScriptConstant,
+  ScriptNumberOperation,
+  ScriptToken
+}
 import org.bitcoins.core.util.FutureUtil
 import org.bitcoins.crypto.DoubleSha256DigestBE
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
@@ -149,7 +153,8 @@ class ScanBitcoind()(implicit
 
   private case class ScriptNumHelper(
       tx: Transaction,
-      scriptConstants: Vector[ScriptConstant]) {
+      scriptConstants: Vector[ScriptConstant],
+      comment: String) {
 
     def toJson: String = {
       val scriptConstantsStr =
@@ -163,13 +168,14 @@ class ScanBitcoind()(implicit
       s"""{
          |"txId" : "${tx.txIdBE.hex}",
          |"scriptConstants": [${scriptConstantsStr}],
-         |"scriptConstantsBytes" : [${scriptConstantsBytesStr}]
+         |"scriptConstantsBytes" : [${scriptConstantsBytesStr}],
+         |"comment": "$comment"
          |}""".stripMargin
     }
   }
 
   def countAllScriptNums(bitcoind: BitcoindRpcClient): Future[Unit] = {
-    val blockCountF = bitcoind.getBlockCount()
+    val blockCountF = Future.successful(130000) //bitcoind.getBlockCount()
     val sourceF = blockCountF.map(h => Source((1.until(h))))
     val fn: Block => Vector[ScriptNumHelper] = { block =>
       block.transactions.map(findScriptNum).flatten.toVector
@@ -190,64 +196,158 @@ class ScanBitcoind()(implicit
   private def findScriptNum(tx: Transaction): Vector[ScriptNumHelper] = {
     val scriptSig: Vector[ScriptNumHelper] =
       tx.inputs
-        .map(i => searchAsm(tx, i.scriptSignature.asm.toVector))
+        .map(i => searchAsm(tx, i.scriptSignature))
         .toVector
         .flatten
     val spk: Vector[ScriptNumHelper] =
       tx.outputs
-        .map(o => searchAsm(tx, o.scriptPubKey.asm.toVector))
+        .map(o => searchAsm(tx, o.scriptPubKey))
         .toVector
         .flatten
     val witness: Vector[ScriptNumHelper] = tx match {
       case _: BaseTransaction | EmptyTransaction => Vector.empty //no witnesses
       case wtx: WitnessTransaction =>
-        wtx.witness.toVector.flatMap(wit => searchScriptWit(tx, wit)).flatten
+        wtx.witness.toVector.flatMap(wit => searchAsm(tx, wit))
     }
 
     (scriptSig ++ spk ++ witness)
   }
 
-  private def searchScriptWit(
+  private def searchAsm(
       tx: Transaction,
-      scriptWit: ScriptWitness): Vector[Option[ScriptNumHelper]] = {
-    scriptWit match {
-      case v0: ScriptWitnessV0 =>
-        v0 match {
-          case _: P2WPKHWitnessV0 =>
-            Vector.empty
-          case p2wsh: P2WSHWitnessV0 =>
-            Vector(searchAsm(tx, p2wsh.redeemScript.asm.toVector),
-                   searchAsm(tx, p2wsh.scriptSignature.asm.toVector))
+      spk: ScriptPubKey): Option[ScriptNumHelper] = {
+    spk match {
+      case _ @(_: P2PKScriptPubKey | _: P2PKHScriptPubKey |
+          _: P2SHScriptPubKey | _: WitnessScriptPubKey | _: WitnessCommitment |
+          EmptyScriptPubKey) =>
+        None
+      case p2kwt: P2PKWithTimeoutScriptPubKey =>
+        Some(ScriptNumHelper(tx, Vector(p2kwt.lockTime), s"SCRIPTPUBKEY"))
+      case m: MultiSignatureScriptPubKey =>
+        if (!m.maxSigsScriptNumber.isInstanceOf[ScriptNumberOperation]) {
+          None
+        } else {
+          Some(
+            ScriptNumHelper(tx, Vector(m.maxSigsScriptNumber), s"SCRIPTPUBKEY"))
         }
-      case v1: TaprootWitness =>
-        v1 match {
-          case _: TaprootKeyPath | _: TaprootUnknownPath =>
-            // no CScriptNum in keypath,
-            // we don't know how to parse unknown paths
-            Vector.empty
-          case tsp: TaprootScriptPath =>
-            //think i need to search control block? ignore for now since taproot
-            //txs are a relatively small piece of the blockchain
-            Vector(searchAsm(tx, tsp.script.asm.toVector))
+      case mwt: MultiSignatureWithTimeoutScriptPubKey =>
+        val snh1Opt = searchAsm(tx, mwt.multiSigSPK)
+        val snh2Opt = searchAsm(tx, mwt.timeoutSPK)
+        (snh1Opt, snh2Opt) match {
+          case (Some(snh1), Some(snh2)) =>
+            Some(
+              ScriptNumHelper(tx,
+                              snh1.scriptConstants ++ snh2.scriptConstants,
+                              s"SCRIPTPUBKEY"))
+          case (Some(snh1), None) => Some(snh1)
+          case (None, Some(snh2)) => Some(snh2)
+          case (None, None)       => None
         }
-      case EmptyScriptWitness => Vector.empty
+      case cltv: CLTVScriptPubKey =>
+        val nestedOpt = searchAsm(tx, cltv.nestedScriptPubKey)
+        val base = ScriptNumHelper(tx, Vector(cltv.locktime), s"SCRIPTPUBKEY")
+        nestedOpt match {
+          case Some(nested) =>
+            Some(
+              base.copy(scriptConstants =
+                base.scriptConstants ++ nested.scriptConstants))
+          case None => Some(base)
+        }
+      case csv: CSVScriptPubKey =>
+        val nestedOpt = searchAsm(tx, csv.nestedScriptPubKey)
+        val base = ScriptNumHelper(tx, Vector(csv.locktime), s"SCRIPTPUBKEY")
+        nestedOpt match {
+          case Some(nested) =>
+            Some(
+              base.copy(scriptConstants =
+                base.scriptConstants ++ nested.scriptConstants))
+          case None => Some(base)
+        }
+
+      case cspk: ConditionalScriptPubKey =>
+        val snh1Opt = searchAsm(tx, cspk.firstSPK)
+        val snh2Opt = searchAsm(tx, cspk.secondSPK)
+        (snh1Opt, snh2Opt) match {
+          case (Some(snh1), Some(snh2)) =>
+            Some(
+              ScriptNumHelper(tx,
+                              snh1.scriptConstants ++ snh2.scriptConstants,
+                              s"SCRIPTPUBKEY"))
+          case (Some(snh1), None) => Some(snh1)
+          case (None, Some(snh2)) => Some(snh2)
+          case (None, None)       => None
+        }
+      case n: NonStandardScriptPubKey =>
+        searchAsm(tx, n.asm.toVector)
     }
   }
 
   private def searchAsm(
       tx: Transaction,
-      vec: Vector[ScriptToken]): Option[ScriptNumHelper] = {
-    //we want ScriptNums, but we don't want literals (we call the ScriptNumberOperations like OP_0,OP_1,OP_2...)
-    val scriptNums = vec.filter(asm =>
-      asm.isInstanceOf[ScriptConstant] && !asm
-        .asInstanceOf[ScriptConstant]
-        .isShortestEncoding)
-    if (scriptNums.isEmpty) None
-    else {
-      val s =
-        ScriptNumHelper(tx, scriptNums.map(_.asInstanceOf[ScriptConstant]))
-      Some(s)
+      scriptSignature: ScriptSignature): Option[ScriptNumHelper] = {
+    scriptSignature match {
+      case _: P2PKScriptSignature | _: P2PKHScriptSignature |
+          EmptyScriptSignature | TrivialTrueScriptSignature |
+          _: MultiSignatureScriptSignature =>
+        None
+      case _: LockTimeScriptSignature => None
+      case c: ConditionalScriptSignature =>
+        searchAsm(tx, c.nestedScriptSig)
+      case n: NonStandardScriptSignature =>
+        searchAsm(tx, n.asm.toVector)
+      case p2sh: P2SHScriptSignature =>
+        val snh1Opt = searchAsm(tx, p2sh.redeemScript)
+        val snh2Opt = searchAsm(tx, p2sh.scriptSignatureNoRedeemScript)
+        (snh1Opt, snh2Opt) match {
+          case (Some(snh1), Some(snh2)) =>
+            Some(
+              ScriptNumHelper(tx,
+                              snh1.scriptConstants ++ snh2.scriptConstants,
+                              "SCRIPTSIG"))
+          case (Some(snh1), None) => Some(snh1)
+          case (None, Some(snh2)) => Some(snh2)
+          case (None, None)       => None
+        }
     }
+  }
+
+  private def searchAsm(
+      tx: Transaction,
+      scriptWitness: ScriptWitness): Option[ScriptNumHelper] = {
+    scriptWitness match {
+      case _: P2WPKHWitnessV0 | EmptyScriptWitness | _: TaprootKeyPath => None
+      case p2wsh: P2WSHWitnessV0 =>
+        val snh1Opt = searchAsm(tx, p2wsh.redeemScript)
+        val snh2Opt = searchAsm(tx, p2wsh.scriptSignature)
+        (snh1Opt, snh2Opt) match {
+          case (Some(snh1), Some(snh2)) =>
+            Some(
+              ScriptNumHelper(tx,
+                              snh1.scriptConstants ++ snh2.scriptConstants,
+                              s"SCRIPTWITNESS"))
+          case (Some(snh1), None) => Some(snh1)
+          case (None, Some(snh2)) => Some(snh2)
+          case (None, None)       => None
+        }
+      case trsp: TaprootScriptPath =>
+        searchAsm(tx, trsp.script)
+      case _: TaprootUnknownPath => None
+    }
+  }
+
+  private def searchAsm(
+      tx: Transaction,
+      asm: Vector[ScriptToken]): Option[ScriptNumHelper] = {
+    val filtered =
+      asm.filter(a =>
+        a.isInstanceOf[ScriptConstant] && a.bytes.size < 8 && !a
+          .isInstanceOf[ScriptNumberOperation])
+    if (filtered.isEmpty) None
+    else
+      Some(
+        ScriptNumHelper(tx,
+                        filtered.map(_.asInstanceOf[ScriptConstant]),
+                        "ASM"))
   }
 
   private def writeToFile(vec: Vector[ScriptNumHelper]): Unit = {
