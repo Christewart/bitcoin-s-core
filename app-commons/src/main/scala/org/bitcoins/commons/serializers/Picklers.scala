@@ -33,6 +33,7 @@ import org.bitcoins.core.protocol.transaction.{
 import org.bitcoins.core.protocol.{BitcoinAddress, BlockStamp}
 import org.bitcoins.core.psbt.InputPSBTRecord.PartialSignature
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.constant.ScriptConstant
 import org.bitcoins.core.serializers.PicklerKeys
 import org.bitcoins.core.util.{NetworkUtil, TimeUtil}
 import org.bitcoins.core.util.TimeUtil._
@@ -153,6 +154,10 @@ object Picklers {
 
   implicit val scriptPubKeyPickler: ReadWriter[ScriptPubKey] = {
     readwriter[String].bimap(_.asmHex, ScriptPubKey.fromAsmHex(_))
+  }
+
+  implicit val scriptConstantPickler: ReadWriter[ScriptConstant] = {
+    readwriter[String].bimap(_.hex, ScriptConstant.fromHex)
   }
 
   private def parseWitnessElements(arr: ujson.Arr): ScriptWitness = {
