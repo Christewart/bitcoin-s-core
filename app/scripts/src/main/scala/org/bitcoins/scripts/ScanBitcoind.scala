@@ -2,7 +2,9 @@ package org.bitcoins.scripts
 
 import akka.NotUsed
 import akka.actor.ActorSystem
-import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.IOResult
+import akka.stream.scaladsl.{FileIO, Keep, Source}
+import akka.util.ByteString
 import org.bitcoins.core.protocol.blockchain.Block
 import org.bitcoins.core.protocol.script._
 import org.bitcoins.core.protocol.transaction.{
@@ -24,8 +26,7 @@ import org.bitcoins.server.routes.BitcoinSRunner
 import org.bitcoins.server.util.BitcoinSAppScalaDaemon
 
 import java.nio.charset.StandardCharsets
-import java.nio.file.{Files, Paths}
-import java.time.Instant
+import java.nio.file.{Path, Paths}
 import scala.concurrent.Future
 
 /** Useful script for scanning bitcoind
@@ -63,12 +64,13 @@ class ScanBitcoind()(implicit
   }
 
   /** Searches a given Source[Int] that represents block heights applying f to them and returning a Seq[T] with the results */
-  def searchBlocks[T](
+  def searchBlocks[T <: Json](
       bitcoind: BitcoindRpcClient,
       source: Source[Int, NotUsed],
-      f: Block => T,
+      f: Block => Vector[T],
+      file: Path,
       numParallelism: Int = Runtime.getRuntime.availableProcessors()): Future[
-    Seq[T]] = {
+    IOResult] = {
     source
       .mapAsync(parallelism = numParallelism) { height =>
         bitcoind
@@ -83,78 +85,89 @@ class ScanBitcoind()(implicit
           f(block)
         }
       }
-      .toMat(Sink.seq)(Keep.right)
+      .mapConcat(identity)
+      .map(_.bytes)
+      .toMat(FileIO.toPath(file))(Keep.right)
       .run()
   }
 
-  def countSegwitTxs(
-      bitcoind: BitcoindRpcClient,
-      startHeight: Int,
-      endHeight: Int): Future[Unit] = {
-    val startTime = System.currentTimeMillis()
-    val source: Source[Int, NotUsed] = Source(startHeight.to(endHeight))
+//  def countSegwitTxs(
+//      bitcoind: BitcoindRpcClient,
+//      startHeight: Int,
+//      endHeight: Int): Future[Unit] = {
+//    val startTime = System.currentTimeMillis()
+//    val source: Source[Int, NotUsed] = Source(startHeight.to(endHeight))
+//
+//    //in this simple example, we are going to count the number of witness transactions
+//    val countSegwitTxs: Block => Int = { block: Block =>
+//      block.transactions.count(_.isInstanceOf[WitnessTransaction])
+//    }
+//    val countsF: Future[Seq[Int]] = for {
+//      counts <- searchBlocks[Int](bitcoind, source, countSegwitTxs)
+//    } yield counts
+//
+//    val countF: Future[Int] = countsF.map(_.sum)
+//
+//    for {
+//      count <- countF
+//      endTime = System.currentTimeMillis()
+//      _ = logger.info(
+//        s"Count of segwit txs from height=${startHeight} to endHeight=${endHeight} is ${count}. It took ${endTime - startTime}ms ")
+//    } yield ()
+//  }
+//
+//  def countTaprootTxsInBlocks(
+//      endHeight: Int,
+//      lastBlocks: Int,
+//      bitcoind: BitcoindRpcClient): Future[Int] = {
+//    val startTime = System.currentTimeMillis()
+//    val startHeight = endHeight - lastBlocks
+//    val source: Source[Int, NotUsed] = Source(startHeight.to(endHeight))
+//    val countTaprootOutputs: Block => Int = { block =>
+//      val outputs = block.transactions
+//        .flatMap(_.outputs)
+//        .filter(_.scriptPubKey.isInstanceOf[TaprootScriptPubKey])
+//      outputs.length
+//    }
+//
+//    val countsF: Future[Seq[Int]] = for {
+//      counts <- searchBlocks[Int](bitcoind, source, countTaprootOutputs)
+//    } yield counts
+//
+//    val countF: Future[Int] = countsF.map(_.sum)
+//
+//    for {
+//      count <- countF
+//      endTime = System.currentTimeMillis()
+//      _ = logger.info(
+//        s"Count of taproot outputs from height=${startHeight} to endHeight=${endHeight} is ${count}. It took ${endTime - startTime}ms ")
+//    } yield count
+//  }
+//
+//  def countWitV1MempoolTxs(bitcoind: BitcoindRpcClient): Future[Int] = {
+//    val memPoolSourceF = getMemPoolSource(bitcoind)
+//    val countF = memPoolSourceF.flatMap(_.runFold(0) { case (count, tx) =>
+//      count + tx.outputs.count(_.scriptPubKey.isInstanceOf[TaprootScriptPubKey])
+//    })
+//    countF.foreach(c =>
+//      logger.info(
+//        s"Found $c mempool transactions with witness v1 outputs at ${Instant.now}"))
+//    countF
+//  }
 
-    //in this simple example, we are going to count the number of witness transactions
-    val countSegwitTxs: Block => Int = { block: Block =>
-      block.transactions.count(_.isInstanceOf[WitnessTransaction])
+  sealed trait Json {
+    def toJson: String
+
+    def bytes: ByteString = {
+      ByteString(toJson.getBytes(StandardCharsets.UTF_8))
     }
-    val countsF: Future[Seq[Int]] = for {
-      counts <- searchBlocks[Int](bitcoind, source, countSegwitTxs)
-    } yield counts
-
-    val countF: Future[Int] = countsF.map(_.sum)
-
-    for {
-      count <- countF
-      endTime = System.currentTimeMillis()
-      _ = logger.info(
-        s"Count of segwit txs from height=${startHeight} to endHeight=${endHeight} is ${count}. It took ${endTime - startTime}ms ")
-    } yield ()
-  }
-
-  def countTaprootTxsInBlocks(
-      endHeight: Int,
-      lastBlocks: Int,
-      bitcoind: BitcoindRpcClient): Future[Int] = {
-    val startTime = System.currentTimeMillis()
-    val startHeight = endHeight - lastBlocks
-    val source: Source[Int, NotUsed] = Source(startHeight.to(endHeight))
-    val countTaprootOutputs: Block => Int = { block =>
-      val outputs = block.transactions
-        .flatMap(_.outputs)
-        .filter(_.scriptPubKey.isInstanceOf[TaprootScriptPubKey])
-      outputs.length
-    }
-
-    val countsF: Future[Seq[Int]] = for {
-      counts <- searchBlocks[Int](bitcoind, source, countTaprootOutputs)
-    } yield counts
-
-    val countF: Future[Int] = countsF.map(_.sum)
-
-    for {
-      count <- countF
-      endTime = System.currentTimeMillis()
-      _ = logger.info(
-        s"Count of taproot outputs from height=${startHeight} to endHeight=${endHeight} is ${count}. It took ${endTime - startTime}ms ")
-    } yield count
-  }
-
-  def countWitV1MempoolTxs(bitcoind: BitcoindRpcClient): Future[Int] = {
-    val memPoolSourceF = getMemPoolSource(bitcoind)
-    val countF = memPoolSourceF.flatMap(_.runFold(0) { case (count, tx) =>
-      count + tx.outputs.count(_.scriptPubKey.isInstanceOf[TaprootScriptPubKey])
-    })
-    countF.foreach(c =>
-      logger.info(
-        s"Found $c mempool transactions with witness v1 outputs at ${Instant.now}"))
-    countF
   }
 
   private case class ScriptNumHelper(
       tx: Transaction,
       scriptConstants: Vector[ScriptConstant],
-      comment: String) {
+      comment: String)
+      extends Json {
 
     def toJson: String = {
       val scriptConstantsStr =
@@ -175,21 +188,22 @@ class ScanBitcoind()(implicit
   }
 
   def countAllScriptNums(bitcoind: BitcoindRpcClient): Future[Unit] = {
-    val blockCountF = bitcoind.getBlockCount()
+    val blockCountF = Future.successful(300000) //bitcoind.getBlockCount()
     val sourceF = blockCountF.map(h => Source((1.until(h))))
     val fn: Block => Vector[ScriptNumHelper] = { block =>
       block.transactions.map(findScriptNum).flatten.toVector
     }
 
-    val countAllF: Future[Vector[ScriptNumHelper]] = {
+    val fileName = "scriptnumcount.json"
+    val path = Paths.get(fileName)
+    val countAllF: Future[Unit] = {
       for {
         src <- sourceF
-        nums <- searchBlocks(bitcoind, src, fn)
-      } yield nums.flatten.toVector
+        _ <- searchBlocks(bitcoind, src, fn, path)
+      } yield ()
     }
 
     countAllF
-      .map(writeToFile)
       .map(_ => logger.info(s"Done"))
   }
 
@@ -348,17 +362,6 @@ class ScanBitcoind()(implicit
         ScriptNumHelper(tx,
                         filtered.map(_.asInstanceOf[ScriptConstant]),
                         "ASM"))
-  }
-
-  private def writeToFile(vec: Vector[ScriptNumHelper]): Unit = {
-    val fileName = "scriptnumcount.json"
-    val path = Paths.get(fileName)
-    logger.info(
-      s"Writing ${vec.size} scriptNumbers to ${path.toAbsolutePath.toString}")
-    val bytes =
-      vec.map(_.toJson).mkString(",\n").getBytes(StandardCharsets.UTF_8)
-    Files.write(path, bytes)
-    ()
   }
 
   def getMemPoolSource(
