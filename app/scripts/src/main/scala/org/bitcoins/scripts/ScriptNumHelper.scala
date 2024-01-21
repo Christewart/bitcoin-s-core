@@ -4,6 +4,8 @@ import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.script.constant.ScriptConstant
 import org.bitcoins.crypto.DoubleSha256DigestBE
 
+import java.nio.file.Paths
+
 case class ScriptNumHelper(
     txIdBE: DoubleSha256DigestBE,
     tx: Transaction,
@@ -30,4 +32,7 @@ object ScriptNumHelper {
       acc + (8 - sc.byteSize)
     }
   }
+
+  val fileName = "scriptnumcount.json"
+  val path = Paths.get(fileName)
 }

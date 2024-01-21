@@ -26,7 +26,7 @@ import org.bitcoins.rpc.config.BitcoindRpcAppConfig
 import org.bitcoins.server.routes.BitcoinSRunner
 import org.bitcoins.server.util.BitcoinSAppScalaDaemon
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.{Path}
 import scala.concurrent.Future
 
 /** Useful script for scanning bitcoind
@@ -164,12 +164,10 @@ class ScanBitcoind()(implicit
       block.transactions.map(findScriptNum).flatten.toVector
     }
 
-    val fileName = "scriptnumcount.json"
-    val path = Paths.get(fileName)
     val countAllF: Future[Unit] = {
       for {
         src <- sourceF
-        _ <- searchBlocks(bitcoind, src, fn, path)
+        _ <- searchBlocks(bitcoind, src, fn, ScriptNumHelper.path)
       } yield ()
     }
 
