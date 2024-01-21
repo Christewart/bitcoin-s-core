@@ -170,26 +170,37 @@ class ScanBitcoind()(implicit
       comment: String)
       extends Json {
 
-    def toJson: String = {
+    def sizeIncrease: Long = {
+      val f: Vector[ScriptConstant] = scriptConstants.filter(_.bytes.size < 8)
+      f.foldLeft(0L) { case (acc: Long, sc: ScriptConstant) =>
+        acc + (8 - sc.byteSize)
+      }
+    }
+
+    override def toJson: String = {
       val scriptConstantsStr =
         scriptConstants
           .map(s => "\"" + s.toString + "\"")
           .mkString(",")
+          .dropRight(1)
       val scriptConstantsBytesStr =
         scriptConstants
           .map(s => "\"" + s.bytes.toHex + "\"")
           .mkString(",")
+          .dropRight(1)
       s"""{
          |"txId" : "${tx.txIdBE.hex}",
+         |"tx": "${tx.hex}",
          |"scriptConstants": [${scriptConstantsStr}],
          |"scriptConstantsBytes" : [${scriptConstantsBytesStr}],
+         |"sizeIncrease": $sizeIncrease,
          |"comment": "$comment"
          |},""".stripMargin
     }
   }
 
   def countAllScriptNums(bitcoind: BitcoindRpcClient): Future[Unit] = {
-    val blockCountF = bitcoind.getBlockCount()
+    val blockCountF = Future.successful(250000) //bitcoind.getBlockCount()
     val sourceF = blockCountF.map(h => Source((1.until(h))))
     val fn: Block => Vector[ScriptNumHelper] = { block =>
       block.transactions.map(findScriptNum).flatten.toVector
