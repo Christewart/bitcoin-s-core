@@ -15,6 +15,7 @@ import org.bitcoins.core.protocol.transaction.{
 }
 import org.bitcoins.core.script.constant.{
   ScriptConstant,
+  ScriptNumber,
   ScriptNumberOperation,
   ScriptToken
 }
@@ -183,7 +184,7 @@ class ScanBitcoind()(implicit
          |"scriptConstants": [${scriptConstantsStr}],
          |"scriptConstantsBytes" : [${scriptConstantsBytesStr}],
          |"comment": "$comment"
-         |}""".stripMargin
+         |},""".stripMargin
     }
   }
 
@@ -238,11 +239,19 @@ class ScanBitcoind()(implicit
       case p2kwt: P2PKWithTimeoutScriptPubKey =>
         Some(ScriptNumHelper(tx, Vector(p2kwt.lockTime), s"SCRIPTPUBKEY"))
       case m: MultiSignatureScriptPubKey =>
-        if (!m.maxSigsScriptNumber.isInstanceOf[ScriptNumberOperation]) {
-          None
-        } else {
-          Some(
-            ScriptNumHelper(tx, Vector(m.maxSigsScriptNumber), s"SCRIPTPUBKEY"))
+        (m.maxSigsScriptNumber, m.requiredSigsScriptNumber) match {
+          case (_: ScriptNumberOperation, _: ScriptNumberOperation) =>
+            None
+          case (_: ScriptNumberOperation, sn2: ScriptNumber) =>
+            Some(ScriptNumHelper(tx, Vector(sn2), "SCRIPTPUBKEY"))
+          case (sn1: ScriptNumber, _: ScriptNumberOperation) =>
+            Some(ScriptNumHelper(tx, Vector(sn1), "SCRIPTPUBKEY"))
+          case (sn1: ScriptNumber, sn2: ScriptNumber) =>
+            Some(ScriptNumHelper(tx, Vector(sn1, sn2), "SCRIPTPUBKEY"))
+          case (unkn1, unkn2) =>
+            logger.warn(
+              s"Unkown script numbers of maxSigs=$unkn1 requiredSigs=$unkn2")
+            None
         }
       case mwt: MultiSignatureWithTimeoutScriptPubKey =>
         val snh1Opt = searchAsm(tx, mwt.multiSigSPK)
