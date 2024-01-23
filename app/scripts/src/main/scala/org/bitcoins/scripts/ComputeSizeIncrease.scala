@@ -11,9 +11,8 @@ case class ComputeSizeIncrease()(implicit override val system: ActorSystem)
 
   override def start(): Future[Unit] = {
     import ScriptNumHelper.scriptNumHelperRw
-    val json = ujson.read(ScriptNumHelper.path)
     val scriptNums: Seq[ScriptNumHelper] =
-      upickle.default.read[Seq[ScriptNumHelper]](json)
+      upickle.default.read[Seq[ScriptNumHelper]](ScriptNumHelper.path)
 
     val sizeIncrease = scriptNums.foldLeft(0L) { case (accum, helper) =>
       accum + helper.sizeIncrease
