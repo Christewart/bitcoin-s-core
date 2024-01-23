@@ -71,7 +71,7 @@ class ScanBitcoind()(implicit
       file: Path,
       numParallelism: Int = Runtime.getRuntime.availableProcessors())(implicit
       writer: upickle.default.Writer[T]): Future[IOResult] = {
-    val nl = ByteString(",\n")
+
     source
       .mapAsync(parallelism = numParallelism) { height =>
         bitcoind
@@ -88,7 +88,7 @@ class ScanBitcoind()(implicit
       }
       .mapConcat(identity)
       .map(upickle.default.write(_)(writer))
-      .map(ByteString(_) ++ nl)
+      .map(ByteString(_) ++ ScriptNumHelper.nl)
       .toMat(FileIO.toPath(file))(Keep.right)
       .run()
   }

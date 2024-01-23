@@ -1,5 +1,8 @@
 package org.bitcoins.scripts
 
+import akka.NotUsed
+import akka.stream.scaladsl.Source
+import akka.util.ByteString
 import org.bitcoins.core.script.constant.ScriptConstant
 import org.bitcoins.crypto.DoubleSha256DigestBE
 
@@ -30,7 +33,12 @@ object ScriptNumHelper {
     }
   }
 
+  val nl = ByteString(",\n")
   val fileName = "scriptnumcount.json"
   val path = Paths.get(fileName)
   val inputStream = Files.newInputStream(path)
+  val streamByLine: java.util.stream.Stream[String] = Files.lines(path)
+
+  val source: Source[String, NotUsed] =
+    Source.fromJavaStream(() => streamByLine)
 }
