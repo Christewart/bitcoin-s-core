@@ -1,6 +1,7 @@
 package org.bitcoins.scripts
 
 import akka.actor.ActorSystem
+import akka.stream.scaladsl.{Flow, Keep, Sink}
 import org.bitcoins.server.routes.BitcoinSRunner
 import org.bitcoins.server.util.BitcoinSAppScalaDaemon
 
@@ -11,15 +12,24 @@ case class ComputeSizeIncrease()(implicit override val system: ActorSystem)
 
   override def start(): Future[Unit] = {
     import ScriptNumHelper.scriptNumHelperRw
-    val scriptNums: Seq[ScriptNumHelper] =
-      upickle.default.read[Seq[ScriptNumHelper]](ScriptNumHelper.inputStream)
 
-    val sizeIncrease = scriptNums.foldLeft(0L) { case (accum, helper) =>
-      accum + helper.sizeIncrease
+    val parseFlow = Flow.fromFunction { str: String =>
+      val drop = str.dropRight(1)
+      upickle.default.read[ScriptNumHelper](drop)
     }
+    val sink: Sink[ScriptNumHelper, Future[Long]] = Sink.fold(0L) {
+      case (acc, scriptNumHelper) =>
+        acc + scriptNumHelper.sizeIncrease
+    }
+    
+    val sizeIncreaseF: Future[Long] = ScriptNumHelper.source
+      .via(parseFlow)
+      .toMat(sink)(Keep.right)
+      .run()
 
-    logger.info(s"Size increase=${sizeIncrease}")
-    Future.unit
+    sizeIncreaseF.map { sizeIncrease =>
+      logger.info(s"Size increase=${sizeIncrease}")
+    }
 
   }
 
