@@ -1,6 +1,5 @@
 package org.bitcoins.scripts
 
-import org.bitcoins.core.protocol.transaction.Transaction
 import org.bitcoins.core.script.constant.ScriptConstant
 import org.bitcoins.crypto.DoubleSha256DigestBE
 
@@ -8,7 +7,6 @@ import java.nio.file.{Paths}
 
 case class ScriptNumHelper(
     txIdBE: DoubleSha256DigestBE,
-    tx: Transaction,
     scriptConstants: Vector[ScriptConstant],
     sizeIncrease: Long,
     comment: String)
@@ -17,8 +15,7 @@ object ScriptNumHelper {
 
   import org.bitcoins.commons.serializers.Picklers.{
     doubleSha256DigestBEPickler,
-    scriptConstantPickler,
-    transactionPickler
+    scriptConstantPickler
   }
 
   implicit val scriptNumHelperRw: upickle.default.ReadWriter[

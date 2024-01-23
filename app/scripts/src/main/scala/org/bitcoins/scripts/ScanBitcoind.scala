@@ -206,7 +206,7 @@ class ScanBitcoind()(implicit
       case p2kwt: P2PKWithTimeoutScriptPubKey =>
         val vec = Vector(p2kwt.lockTime)
         val sizeIncrase = ScriptNumHelper.sizeIncrease(vec)
-        Some(ScriptNumHelper(tx.txIdBE, tx, vec, sizeIncrase, s"SCRIPTPUBKEY"))
+        Some(ScriptNumHelper(tx.txIdBE, vec, sizeIncrase, s"SCRIPTPUBKEY"))
       case m: MultiSignatureScriptPubKey =>
         (m.maxSigsScriptNumber, m.requiredSigsScriptNumber) match {
           case (_: ScriptNumberOperation, _: ScriptNumberOperation) =>
@@ -214,18 +214,15 @@ class ScanBitcoind()(implicit
           case (_: ScriptNumberOperation, sn2: ScriptNumber) =>
             val vec = Vector(sn2)
             val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
-            Some(
-              ScriptNumHelper(tx.txIdBE, tx, vec, sizeIncrease, "SCRIPTPUBKEY"))
+            Some(ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, "SCRIPTPUBKEY"))
           case (sn1: ScriptNumber, _: ScriptNumberOperation) =>
             val vec = Vector(sn1)
             val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
-            Some(
-              ScriptNumHelper(tx.txIdBE, tx, vec, sizeIncrease, "SCRIPTPUBKEY"))
+            Some(ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, "SCRIPTPUBKEY"))
           case (sn1: ScriptNumber, sn2: ScriptNumber) =>
             val vec = Vector(sn1, sn2)
             val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
-            Some(
-              ScriptNumHelper(tx.txIdBE, tx, vec, sizeIncrease, "SCRIPTPUBKEY"))
+            Some(ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, "SCRIPTPUBKEY"))
           case (unkn1, unkn2) =>
             logger.warn(
               s"Unknown script numbers of maxSigs=$unkn1 requiredSigs=$unkn2")
@@ -238,12 +235,7 @@ class ScanBitcoind()(implicit
           case (Some(snh1), Some(snh2)) =>
             val vec = snh1.scriptConstants ++ snh2.scriptConstants
             val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
-            Some(
-              ScriptNumHelper(tx.txIdBE,
-                              tx,
-                              vec,
-                              sizeIncrease,
-                              s"SCRIPTPUBKEY"))
+            Some(ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, s"SCRIPTPUBKEY"))
           case (Some(snh1), None) => Some(snh1)
           case (None, Some(snh2)) => Some(snh2)
           case (None, None)       => None
@@ -253,7 +245,7 @@ class ScanBitcoind()(implicit
         val vec = Vector(cltv.locktime)
         val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
         val base =
-          ScriptNumHelper(tx.txIdBE, tx, vec, sizeIncrease, s"SCRIPTPUBKEY")
+          ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, s"SCRIPTPUBKEY")
         nestedOpt match {
           case Some(nested) =>
             val vec = base.scriptConstants ++ nested.scriptConstants
@@ -266,7 +258,7 @@ class ScanBitcoind()(implicit
         val vec = Vector(csv.locktime)
         val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
         val base =
-          ScriptNumHelper(tx.txIdBE, tx, vec, sizeIncrease, s"SCRIPTPUBKEY")
+          ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, s"SCRIPTPUBKEY")
         nestedOpt match {
           case Some(nested) =>
             val vec = base.scriptConstants ++ nested.scriptConstants
@@ -282,12 +274,7 @@ class ScanBitcoind()(implicit
           case (Some(snh1), Some(snh2)) =>
             val vec = snh1.scriptConstants ++ snh2.scriptConstants
             val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
-            Some(
-              ScriptNumHelper(tx.txIdBE,
-                              tx,
-                              vec,
-                              sizeIncrease,
-                              s"SCRIPTPUBKEY"))
+            Some(ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, s"SCRIPTPUBKEY"))
           case (Some(snh1), None) => Some(snh1)
           case (None, Some(snh2)) => Some(snh2)
           case (None, None)       => None
@@ -317,7 +304,7 @@ class ScanBitcoind()(implicit
           case (Some(snh1), Some(snh2)) =>
             val vec = snh1.scriptConstants ++ snh2.scriptConstants
             val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
-            Some(ScriptNumHelper(tx.txIdBE, tx, vec, sizeIncrease, "SCRIPTSIG"))
+            Some(ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, "SCRIPTSIG"))
           case (Some(snh1), None) => Some(snh1)
           case (None, Some(snh2)) => Some(snh2)
           case (None, None)       => None
@@ -338,11 +325,7 @@ class ScanBitcoind()(implicit
             val vec = snh1.scriptConstants ++ snh2.scriptConstants
             val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
             Some(
-              ScriptNumHelper(tx.txIdBE,
-                              tx,
-                              vec,
-                              sizeIncrease,
-                              s"SCRIPTWITNESS"))
+              ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, s"SCRIPTWITNESS"))
           case (Some(snh1), None) => Some(snh1)
           case (None, Some(snh2)) => Some(snh2)
           case (None, None)       => None
@@ -364,7 +347,7 @@ class ScanBitcoind()(implicit
     else {
       val vec = filtered.map(_.asInstanceOf[ScriptConstant])
       val sizeIncrease = ScriptNumHelper.sizeIncrease(vec)
-      Some(ScriptNumHelper(tx.txIdBE, tx, vec, sizeIncrease, "ASM"))
+      Some(ScriptNumHelper(tx.txIdBE, vec, sizeIncrease, "ASM"))
     }
   }
 
