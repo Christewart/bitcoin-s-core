@@ -33,12 +33,11 @@ object ScriptNumHelper {
     }
   }
 
-  val nl = ByteString(",\n")
+  val nl = ByteString("\n")
   val fileName = "scriptnumcount.json"
-  val path = Paths.get(fileName)
-  val inputStream = Files.newInputStream(path)
-  val streamByLine: java.util.stream.Stream[String] = Files.lines(path)
+  lazy val path = Paths.get(fileName)
+  lazy val streamByLine: java.util.stream.Stream[String] = Files.lines(path)
 
-  val source: Source[String, NotUsed] =
+  lazy val source: Source[String, NotUsed] =
     Source.fromJavaStream(() => streamByLine)
 }
