@@ -26,8 +26,9 @@ import org.bitcoins.rpc.config.BitcoindRpcAppConfig
 import org.bitcoins.server.routes.BitcoinSRunner
 import org.bitcoins.server.util.BitcoinSAppScalaDaemon
 
-import java.nio.file.{Path}
+import java.nio.file.Path
 import scala.concurrent.Future
+import scala.util.{Failure, Success, Try}
 
 /** Useful script for scanning bitcoind
   * This file assumes you have pre-configured the connection
@@ -176,23 +177,33 @@ class ScanBitcoind()(implicit
   }
 
   private def findScriptNum(tx: Transaction): Vector[ScriptNumHelper] = {
-    val scriptSig: Vector[ScriptNumHelper] =
-      tx.inputs
-        .map(i => searchAsm(tx, i.scriptSignature))
-        .toVector
-        .flatten
-    val spk: Vector[ScriptNumHelper] =
-      tx.outputs
-        .map(o => searchAsm(tx, o.scriptPubKey))
-        .toVector
-        .flatten
-    val witness: Vector[ScriptNumHelper] = tx match {
-      case _: BaseTransaction | EmptyTransaction => Vector.empty //no witnesses
-      case wtx: WitnessTransaction =>
-        wtx.witness.toVector.flatMap(wit => searchAsm(tx, wit))
+    val t = Try {
+      val scriptSig: Vector[ScriptNumHelper] =
+        tx.inputs
+          .map(i => searchAsm(tx, i.scriptSignature))
+          .toVector
+          .flatten
+      val spk: Vector[ScriptNumHelper] =
+        tx.outputs
+          .map(o => searchAsm(tx, o.scriptPubKey))
+          .toVector
+          .flatten
+      val witness: Vector[ScriptNumHelper] = tx match {
+        case _: BaseTransaction | EmptyTransaction =>
+          Vector.empty //no witnesses
+        case wtx: WitnessTransaction =>
+          wtx.witness.toVector.flatMap(wit => searchAsm(tx, wit))
+      }
+      (scriptSig ++ spk ++ witness)
     }
 
-    (scriptSig ++ spk ++ witness)
+    t match {
+      case Success(v) => v
+      case Failure(err) =>
+        logger.error(s"Failed to parse transaction=${tx.txIdBE}")
+        throw err
+    }
+
   }
 
   private def searchAsm(
