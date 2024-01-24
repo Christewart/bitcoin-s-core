@@ -21,7 +21,7 @@ case class ComputeSizeIncrease()(implicit override val system: ActorSystem)
       case (acc, scriptNumHelper) =>
         acc + scriptNumHelper.sizeIncrease
     }
-    
+
     val sizeIncreaseF: Future[Long] = ScriptNumHelper.source
       .via(parseFlow)
       .toMat(sink)(Keep.right)
