@@ -14,8 +14,7 @@ case class ComputeSizeIncrease()(implicit override val system: ActorSystem)
     import ScriptNumHelper.scriptNumHelperRw
 
     val parseFlow = Flow.fromFunction { str: String =>
-      val drop = str.dropRight(1)
-      upickle.default.read[ScriptNumHelper](drop)
+      upickle.default.read[ScriptNumHelper](str)
     }
     val sink: Sink[ScriptNumHelper, Future[Long]] = Sink.fold(0L) {
       case (acc, scriptNumHelper) =>
