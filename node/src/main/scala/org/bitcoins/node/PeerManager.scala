@@ -613,9 +613,7 @@ case class PeerManager(
         logger.debug(s"Got ${payload.commandName} from peer=${peer} in stream")
         state match {
           case runningState: NodeRunningState =>
-            val peerDataOpt = runningState.peerDataMap
-              .find(_._1.peer == peer)
-              .map(_._2)
+            val peerDataOpt = runningState.getPeerData(peer)
             peerDataOpt match {
               case None =>
                 logger.warn(
