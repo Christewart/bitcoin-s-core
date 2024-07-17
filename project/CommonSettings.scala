@@ -291,6 +291,7 @@ object CommonSettings {
           base
         } else {
           // fresh install, so use the proper spot
+          Files.createDirectories(full)
           full
         }
       }
