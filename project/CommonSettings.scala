@@ -188,10 +188,10 @@ object CommonSettings {
       "-feature",
       "-deprecation",
       "-Ywarn-dead-code",
+      "-Ywarn-extra-implicit",
       "-Ywarn-value-discard",
       "-Ywarn-unused",
       "-unchecked",
-      "-deprecation",
       "-feature",
       "-Ypatmat-exhaust-depth",
       "off"
