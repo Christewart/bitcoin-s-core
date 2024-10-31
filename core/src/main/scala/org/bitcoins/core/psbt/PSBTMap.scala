@@ -908,7 +908,7 @@ object InputPSBTMap extends PSBTMapFactory[InputPSBTRecord, InputPSBTMap] {
       .sign(spendingInfo, unsignedTx, isDummySignature = false)
 
     val utxos = spendingInfo.inputInfo match {
-      case _: UnassignedSegwitNativeInputInfo =>
+      case _: UnassignedSegwitNativeInputInfo | _: TaprootKeyPathInputInfo =>
         Vector(WitnessUTXO(spendingInfo.output))
       case _: RawInputInfo | _: P2SHNonSegwitInputInfo |
           _: SegwitV0NativeInputInfo | _: P2SHNestedSegwitV0InputInfo =>
@@ -949,7 +949,7 @@ object InputPSBTMap extends PSBTMapFactory[InputPSBTRecord, InputPSBTMap] {
     val builder = Vector.newBuilder[InputPSBTRecord]
 
     spendingInfo.inputInfo match {
-      case _: UnassignedSegwitNativeInputInfo =>
+      case _: UnassignedSegwitNativeInputInfo | _: TaprootKeyPathInputInfo =>
         builder.+=(WitnessUTXO(spendingInfo.output))
       case _: RawInputInfo | _: P2SHNonSegwitInputInfo |
           _: SegwitV0NativeInputInfo | _: P2SHNestedSegwitV0InputInfo =>
@@ -974,7 +974,7 @@ object InputPSBTMap extends PSBTMapFactory[InputPSBTRecord, InputPSBTMap] {
       case p2wsh: P2WSHV0InputInfo =>
         builder.+=(WitnessScript(p2wsh.scriptWitness.redeemScript))
       case _: RawInputInfo | _: P2WPKHV0InputInfo |
-          _: UnassignedSegwitNativeInputInfo =>
+          _: UnassignedSegwitNativeInputInfo | _: TaprootKeyPathInputInfo =>
         ()
     }
 
