@@ -160,7 +160,7 @@ class BitcoinSServerMainBitcoindTest
       _ <- server.start()
       _ <- AsyncUtil.nonBlockingSleep(5.second)
       addr = ConsoleCli
-        .exec(CliCommand.GetUnusedAddresses, cliConfig)
+        .exec(GetNewAddress(None), cliConfig)
         .map(BitcoinAddress.fromString)
         .get
       bitcoind <- cachedBitcoindWithFundsF
@@ -169,12 +169,14 @@ class BitcoinSServerMainBitcoindTest
       _ <- AsyncUtil.retryUntilSatisfied({
         ConsoleCli
           .exec(GetBalance(isSats = false), cliConfig)
-          .map{ str => println(s"str=$str")
-          str
+          .map { str =>
+            println(s"str=$str")
+            str
           }
           .map(_ != "0")
           .getOrElse(false)
       })
+      _ <- server.stop()
     } yield {
       succeed
     }
