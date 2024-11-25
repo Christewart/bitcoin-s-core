@@ -12,6 +12,8 @@ import org.bitcoins.commons.rpc.{
 import org.bitcoins.cli.{CliCommand, Config, ConsoleCli}
 import org.bitcoins.commons.util.ServerArgParser
 import org.bitcoins.core.crypto.MnemonicCode
+import org.bitcoins.core.currency.Bitcoins
+import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.crypto.ECPrivateKey
 import org.bitcoins.testkit.fixtures.BitcoinSAppConfigBitcoinFixtureNotStarted
 
@@ -145,5 +147,36 @@ class BitcoinSServerMainBitcoindTest
       }
 
       failF
+  }
+
+  it must "acknowledge a balance" in { (config: BitcoinSAppConfig) =>
+    val server = new BitcoinSServerMain(ServerArgParser.empty)(system, config)
+
+    val cliConfig = Config(
+      rpcPortOpt = Some(config.rpcPort),
+      rpcPassword = config.rpcPassword
+    )
+    for {
+      _ <- server.start()
+      _ <- AsyncUtil.nonBlockingSleep(5.second)
+      addr = ConsoleCli
+        .exec(CliCommand.GetUnusedAddresses, cliConfig)
+        .map(BitcoinAddress.fromString)
+        .get
+      bitcoind <- cachedBitcoindWithFundsF
+      _ <- bitcoind.sendToAddress(addr, Bitcoins.one)
+      _ <- bitcoind.generate(1)
+      _ <- AsyncUtil.retryUntilSatisfied({
+        ConsoleCli
+          .exec(GetBalance(isSats = false), cliConfig)
+          .map{ str => println(s"str=$str")
+          str
+          }
+          .map(_ != "0")
+          .getOrElse(false)
+      })
+    } yield {
+      succeed
+    }
   }
 }
