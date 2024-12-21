@@ -542,7 +542,9 @@ object AddrMessage extends Factory[AddrMessage] {
   private case class AddrMessageImpl(
       ipCount: CompactSizeUInt,
       addresses: Seq[NetworkIpAddress])
-      extends AddrMessage
+      extends AddrMessage {
+    override def toString: String = s"AddrMessageImpl(${addresses.length})"
+  }
 
   def fromBytes(bytes: ByteVector): AddrMessage =
     RawAddrMessageSerializer.read(bytes)

@@ -684,7 +684,7 @@ case class PeerManager(
         }
 
       case (state, DataMessageWrapper(payload, peer)) =>
-        logger.debug(s"Got ${payload.commandName} from peer=${peer} in stream")
+        logger.trace(s"Got ${payload.commandName} from peer=${peer} in stream")
         state match {
           case runningState: NodeRunningState =>
             val peerDataOpt = runningState.peerDataMap.get(peer)
@@ -724,7 +724,7 @@ case class PeerManager(
                     }
                   }
                 resultF.map { r =>
-                  logger.debug(
+                  logger.trace(
                     s"Done processing ${payload.commandName} in peer=${peer} state=${r}"
                   )
                   r
@@ -732,7 +732,9 @@ case class PeerManager(
             }
         }
 
-      case (state, ControlMessageWrapper(payload, peer)) =>
+      case (state, c @ ControlMessageWrapper(payload, peer)) =>
+        logger.debug(
+          s"Handling $c message in stream from peer=$peer state=$state")
         state match {
           case runningState: NodeRunningState =>
             val peerMsgSenderApiOpt: Option[PeerMessageSenderApi] = {
@@ -756,12 +758,19 @@ case class PeerManager(
                   case Some(i: ControlMessageHandler.Initialized) =>
                     onInitialization(i.peer, runningState)
                   case Some(ControlMessageHandler.ReceivedAddrMessage) =>
+                    logger.error(s"Done handling control message ")
                     if (runningState.peerFinder.hasPeer(peer)) {
+                      logger.error(s"runningState.peerFinder.hasPeer=${peer}")
                       // got to disconnect it since it hasn't been promoted to a persistent peer
                       runningState.peerFinder.getPeerData(peer) match {
                         case Some(pd: AttemptToConnectPeerData) =>
+                          logger.error(
+                            s"Stopping peer data as we just attempted to connect $pd")
+                          // something suspicious here
                           pd.stop().map(_ => runningState)
                         case None | Some(_: PersistentPeerData) =>
+                          logger.error(
+                            s"Doing nothing with peer data as its persistent")
                           Future.successful(runningState)
                       }
                     } else {

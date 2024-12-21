@@ -53,7 +53,7 @@ case class NeutrinoNode(
   ] = {
     Source
       .queue[NodeStreamMessage](
-        100 * nodeAppConfig.maxConnectedPeers,
+        8,
         overflowStrategy = OverflowStrategy.backpressure,
         maxConcurrentOffers = Runtime.getRuntime.availableProcessors()
       )

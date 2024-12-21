@@ -162,6 +162,9 @@ case class PeerConnection(peer: Peer, queue: SourceQueue[NodeStreamMessage])(
   ): RunnableGraph[
     ((Future[Tcp.OutgoingConnection], UniqueKillSwitch), Future[Done])
   ] = {
+    // is it possible that this stream can never return Future[Done]
+    // because we are still attempting to offer elements to the queue
+    // from the parsing logic in handleNetworkMsgSink?
     val result = mergeHubSource
       .viaMat(connectionFlow)(Keep.right)
       .toMat(handleNetworkMsgSink)(Keep.both)
@@ -172,6 +175,15 @@ case class PeerConnection(peer: Peer, queue: SourceQueue[NodeStreamMessage])(
   private def buildConnectionGraph()
       : Future[((Tcp.OutgoingConnection, UniqueKillSwitch), Future[Done])] = {
 
+    //deadlock could occur here when disconnecting from peer
+    //if queue is backpressured, and we still have p2p messages (txs for instance)
+    //that need to be offered to the queue, we could deadlock here?
+    //the stream will never complete when killswitch.shutdown()
+    //is called because 'downstream' (i.e. offering to the queue)
+    //will never complete because of backpressure
+    //this leads to the streamDoneF inside of ConnectionGraph
+    //to hang forever (because downstream is never drained)
+    //leading to our deadlock
     val handleNetworkMsgSink: Sink[Vector[NetworkMessage], Future[Done]] = {
       Flow[Vector[NetworkMessage]]
         .mapConcat(identity)
