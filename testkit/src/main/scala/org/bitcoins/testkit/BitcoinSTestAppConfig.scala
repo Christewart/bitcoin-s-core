@@ -93,7 +93,7 @@ object BitcoinSTestAppConfig {
       """.stripMargin
       }
       .withFallback(genWalletNameConf(forceNamedWallet))
-      .withFallback(BaseWalletTest.randomAccountTypeConfig)
+      .withFallback(BaseWalletTest.taprootWalletConf)
 
     BitcoinSAppConfig(
       tmpDir(),

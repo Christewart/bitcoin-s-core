@@ -120,6 +120,7 @@ trait BitcoindRpcTestUtil extends BitcoinSLogger {
                   |zmqpubrawtx=tcp://${zmqConfig.rawTx.get.getHostString}:${zmqConfig.rawTx.get.getPort}
                   |zmqpubrawblock=tcp://${zmqConfig.rawBlock.get.getHostString}:${zmqConfig.rawBlock.get.getPort}
                   |prune=${if (pruneMode) 1 else 0}
+                  |acceptnonstdtxn=1
     """.stripMargin
     val config =
       if (blockFilterIndex) {

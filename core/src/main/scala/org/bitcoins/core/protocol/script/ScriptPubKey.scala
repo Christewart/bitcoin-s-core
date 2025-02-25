@@ -1137,7 +1137,7 @@ case object EmptyScriptPubKey extends RawScriptPubKey {
 }
 
 object RawScriptPubKey extends ScriptFactory[RawScriptPubKey] {
-  val empty: RawScriptPubKey = fromAsm(Nil)
+  val empty: RawScriptPubKey = EmptyScriptPubKey
 
   def fromAsm(asm: Seq[ScriptToken]): RawScriptPubKey =
     asm match {
