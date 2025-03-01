@@ -1,15 +1,25 @@
 package org.bitcoins.wallet
 
-import org.bitcoins.commons.rpc.BitcoindException
+//import org.bitcoins.commons.rpc.BitcoindException
 import org.bitcoins.core.api.wallet.NeutrinoHDWalletApi
 import org.bitcoins.core.currency.Bitcoins
-import org.bitcoins.core.protocol.script.{UnassignedWitnessScriptPubKey}
-import org.bitcoins.core.protocol.transaction.{TransactionOutput}
-import org.bitcoins.core.script.constant.{
-  BytesToPushOntoStack,
-  OP_2,
-  ScriptConstant
+//import org.bitcoins.core.protocol.BitcoinAddress
+import org.bitcoins.core.protocol.script.{
+  NonStandardScriptPubKey,
+  P2SHScriptSignature,
+  ScriptPubKey,
+  ScriptSignature
 }
+import org.bitcoins.core.protocol.transaction.{
+  BaseTransaction,
+  TransactionConstants,
+  TransactionInput,
+  TransactionOutPoint,
+  TransactionOutput
+}
+import org.bitcoins.core.script.bitwise.OP_EQUAL
+import org.bitcoins.core.script.constant.{BytesToPushOntoStack, ScriptConstant}
+import org.bitcoins.core.script.crypto.OP_HASH256
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.core.wallet.utxo.StorageLocationTag.HotStorage
 import org.bitcoins.core.wallet.utxo.*
@@ -327,38 +337,49 @@ class FundTransactionHandlingTest
     (fundedWallet: WalletWithBitcoindRpc) =>
       val wallet = fundedWallet.wallet
       val bitcoind = fundedWallet.bitcoind
-      // val redeemSPK = NonStandardScriptPubKey.fromAsmHex("000000")
-      // val p2sh = P2SHScriptPubKey(redeemSPK)
-      val paymentSPK = UnassignedWitnessScriptPubKey.fromAsm(
-        Vector(OP_2, BytesToPushOntoStack(3), ScriptConstant.fromHex("000000")))
+      val redeemSPK =
+        NonStandardScriptPubKey.fromAsm(Vector(ScriptConstant("000000")))
+      val hashlock = NonStandardScriptPubKey.fromAsm(Vector(
+        OP_HASH256,
+        BytesToPushOntoStack(32),
+        ScriptConstant(
+          "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f "),
+        OP_EQUAL))
+      val paymentSPK =
+        ScriptPubKey.empty /*UnassignedWitnessScriptPubKey.fromAsm(
+        Vector(OP_2, BytesToPushOntoStack(3), ScriptConstant.fromHex("000000")))*/
       println(s"paymentSPK.asm=${paymentSPK.asm}")
       val feeRate = SatoshisPerVirtualByte.one
-      // Future.successful(
-      //          BitcoinAddress.fromScriptPubKey(p2sh, networkParam))
-      for {
-        sweepAddr <- wallet.getNewAddress()
-        // consolidate all outputs into 1 output
-        consolidateTx <- wallet.sendFundsHandling.sweepWallet(sweepAddr,
-                                                              feeRate)
-//        outPoint = TransactionOutPoint(consolidateTx.txIdBE, 0)
-        // scriptSig = P2SHScriptSignature(ScriptSignature.empty, redeemSPK)
-        // _ = println(
-        //  s"scriptSig.hex=${scriptSig.hex} asmHex=${scriptSig.asmHex}")
-//        input = TransactionInput(outPoint,
-//                                 scriptSig,
-//                                 TransactionConstants.sequence)
 
-        _ <- wallet.broadcastTransaction(consolidateTx)
+      for {
+        /*        sweepAddr <- Future.successful(
+          BitcoinAddress.fromScriptPubKey(hashlock, networkParam))*/
+        // consolidate all outputs into 1 output
+        consolidateTx <- wallet.fundTxHandling
+          .fundRawTransaction(Vector(TransactionOutput(Bitcoins.one, hashlock)),
+                              feeRate,
+                              None,
+                              markAsReserved = true)
+          .map(_.unsignedTx)
+        outPoint = TransactionOutPoint(consolidateTx.txIdBE, 0)
+        scriptSig = P2SHScriptSignature(ScriptSignature.empty, redeemSPK)
+        _ = println(
+          s"scriptSig.hex=${scriptSig.hex} asmHex=${scriptSig.asmHex}")
+        input = TransactionInput(outPoint,
+                                 scriptSig,
+                                 TransactionConstants.sequence)
+
+        // _ <- wallet.broadcastTransaction(consolidateTx)
         balance <- wallet.getBalance()
         output = TransactionOutput(balance - (feeRate * 120), paymentSPK)
-        tx <- wallet.sendFundsHandling.sendToOutputs(Vector(output), feeRate)
-//        tx = BaseTransaction(TransactionConstants.version,
-//                             Vector(input),
-//                             Vector(output),
-//                             TransactionConstants.lockTime)
+        //       tx <- wallet.sendFundsHandling.sendToOutputs(Vector(output), feeRate)
+        tx = BaseTransaction(TransactionConstants.version,
+                             Vector(input),
+                             Vector(output),
+                             TransactionConstants.lockTime)
         // unfortunately 64 byte transactions cannot be broadcast even with -acceptnonstdtxn=1
-        _ <- recoverToSucceededIf[BitcoindException](
-          bitcoind.broadcastTransaction(tx))
+        /*        _ <- recoverToSucceededIf[BitcoindException](
+          bitcoind.broadcastTransaction(tx))*/
         _ <- bitcoind.generate(6)
         _ = assert(tx.inputs.length == 1)
         _ = assert(tx.outputs.length == 1)
