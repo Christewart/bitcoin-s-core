@@ -39,17 +39,17 @@ class ScriptNumberSpec extends Properties("ScriptNumberSpec") {
   property("add two script numbers") =
     Prop.forAll(NumberGenerator.scriptNumbers, NumberGenerator.scriptNumbers) {
       (num1: ScriptNumber, num2: ScriptNumber) =>
-        num1 + num2 == ScriptNumber(num1.toLong + num2.toLong)
+        num1 + num2 == ScriptNumber(num1.toBigInt + num2.toBigInt)
     }
   property("subtract a script number from another script number") =
     Prop.forAll(NumberGenerator.scriptNumbers, NumberGenerator.scriptNumbers) {
       (num1: ScriptNumber, num2: ScriptNumber) =>
-        num1 - num2 == ScriptNumber(num1.toLong - num2.toLong)
+        num1 - num2 == ScriptNumber(num1.toBigInt - num2.toBigInt)
     }
   property("multiply two script numbers") =
     Prop.forAll(NumberGenerator.scriptNumbers, NumberGenerator.scriptNumbers) {
       (num1: ScriptNumber, num2: ScriptNumber) =>
-        num1 * num2 == ScriptNumber(num1.toLong * num2.toLong)
+        num1 * num2 == ScriptNumber(num1.toBigInt * num2.toBigInt)
     }
   property("multiply a script number by zero should return zero") =
     Prop.forAll(NumberGenerator.scriptNumbers) { (num1: ScriptNumber) =>

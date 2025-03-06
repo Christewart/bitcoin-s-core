@@ -85,23 +85,25 @@ sealed abstract class ScriptNumber
     */
   def numEqual(that: ScriptNumber): Boolean = underlying == that.underlying
 
-  def toInt = {
+  def toInt: Int = {
     val l = toLong
     require(l <= Int.MaxValue && l >= Int.MinValue)
     l.toInt
   }
 
-  override def toLong = underlying
+  override def toLong: Long = toBigInt.bigInteger.longValueExact()
+
+  def toBigInt: BigInt = underlying
 
   /** The underlying number of the [[ScriptNumber]]. */
-  protected val underlying: Long
+  protected val underlying: BigInt
 }
 
 object ScriptNumber
     extends Factory[ScriptNumber]
     with NumberCache[ScriptNumber] {
 
-  private case class ScriptNumberImpl(underlying: Long, bytes: ByteVector)
+  private case class ScriptNumberImpl(underlying: BigInt, bytes: ByteVector)
       extends ScriptNumber
 
   /** Represents the number zero inside of bitcoin's script language. */
@@ -116,7 +118,7 @@ object ScriptNumber
   /** Bitcoin has a numbering system which has a negative zero. */
   lazy val negativeZero: ScriptNumber = fromHex("80")
 
-  override def fromBytes(bytes: ByteVector) = {
+  override def fromBytes(bytes: ByteVector): ScriptNumber = {
     if (bytes.isEmpty) zero
     else if (BitcoinScriptUtil.isShortestEncoding(bytes)) {
       // if it's the shortest encoding possible, use our cache
@@ -147,8 +149,16 @@ object ScriptNumber
     }
   }
 
-  def apply(underlying: Long): ScriptNumber = {
-    checkCached(underlying)
+  def apply(underlying: BigInt): ScriptNumber = {
+    if (underlying.isValidLong) {
+      apply(underlying.toLong)
+    } else {
+      ScriptNumberImpl(underlying, ScriptNumberUtil.toByteVec(underlying))
+    }
+  }
+
+  def apply(long: Long): ScriptNumber = {
+    checkCached(long)
   }
 
   def apply(bytes: ByteVector, requireMinimal: Boolean): Try[ScriptNumber] =
@@ -243,146 +253,146 @@ case object OP_0 extends ScriptNumberOperation {
 
   override val hex: String = "00"
 
-  override val underlying: Long = 0
+  override val underlying: BigInt = 0
 }
 
 /** An empty array of bytes is pushed onto the stack. (This is not a no-op: an
   * item is added to the stack.)
   */
 case object OP_FALSE extends ScriptNumberOperation {
-  override val opCode = OP_0.opCode
+  override val opCode: Int = OP_0.opCode
 
-  override val hex = OP_0.hex
+  override val hex: String = OP_0.hex
 
-  override val underlying = OP_0.underlying
+  override val underlying: BigInt = OP_0.underlying
 
-  override lazy val bytes = OP_0.bytes
+  override lazy val bytes: ByteVector = OP_0.bytes
 }
 
 /** The number 1 is pushed onto the stack. */
 case object OP_TRUE extends ScriptNumberOperation {
   override val opCode = 81
 
-  override val underlying: Long = 1
+  override val underlying: BigInt = 1
 }
 
 /** The number -1 is pushed onto the stack. */
 case object OP_1NEGATE extends ScriptNumberOperation {
   override val opCode: Int = 79
 
-  override val underlying: Long = -1
+  override val underlying: BigInt = -1
 }
 
 /** The number 1 is pushed onto the stack. */
 case object OP_1 extends ScriptNumberOperation {
   override val opCode: Int = OP_TRUE.opCode
 
-  override val underlying: Long = OP_TRUE.underlying
+  override val underlying: BigInt = OP_TRUE.underlying
 }
 
 /** The number 2 is pushed onto the stack. */
 case object OP_2 extends ScriptNumberOperation {
   override val opCode: Int = 82
 
-  override val underlying: Long = 2
+  override val underlying: BigInt = 2
 }
 
 /** The number 3 is pushed onto the stack. */
 case object OP_3 extends ScriptNumberOperation {
   override val opCode: Int = 83
 
-  override val underlying: Long = 3
+  override val underlying: BigInt = 3
 }
 
 /** The number 4 is pushed onto the stack. */
 case object OP_4 extends ScriptNumberOperation {
   override val opCode: Int = 84
 
-  override val underlying: Long = 4
+  override val underlying: BigInt = 4
 }
 
 /** The number 5 is pushed onto the stack. */
 case object OP_5 extends ScriptNumberOperation {
   override val opCode: Int = 85
 
-  override val underlying: Long = 5
+  override val underlying: BigInt = 5
 }
 
 /** The number 6 is pushed onto the stack. */
 case object OP_6 extends ScriptNumberOperation {
   override val opCode: Int = 86
 
-  override val underlying: Long = 6
+  override val underlying: BigInt = 6
 }
 
 /** The number 7 is pushed onto the stack. */
 case object OP_7 extends ScriptNumberOperation {
   override val opCode: Int = 87
 
-  override val underlying: Long = 7
+  override val underlying: BigInt = 7
 }
 
 /** The number 8 is pushed onto the stack. */
 case object OP_8 extends ScriptNumberOperation {
   override val opCode: Int = 88
 
-  override val underlying: Long = 8
+  override val underlying: BigInt = 8
 }
 
 /** The number 9 is pushed onto the stack. */
 case object OP_9 extends ScriptNumberOperation {
   override val opCode: Int = 89
 
-  override val underlying: Long = 9
+  override val underlying: BigInt = 9
 }
 
 /** The number 10 is pushed onto the stack. */
 case object OP_10 extends ScriptNumberOperation {
   override val opCode: Int = 90
 
-  override val underlying: Long = 10
+  override val underlying: BigInt = 10
 }
 
 /** The number 11 is pushed onto the stack. */
 case object OP_11 extends ScriptNumberOperation {
   override val opCode: Int = 91
 
-  override val underlying: Long = 11
+  override val underlying: BigInt = 11
 }
 
 /** The number 12 is pushed onto the stack. */
 case object OP_12 extends ScriptNumberOperation {
   override val opCode: Int = 92
 
-  override val underlying: Long = 12
+  override val underlying: BigInt = 12
 }
 
 /** The number 13 is pushed onto the stack. */
 case object OP_13 extends ScriptNumberOperation {
   override val opCode: Int = 93
 
-  override val underlying: Long = 13
+  override val underlying: BigInt = 13
 }
 
 /** The number 14 is pushed onto the stack. */
 case object OP_14 extends ScriptNumberOperation {
   override val opCode: Int = 94
 
-  override val underlying: Long = 14
+  override val underlying: BigInt = 14
 }
 
 /** The number 15 is pushed onto the stack. */
 case object OP_15 extends ScriptNumberOperation {
   override val opCode: Int = 95
 
-  override val underlying: Long = 15
+  override val underlying: BigInt = 15
 }
 
 /** The number 16 is pushed onto the stack. */
 case object OP_16 extends ScriptNumberOperation {
   override val opCode: Int = 96
 
-  override val underlying: Long = 16
+  override val underlying: BigInt = 16
 }
 
 object ScriptNumberOperation

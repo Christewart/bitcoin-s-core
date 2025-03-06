@@ -131,8 +131,8 @@ trait ScriptNumberUtil {
     }
   }
 
-  def toByteVec(long: Long): ByteVector = {
-    ByteVector(BigInt(long).toByteArray)
+  def toByteVec(bigInt: BigInt): ByteVector = {
+    ByteVector(bigInt.toByteArray)
   }
 
   /** Determines if a given hex string is a positive number

@@ -1,14 +1,13 @@
 package org.bitcoins.core.script.arithmetic
 
-import org.bitcoins.core.script.constant._
-import org.bitcoins.core.script.result._
+import org.bitcoins.core.script.constant.*
+import org.bitcoins.core.script.result.*
 import org.bitcoins.core.script.{
   ExecutedScriptProgram,
   ExecutionInProgressScriptProgram
 }
-import org.bitcoins.core.util.ScriptProgramTestUtil
-import org.bitcoins.testkitcore.util.TestUtil
-import org.bitcoins.testkitcore.util.BitcoinSUnitTest
+import org.bitcoins.core.util.{NumberUtil, ScriptProgramTestUtil}
+import org.bitcoins.testkitcore.util.{BitcoinSUnitTest, TestUtil}
 
 import scala.util.Try
 
@@ -749,5 +748,26 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     Try(AI.opMin(program)).isFailure must be(true)
     Try(AI.opMax(program)).isFailure must be(true)
     Try(AI.opWithin(program)).isFailure must be(true)
+  }
+
+  it must "support 64 bit arithmetic" in {
+    val max = NumberUtil.pow2(63) - 1
+
+    println(s"max=$max ${max + 1} ${max + 2}")
+    // val min = -max + 2
+    val maxScriptNumber = ScriptNumber(max)
+    // val minScriptNumber = ScriptNumber(min)
+    val stack = List(maxScriptNumber, ScriptNumber.one)
+    val script = List(OP_ADD)
+    val program =
+      TestUtil.testProgramExecutionInProgress.updateStackAndScript(
+        stack,
+        script
+      )
+    assert(maxScriptNumber + ScriptNumber.one == ScriptNumber(max + 1))
+    val newProgram = AI.opAdd(program)
+    assert(!newProgram.isInstanceOf[ExecutedScriptProgram])
+    newProgram.stack.head must be(ScriptNumber(max + 1))
+    newProgram.script.isEmpty must be(true)
   }
 }

@@ -1,12 +1,12 @@
 package org.bitcoins.core.script.arithmetic
 
-import org.bitcoins.core.script.constant._
+import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.{
   ControlOperationsInterpreter,
   OP_VERIFY
 }
 import org.bitcoins.core.script.flag.ScriptFlagUtil
-import org.bitcoins.core.script.result._
+import org.bitcoins.core.script.result.*
 import org.bitcoins.core.script.{
   ExecutedScriptProgram,
   ExecutionInProgressScriptProgram,
@@ -344,11 +344,13 @@ sealed abstract class ArithmeticInterpreter {
           ) {
             program.failExecution(ScriptErrorUnknownError)
           } else if (isLargerThan4Bytes(x) || isLargerThan4Bytes(y)) {
+            println(s"here1?")
             // pretty sure that an error is thrown inside of CScriptNum which in turn is caught by interpreter.cpp here
             // https://github.com/bitcoin/bitcoin/blob/master/src/script/interpreter.cpp#L999-L1002
             program.failExecution(ScriptErrorUnknownError)
           } else {
             val newStackTop = op(x, y)
+            println(s"here2?")
             program.updateStackAndScript(newStackTop :: program.stack.tail.tail,
                                          program.script.tail)
           }
