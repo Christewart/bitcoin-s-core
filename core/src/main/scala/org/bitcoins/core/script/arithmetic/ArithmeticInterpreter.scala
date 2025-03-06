@@ -1,5 +1,6 @@
 package org.bitcoins.core.script.arithmetic
 
+import org.bitcoins.core.protocol.script.SigVersionTapscript64Bit
 import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.{
   ControlOperationsInterpreter,
@@ -263,6 +264,10 @@ sealed abstract class ArithmeticInterpreter {
   private def isLargerThan4Bytes(scriptNumber: ScriptNumber): Boolean =
     scriptNumber.bytes.size > 4
 
+  private def isLargerThan8Bytes(scriptNumber: ScriptNumber): Boolean = {
+    scriptNumber.bytes.size > 8
+  }
+
   /** Performs the given arithmetic operation on the stack head
     * @param program
     *   the program whose stack top is used as an argument for the arithmetic
@@ -343,10 +348,18 @@ sealed abstract class ArithmeticInterpreter {
               y))
           ) {
             program.failExecution(ScriptErrorUnknownError)
-          } else if (isLargerThan4Bytes(x) || isLargerThan4Bytes(y)) {
+          } else if (
+            program.sigVersion != SigVersionTapscript64Bit && (isLargerThan4Bytes(
+              x) || isLargerThan4Bytes(y))
+          ) {
             println(s"here1?")
             // pretty sure that an error is thrown inside of CScriptNum which in turn is caught by interpreter.cpp here
             // https://github.com/bitcoin/bitcoin/blob/master/src/script/interpreter.cpp#L999-L1002
+            program.failExecution(ScriptErrorUnknownError)
+          } else if (
+            program.sigVersion == SigVersionTapscript64Bit && (isLargerThan8Bytes(
+              x) || isLargerThan4Bytes(y))
+          ) {
             program.failExecution(ScriptErrorUnknownError)
           } else {
             val newStackTop = op(x, y)

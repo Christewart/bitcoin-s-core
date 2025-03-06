@@ -29,3 +29,5 @@ case object SigVersionTaprootKeySpend extends SigVersionTaproot
   *   https://github.com/bitcoin/bitcoin/blob/e826b22da252e0599c61d21c98ff89f366b3120f/src/script/interpreter.h#L192
   */
 case object SigVersionTapscript extends SigVersionTaproot
+
+case object SigVersionTapscript64Bit extends SigVersionTaproot

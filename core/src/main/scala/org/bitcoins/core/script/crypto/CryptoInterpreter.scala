@@ -1,24 +1,18 @@
 package org.bitcoins.core.script.crypto
 
 import org.bitcoins.core.consensus.Consensus
-import org.bitcoins.core.crypto._
-import org.bitcoins.core.protocol.script.{
-  SigVersionBase,
-  SigVersionTaproot,
-  SigVersionTaprootKeySpend,
-  SigVersionTapscript,
-  SigVersionWitnessV0
-}
-import org.bitcoins.core.script._
-import org.bitcoins.core.script.constant._
+import org.bitcoins.core.crypto.*
+import org.bitcoins.core.protocol.script.*
+import org.bitcoins.core.script.*
+import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.{
   ControlOperationsInterpreter,
   OP_VERIFY
 }
 import org.bitcoins.core.script.flag.ScriptFlagUtil
-import org.bitcoins.core.script.result._
+import org.bitcoins.core.script.result.*
 import org.bitcoins.core.util.BitcoinScriptUtil
-import org.bitcoins.crypto._
+import org.bitcoins.crypto.*
 import scodec.bits.ByteVector
 
 import scala.util.Try
@@ -109,7 +103,7 @@ sealed abstract class CryptoInterpreter {
                                       result = result,
                                       restOfStack = restOfStack,
                                       numOpt = None)
-          case SigVersionTapscript =>
+          case SigVersionTapscript | SigVersionTapscript64Bit =>
             val tapscriptE
                 : Either[ScriptError, TransactionSignatureCheckerResult] =
               evalChecksigTapscript(updatedProgram)
@@ -429,7 +423,8 @@ sealed abstract class CryptoInterpreter {
     program.txSignatureComponent.sigVersion match {
       case SigVersionBase | SigVersionWitnessV0 =>
         program.failExecution(ScriptErrorBadOpCode)
-      case SigVersionTapscript | SigVersionTaprootKeySpend =>
+      case SigVersionTapscript | SigVersionTaprootKeySpend |
+          SigVersionTapscript64Bit =>
         if (program.stack.length < 3) {
           program.failExecution(ScriptErrorInvalidStackOperation)
         } else {

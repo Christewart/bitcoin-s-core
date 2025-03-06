@@ -2,8 +2,8 @@ package org.bitcoins.core.protocol.transaction
 
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.serializers.transaction.RawTransactionOutPointParser
-import org.bitcoins.crypto._
-import scodec.bits._
+import org.bitcoins.crypto.*
+import scodec.bits.*
 
 /** @param txId
   *   The transaction id for the crediting transaction for this input
@@ -55,6 +55,7 @@ object TransactionOutPoint
     extends Factory[TransactionOutPoint]
     with StringFactory[TransactionOutPoint] {
 
+  val empty: TransactionOutPoint = EmptyTransactionOutPoint
   def fromBytes(bytes: ByteVector): TransactionOutPoint =
     RawTransactionOutPointParser.read(bytes)
 

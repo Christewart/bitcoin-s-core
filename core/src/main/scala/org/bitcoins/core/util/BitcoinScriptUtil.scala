@@ -1,20 +1,15 @@
 package org.bitcoins.core.util
 
 import org.bitcoins.core.consensus.Consensus
-import org.bitcoins.core.crypto._
+import org.bitcoins.core.crypto.*
 import org.bitcoins.core.currency.CurrencyUnits
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.CompactSizeUInt
-import org.bitcoins.core.protocol.script.{
-  CLTVScriptPubKey,
-  CSVScriptPubKey,
-  EmptyScriptPubKey,
-  _
-}
-import org.bitcoins.core.protocol.transaction._
+import org.bitcoins.core.protocol.script.*
+import org.bitcoins.core.protocol.transaction.*
 import org.bitcoins.core.psbt.InputPSBTMap
-import org.bitcoins.core.script.constant._
+import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.crypto.{
   OP_CHECKMULTISIG,
   OP_CHECKMULTISIGVERIFY,
@@ -35,7 +30,7 @@ import org.bitcoins.core.script.{
   PreExecutionScriptProgram
 }
 import org.bitcoins.core.serializers.script.ScriptParser
-import org.bitcoins.core.wallet.utxo._
+import org.bitcoins.core.wallet.utxo.*
 import org.bitcoins.crypto.{ECDigitalSignature, ECPublicKeyBytes}
 import scodec.bits.ByteVector
 
@@ -428,7 +423,7 @@ trait BitcoinScriptUtil {
       case SigVersionBase =>
         removeSignatureFromScript(signature, scriptForChecking)
       case SigVersionWitnessV0 | SigVersionTaprootKeySpend |
-          SigVersionTapscript =>
+          SigVersionTapscript | SigVersionTapscript64Bit =>
         // BIP143 removes requirement for calling FindAndDelete
         // https://github.com/bitcoin/bips/blob/master/bip-0143.mediawiki#no-findanddelete
         scriptForChecking

@@ -95,6 +95,8 @@ sealed trait ScriptProgram {
     getTaprootWitness.flatMap(_.annexHashOpt)
   }
 
+  def sigVersion: SignatureVersion = txSignatureComponent.sigVersion
+
 }
 
 /** This represents a [[org.bitcoins.core.script.ScriptProgram ScriptProgram]]

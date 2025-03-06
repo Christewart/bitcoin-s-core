@@ -18,7 +18,7 @@ object EmptyTransactionOutput
 }
 
 object TransactionOutput extends Factory[TransactionOutput] {
-
+  val empty: TransactionOutput = EmptyTransactionOutput
   def fromBytes(bytes: ByteVector): TransactionOutput =
     RawTransactionOutputParser.read(bytes)
 
