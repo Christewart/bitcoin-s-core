@@ -144,6 +144,10 @@ case object OP_RSHIFT extends ArithmeticOperation {
   override val opCode: Int = 153
 }
 
+case object OP_INOUT_AMOUNT extends ArithmeticOperation {
+  override val opCode: Int = 0xe3
+}
+
 object ArithmeticOperation extends ScriptOperationFactory[ArithmeticOperation] {
 
   override val operations: scala.collection.immutable.Vector[

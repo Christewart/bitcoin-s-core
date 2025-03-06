@@ -1,6 +1,6 @@
 package org.bitcoins.testkitcore.gen
 
-import org.bitcoins.core.number._
+import org.bitcoins.core.number.*
 import org.bitcoins.core.protocol.{BigSizeUInt, CompactSizeUInt}
 import org.bitcoins.core.script.constant.ScriptNumber
 import org.bitcoins.core.util.NumberUtil
@@ -80,7 +80,7 @@ trait NumberGenerator {
     Gen.choose(Int64.min.toLong, Int64.max.toLong).map(Int64(_))
 
   def scriptNumbers: Gen[ScriptNumber] =
-    Gen.choose(Int64.min.toLong, Int64.max.toLong).map(ScriptNumber(_))
+    Gen.choose(Int64.min.toBigInt, Int64.max.toBigInt).map(ScriptNumber(_))
 
   /** The policy bounds for nTimeLock fields (see TxBuilder) */
   def timeLockScriptNumbers: Gen[ScriptNumber] =
