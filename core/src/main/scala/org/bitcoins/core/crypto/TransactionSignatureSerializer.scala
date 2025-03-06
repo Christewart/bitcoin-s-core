@@ -250,8 +250,8 @@ sealed abstract class TransactionSignatureSerializer {
           HashType.isSigHashAllAnyoneCanPay(hashType.num)
 
         val extFlag = taprootSigVersion match {
-          case SigVersionTaprootKeySpend => 0.toByte
-          case SigVersionTapscript       => 1.toByte
+          case SigVersionTaprootKeySpend                      => 0.toByte
+          case SigVersionTapscript | SigVersionTapscript64Bit => 1.toByte
         }
         val epoch = ByteVector.fromByte(0)
 

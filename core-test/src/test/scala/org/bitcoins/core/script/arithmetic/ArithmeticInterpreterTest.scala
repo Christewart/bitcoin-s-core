@@ -1,5 +1,6 @@
 package org.bitcoins.core.script.arithmetic
 
+import org.bitcoins.core.protocol.script.*
 import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.result.*
 import org.bitcoins.core.script.{
@@ -7,6 +8,7 @@ import org.bitcoins.core.script.{
   ExecutionInProgressScriptProgram
 }
 import org.bitcoins.core.util.{NumberUtil, ScriptProgramTestUtil}
+import org.bitcoins.crypto.ECPublicKey
 import org.bitcoins.testkitcore.util.{BitcoinSUnitTest, TestUtil}
 
 import scala.util.Try
@@ -759,11 +761,24 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     // val minScriptNumber = ScriptNumber(min)
     val stack = List(maxScriptNumber, ScriptNumber.one)
     val script = List(OP_ADD)
+    val spk = NonStandardScriptPubKey.fromAsm(script)
+    val tapLeaf = TapLeaf.apply(TapLeaf.leaf64Bit, spk)
+    val tree = TapscriptTree.buildTapscriptTree(Vector(tapLeaf))
+    val internalKey = ECPublicKey.freshPublicKey.toXOnly
+    val (_, taprootSPK) =
+      TaprootScriptPubKey.fromInternalKeyTapscriptTree(internalKey, tree)
+    val controlBlock: TapscriptControlBlock =
+      TapscriptControlBlock(internalKey, Vector(tapLeaf))
+    val witness: TaprootScriptPath =
+      TaprootScriptPath(controlBlock = controlBlock, annexOpt = None, spk = spk)
     val program =
-      TestUtil.testProgramExecutionInProgress.updateStackAndScript(
-        stack,
-        script
-      )
+      TestUtil
+        .testTaprootProgram(taprootSPK, witness)
+        .toExecutionInProgress
+        .updateStackAndScript(
+          stack,
+          script
+        )
     assert(maxScriptNumber + ScriptNumber.one == ScriptNumber(max + 1))
     val newProgram = AI.opAdd(program)
     assert(!newProgram.isInstanceOf[ExecutedScriptProgram])

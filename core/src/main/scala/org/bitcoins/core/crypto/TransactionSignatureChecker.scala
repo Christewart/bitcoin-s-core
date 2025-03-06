@@ -116,7 +116,8 @@ trait TransactionSignatureChecker {
       flags: Seq[ScriptFlag] = Policy.standardFlags)
       : TransactionSignatureCheckerResult = {
     txSignatureComponent.sigVersion match {
-      case SigVersionTapscript | SigVersionTaprootKeySpend =>
+      case SigVersionTapscript | SigVersionTaprootKeySpend |
+          SigVersionTapscript64Bit =>
         sys.error(
           s"Call checkTapScript signature to validate a tapscript signature")
       case SigVersionWitnessV0 | SigVersionBase =>
