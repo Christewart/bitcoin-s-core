@@ -1,11 +1,18 @@
 package org.bitcoins.core.script.arithmetic
 
+import org.bitcoins.core.crypto.TaprootTxSigComponent
+import org.bitcoins.core.currency.Bitcoins
+import org.bitcoins.core.number.UInt32
+import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.script.*
+import org.bitcoins.core.protocol.transaction.*
 import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.result.*
+import org.bitcoins.core.script.util.PreviousOutputMap
 import org.bitcoins.core.script.{
   ExecutedScriptProgram,
-  ExecutionInProgressScriptProgram
+  ExecutionInProgressScriptProgram,
+  PreExecutionScriptProgram
 }
 import org.bitcoins.core.util.{NumberUtil, ScriptProgramTestUtil}
 import org.bitcoins.crypto.ECPublicKey
@@ -762,18 +769,18 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     val stack = List(maxScriptNumber, ScriptNumber.one)
     val script = List(OP_ADD)
     val spk = NonStandardScriptPubKey.fromAsm(script)
-    val tapLeaf = TapLeaf.apply(TapLeaf.leaf64Bit, spk)
+    val tapLeaf = TapLeaf.apply(LeafVersion.Tapscript64Bit, spk)
     val tree = TapscriptTree.buildTapscriptTree(Vector(tapLeaf))
     val internalKey = ECPublicKey.freshPublicKey.toXOnly
     val (_, taprootSPK) =
       TaprootScriptPubKey.fromInternalKeyTapscriptTree(internalKey, tree)
     val controlBlock: TapscriptControlBlock =
-      TapscriptControlBlock(internalKey, Vector(tapLeaf))
+      TapscriptControlBlock.fromLeaves(LeafVersion.Tapscript64Bit,
+                                       internalKey,
+                                       Vector(tapLeaf))
     val witness: TaprootScriptPath =
       TaprootScriptPath(controlBlock = controlBlock, annexOpt = None, spk = spk)
-    val program =
-      TestUtil
-        .testTaprootProgram(taprootSPK, witness)
+    val program = testTaprootProgram(taprootSPK, witness)
         .toExecutionInProgress
         .updateStackAndScript(
           stack,
@@ -784,5 +791,28 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     assert(!newProgram.isInstanceOf[ExecutedScriptProgram])
     newProgram.stack.head must be(ScriptNumber(max + 1))
     newProgram.script.isEmpty must be(true)
+  }
+
+  def testTaprootProgram(
+      outPoint: TransactionOutPoint,
+                          spk: TaprootScriptPubKey,
+                          witness: TaprootWitness): PreExecutionScriptProgram = {
+    val input = TransactionInput(outPoint, ScriptSignature.empty, TransactionConstants.sequence)
+    val wtx: WitnessTransaction = new WitnessTransaction(
+      version = TransactionConstants.version,
+      inputs = Vector(input),
+      outputs = Vector.empty,
+      lockTime = TransactionConstants.lockTime,
+      witness = TransactionWitness(Vector(witness))
+    )
+    val t = TaprootTxSigComponent(
+      transaction = wtx,
+      inputIndex = UInt32.zero,
+      outputMap = PreviousOutputMap(
+        Map(outPoint -> TransactionOutput(Bitcoins.one, spk))),
+      flags = Policy.standardFlags
+    )
+
+    PreExecutionScriptProgram(t)
   }
 }
