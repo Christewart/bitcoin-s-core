@@ -1,14 +1,13 @@
 package org.bitcoins.testkitcore.util
 
-import org.bitcoins.core.crypto.{BaseTxSigComponent, TaprootTxSigComponent}
-import org.bitcoins.core.currency.{Bitcoins, CurrencyUnits}
+import org.bitcoins.core.crypto.BaseTxSigComponent
+import org.bitcoins.core.currency.CurrencyUnits
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.script.*
 import org.bitcoins.core.protocol.transaction.{
   Transaction,
   TransactionInput,
-  TransactionOutPoint,
   TransactionOutput
 }
 import org.bitcoins.core.protocol.{Bech32Address, BitcoinAddress}
@@ -20,7 +19,6 @@ import org.bitcoins.core.script.crypto.{
   OP_HASH160
 }
 import org.bitcoins.core.script.stack.OP_DUP
-import org.bitcoins.core.script.util.PreviousOutputMap
 import org.bitcoins.core.script.{
   ExecutionInProgressScriptProgram,
   PreExecutionScriptProgram
@@ -229,19 +227,7 @@ object TestUtil {
     PreExecutionScriptProgram(t)
   }
 
-  def testTaprootProgram(
-      spk: TaprootScriptPubKey,
-      witness: TaprootWitness): PreExecutionScriptProgram = {
-    val t = TaprootTxSigComponent(
-      transaction = TransactionTestUtil.testWitnessTransaction,
-      inputIndex = UInt32.zero,
-      outputMap = PreviousOutputMap(
-        Map(TransactionOutPoint.empty -> TransactionOutput(Bitcoins.one, spk))),
-      flags = Policy.standardFlags
-    )
 
-    PreExecutionScriptProgram(t)
-  }
 
   def testProgramPreExecution =
     testProgram match {
