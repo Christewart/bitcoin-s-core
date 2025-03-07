@@ -352,18 +352,19 @@ sealed abstract class ArithmeticInterpreter {
             program.sigVersion != SigVersionTapscript64Bit && (isLargerThan4Bytes(
               x) || isLargerThan4Bytes(y))
           ) {
-            println(s"here1? sigVersion=${program.sigVersion}")
+            println(s"here1")
             // pretty sure that an error is thrown inside of CScriptNum which in turn is caught by interpreter.cpp here
             // https://github.com/bitcoin/bitcoin/blob/master/src/script/interpreter.cpp#L999-L1002
             program.failExecution(ScriptErrorUnknownError)
           } else if (
             program.sigVersion == SigVersionTapscript64Bit && (isLargerThan8Bytes(
-              x) || isLargerThan4Bytes(y))
+              x) || isLargerThan8Bytes(y))
           ) {
+            println(s"here2")
             program.failExecution(ScriptErrorUnknownError)
           } else {
+            println(s"here3")
             val newStackTop = op(x, y)
-            println(s"here2?")
             program.updateStackAndScript(newStackTop :: program.stack.tail.tail,
                                          program.script.tail)
           }
@@ -414,7 +415,12 @@ sealed abstract class ArithmeticInterpreter {
           .isShortestEncoding(y))
       ) {
         program.failExecution(ScriptErrorUnknownError)
-      } else if (isLargerThan4Bytes(x) || isLargerThan4Bytes(y)) {
+      } else if (
+        (program.sigVersion != SigVersionTapscript64Bit && (isLargerThan4Bytes(
+          x) || isLargerThan4Bytes(
+          y))) || (program.sigVersion == SigVersionTapscript64Bit && (isLargerThan8Bytes(
+          x) || isLargerThan8Bytes(y)))
+      ) {
         // pretty sure that an error is thrown inside of CScriptNum which in turn is caught by interpreter.cpp here
         // https://github.com/bitcoin/bitcoin/blob/master/src/script/interpreter.cpp#L999-L1002
         program.failExecution(ScriptErrorUnknownError)
