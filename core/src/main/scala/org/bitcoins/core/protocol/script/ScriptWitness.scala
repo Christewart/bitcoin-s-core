@@ -410,8 +410,9 @@ case class TaprootScriptPath(stack: Vector[ByteVector]) extends TaprootWitness {
 
   def leafVersion: LeafVersion = controlBlock.leafVersion
 
-  override def sigVersion: SigVersionTapscript.type = leafVersion match {
-    case LeafVersion.Tapscript => SigVersionTapscript
+  override def sigVersion: SigVersionTaproot = leafVersion match {
+    case LeafVersion.Tapscript      => SigVersionTapscript
+    case LeafVersion.Tapscript64Bit => SigVersionTapscript64Bit
     case UnknownLeafVersion(toByte) =>
       sys.error(s"Unknown leaf version=$toByte, cannot determine sigVersion")
   }

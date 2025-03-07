@@ -12,7 +12,8 @@ import org.bitcoins.core.script.util.PreviousOutputMap
 import org.bitcoins.core.script.{
   ExecutedScriptProgram,
   ExecutionInProgressScriptProgram,
-  PreExecutionScriptProgram
+  PreExecutionScriptProgram,
+  StartedScriptProgram
 }
 import org.bitcoins.core.util.{NumberUtil, ScriptProgramTestUtil}
 import org.bitcoins.crypto.ECPublicKey
@@ -759,38 +760,127 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     Try(AI.opWithin(program)).isFailure must be(true)
   }
 
-  it must "support 64 bit arithmetic" in {
-    val max = NumberUtil.pow2(63) - 1
+  val max = NumberUtil.pow2(63) - 1
+  val min = -max + 1
+  val maxScriptNumber = ScriptNumber(max)
+  val minScriptNumber = ScriptNumber(min)
 
-    println(s"max=$max ${max + 1} ${max + 2}")
-    // val min = -max + 2
-    val maxScriptNumber = ScriptNumber(max)
-    // val minScriptNumber = ScriptNumber(min)
-    val stack = List(maxScriptNumber, ScriptNumber.one)
+  it must "support 64 bit arithmetic addition" in {
+    val validStacks: Vector[List[ScriptNumber]] =
+      Vector(List(maxScriptNumber, ScriptNumber.one),
+             List(ScriptNumber(5), maxScriptNumber),
+             List(ScriptNumber(-5), maxScriptNumber))
     val script = List(OP_ADD)
-    val spk = NonStandardScriptPubKey.fromAsm(script)
-    val tapLeaf = TapLeaf.apply(LeafVersion.Tapscript64Bit, spk)
-    val tree = TapscriptTree.buildTapscriptTree(Vector(tapLeaf))
-    val internalKey = ECPublicKey.freshPublicKey.toXOnly
-    val (_, taprootSPK) =
-      TaprootScriptPubKey.fromInternalKeyTapscriptTree(internalKey, tree)
-    val controlBlock: TapscriptControlBlock =
-      TapscriptControlBlock.fromLeaves(LeafVersion.Tapscript64Bit,
-                                       internalKey,
-                                       Vector(tapLeaf))
-    val witness: TaprootScriptPath =
-      TaprootScriptPath(controlBlock = controlBlock, annexOpt = None, spk = spk)
 
-    val program = testTaprootProgram(taprootSPK, witness).toExecutionInProgress
-      .updateStackAndScript(
-        stack,
-        script
+    val (taprootSPK, witness) = buildTaprootSPK(script)
+    val programs: Vector[(ExecutionInProgressScriptProgram, ScriptNumber)] =
+      buildSuccessTests(stacks = validStacks,
+                        taprootSPK = taprootSPK,
+                        witness = witness,
+                        script = script,
+                        op = (_ + _))
+
+    programs.foreach { case (program, result) =>
+      val newProgram = AI.opAdd(program)
+      assert(!newProgram.isInstanceOf[ExecutedScriptProgram])
+      newProgram.stack.head must be(result)
+      newProgram.script.isEmpty must be(true)
+    }
+  }
+
+  it must "support 64bit arithmetic subtraction" in {
+    val validStacks: Vector[List[ScriptNumber]] =
+      Vector(List(maxScriptNumber, ScriptNumber(4)),
+             List(ScriptNumber(-5), maxScriptNumber),
+             List(maxScriptNumber, ScriptNumber(-4)))
+    val script = List(OP_SUB)
+
+    val (taprootSPK, witness) = buildTaprootSPK(script)
+    val programs: Vector[(ExecutionInProgressScriptProgram, ScriptNumber)] =
+      buildSuccessTests(stacks = validStacks,
+                        taprootSPK = taprootSPK,
+                        witness = witness,
+                        script = script,
+                        op = (_ - _))
+
+    programs.foreach { case (program, result) =>
+      val newProgram = AI.opSub(program)
+      assert(!newProgram.isInstanceOf[ExecutedScriptProgram])
+      newProgram.stack.head must be(result)
+      newProgram.script.isEmpty must be(true)
+    }
+  }
+
+  it must "support 64bit comparison opcodes" in {
+    val validStacks = Vector(
+      List(maxScriptNumber, minScriptNumber),
+      List(minScriptNumber, maxScriptNumber),
+      List(minScriptNumber, minScriptNumber),
+      List(maxScriptNumber, maxScriptNumber)
+    )
+
+    val opcodesWithFn
+        : Vector[(ArithmeticOperation,
+                  (ExecutionInProgressScriptProgram => StartedScriptProgram),
+                  (BigInt, BigInt) => BigInt)] = {
+      Vector(
+        (OP_LESSTHAN,
+         ArithmeticInterpreter.opLessThan,
+         { case (a: BigInt, b: BigInt) =>
+           if (a < b) BigInt(1) else BigInt(0)
+         }),
+        (OP_LESSTHANOREQUAL,
+         ArithmeticInterpreter.opLessThanOrEqual,
+         { case (a: BigInt, b: BigInt) =>
+           if (a <= b) BigInt(1) else BigInt(0)
+         }),
+        (OP_GREATERTHAN,
+         ArithmeticInterpreter.opGreaterThan,
+         { case (a: BigInt, b: BigInt) =>
+           if (a > b) BigInt(1) else BigInt(0)
+         }),
+        (OP_GREATERTHANOREQUAL,
+         ArithmeticInterpreter.opGreaterThanOrEqual,
+         { case (a: BigInt, b: BigInt) =>
+           if (a >= b) BigInt(1) else BigInt(0)
+         })
       )
-    assert(maxScriptNumber + ScriptNumber.one == ScriptNumber(max + 1))
-    val newProgram = AI.opAdd(program)
-    assert(!newProgram.isInstanceOf[ExecutedScriptProgram])
-    newProgram.stack.head must be(ScriptNumber(max + 1))
-    newProgram.script.isEmpty must be(true)
+    }
+    val scripts = opcodesWithFn.map { case (op, opCodeFn, fn) =>
+      (List(op), opCodeFn, fn)
+    }
+
+    val spksAndWitness
+        : Vector[(TaprootScriptPubKey,
+                  TaprootWitness,
+                  List[ScriptToken],
+                  (ExecutionInProgressScriptProgram => StartedScriptProgram),
+                  (BigInt, BigInt) => BigInt)] = {
+      scripts.map { case (script, opCodeFn, fn) =>
+        val t = buildTaprootSPK(script)
+        (t._1, t._2, script, opCodeFn, fn)
+      }
+    }
+    val programs
+        : Vector[(ExecutionInProgressScriptProgram,
+                  ScriptNumber,
+                  (ExecutionInProgressScriptProgram => StartedScriptProgram))] =
+      spksAndWitness.flatMap {
+        case (taprootSPK, witness, script, opCodeFn, fn) =>
+          val result = buildSuccessTests(stacks = validStacks,
+                                         taprootSPK = taprootSPK,
+                                         witness = witness,
+                                         script = script,
+                                         op = fn)
+          result.map(r => (r._1, r._2, opCodeFn))
+      }
+
+    programs.foreach { case (program, result, opCodeFn) =>
+      val newProgram = opCodeFn(program)
+      assert(!newProgram.isInstanceOf[ExecutedScriptProgram])
+      newProgram.stack.head must be(result)
+      newProgram.script.isEmpty must be(true)
+    }
   }
 
   def testTaprootProgram(
@@ -820,5 +910,47 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     )
 
     PreExecutionScriptProgram(t)
+  }
+
+  def buildTaprootSPK(
+      script: List[ScriptToken]): (TaprootScriptPubKey, TaprootWitness) = {
+    val spk = NonStandardScriptPubKey.fromAsm(script)
+    val tapLeaf = TapLeaf.apply(LeafVersion.Tapscript64Bit, spk)
+    val tree = TapscriptTree.buildTapscriptTree(Vector(tapLeaf))
+    val internalKey = ECPublicKey.freshPublicKey.toXOnly
+    val (_, taprootSPK) =
+      TaprootScriptPubKey.fromInternalKeyTapscriptTree(internalKey, tree)
+    val controlBlock: TapscriptControlBlock =
+      TapscriptControlBlock.fromLeaves(LeafVersion.Tapscript64Bit,
+                                       internalKey,
+                                       Vector(tapLeaf))
+    val witness: TaprootScriptPath =
+      TaprootScriptPath(controlBlock = controlBlock, annexOpt = None, spk = spk)
+    (taprootSPK, witness)
+  }
+
+  def buildSuccessTests(
+      stacks: Vector[List[ScriptNumber]],
+      taprootSPK: TaprootScriptPubKey,
+      witness: TaprootWitness,
+      script: List[ScriptToken],
+      op: (BigInt, BigInt) => BigInt)
+      : Vector[(ExecutionInProgressScriptProgram, ScriptNumber)] = {
+    stacks.map { stack =>
+      println(s"stack=$stack")
+      val bigInt = stack.reverse.tail.foldLeft(stack.last.toBigInt) {
+        case (b1, b2) =>
+          println(s"b1=$b1 b2=${b2.toBigInt}")
+          op(b1, b2.toBigInt)
+      }
+      println(s"bigInt=$bigInt stack=$stack script=$script")
+      val result = ScriptNumber(bigInt)
+      (testTaprootProgram(taprootSPK, witness).toExecutionInProgress
+         .updateStackAndScript(
+           stack,
+           script
+         ),
+       result)
+    }
   }
 }
