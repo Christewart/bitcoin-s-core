@@ -352,7 +352,7 @@ sealed abstract class ArithmeticInterpreter {
             program.sigVersion != SigVersionTapscript64Bit && (isLargerThan4Bytes(
               x) || isLargerThan4Bytes(y))
           ) {
-            println(s"here1?")
+            println(s"here1? sigVersion=${program.sigVersion}")
             // pretty sure that an error is thrown inside of CScriptNum which in turn is caught by interpreter.cpp here
             // https://github.com/bitcoin/bitcoin/blob/master/src/script/interpreter.cpp#L999-L1002
             program.failExecution(ScriptErrorUnknownError)

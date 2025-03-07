@@ -780,12 +780,12 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
                                        Vector(tapLeaf))
     val witness: TaprootScriptPath =
       TaprootScriptPath(controlBlock = controlBlock, annexOpt = None, spk = spk)
-    val program = testTaprootProgram(taprootSPK, witness)
-        .toExecutionInProgress
-        .updateStackAndScript(
-          stack,
-          script
-        )
+
+    val program = testTaprootProgram(taprootSPK, witness).toExecutionInProgress
+      .updateStackAndScript(
+        stack,
+        script
+      )
     assert(maxScriptNumber + ScriptNumber.one == ScriptNumber(max + 1))
     val newProgram = AI.opAdd(program)
     assert(!newProgram.isInstanceOf[ExecutedScriptProgram])
@@ -794,11 +794,18 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
   }
 
   def testTaprootProgram(
-      outPoint: TransactionOutPoint,
-                          spk: TaprootScriptPubKey,
-                          witness: TaprootWitness): PreExecutionScriptProgram = {
-    val input = TransactionInput(outPoint, ScriptSignature.empty, TransactionConstants.sequence)
-    val wtx: WitnessTransaction = new WitnessTransaction(
+      spk: TaprootScriptPubKey,
+      witness: TaprootWitness): PreExecutionScriptProgram = {
+    val creditingOutput = TransactionOutput(Bitcoins.one, spk)
+    val creditingTx = BaseTransaction(version = TransactionConstants.version,
+                                      Vector.empty,
+                                      Vector(creditingOutput),
+                                      TransactionConstants.lockTime)
+    val outPoint = TransactionOutPoint(creditingTx.txIdBE, 0)
+    val input = TransactionInput(outPoint,
+                                 ScriptSignature.empty,
+                                 TransactionConstants.sequence)
+    val wtx: WitnessTransaction = WitnessTransaction(
       version = TransactionConstants.version,
       inputs = Vector(input),
       outputs = Vector.empty,
@@ -808,8 +815,7 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     val t = TaprootTxSigComponent(
       transaction = wtx,
       inputIndex = UInt32.zero,
-      outputMap = PreviousOutputMap(
-        Map(outPoint -> TransactionOutput(Bitcoins.one, spk))),
+      outputMap = PreviousOutputMap(Map(outPoint -> creditingOutput)),
       flags = Policy.standardFlags
     )
 

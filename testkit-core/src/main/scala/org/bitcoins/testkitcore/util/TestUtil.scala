@@ -227,8 +227,6 @@ object TestUtil {
     PreExecutionScriptProgram(t)
   }
 
-
-
   def testProgramPreExecution =
     testProgram match {
       case p: PreExecutionScriptProgram => p
