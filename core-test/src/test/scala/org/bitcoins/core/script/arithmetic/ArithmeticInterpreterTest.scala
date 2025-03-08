@@ -884,7 +884,55 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
   }
 
   it must "support OP_INOUT_AMOUNT" in {
-    fail()
+    val validStacks = Vector(List(ScriptNumber.one, ScriptNumber.one))
+    val script = List(OP_INOUT_AMOUNT)
+    val (taprootSPK, witness) = buildTaprootSPK(script)
+    val programs = validStacks.map { stack =>
+      testTaprootProgram(taprootSPK, witness).toExecutionInProgress
+        .updateStackAndScript(
+          stack,
+          script
+        )
+    }
+
+    val ONE_BTC_SN = ScriptNumber(Bitcoins.one.satoshis.toLong)
+    programs.foreach { program =>
+      val newProgram = AI.opInOutAmount(program)
+      assert(!newProgram.isInstanceOf[ExecutedScriptProgram])
+      newProgram.stack must be(Vector(ONE_BTC_SN, ONE_BTC_SN))
+      newProgram.script.isEmpty must be(true)
+    }
+  }
+
+  it must "OP_INOUT_AMOUNT must return index out of bounds errors" in {
+    val invalidStacks = Vector(
+      List(ScriptNumber(2), ScriptNumber.one),
+      List(ScriptNumber.one, ScriptNumber(2)),
+      List(ScriptNumber.negativeOne, ScriptNumber.one),
+      List(ScriptNumber.one, ScriptNumber.negativeOne),
+      List(ScriptNumber.one, ScriptNumber.negativeZero),
+      List(ScriptNumber.one, ScriptNumber.negativeZero)
+    )
+    val script = List(OP_INOUT_AMOUNT)
+    val (taprootSPK, witness) = buildTaprootSPK(script)
+    val programs = invalidStacks.map { stack =>
+      testTaprootProgram(taprootSPK, witness).toExecutionInProgress
+        .updateStackAndScript(
+          stack,
+          script
+        )
+    }
+
+    programs.foreach { program =>
+      val newProgram = AI.opInOutAmount(program)
+      newProgram match {
+        case executedScriptProgram: ExecutedScriptProgram =>
+          assert(
+            executedScriptProgram.error.contains(ScriptErrorIndexOutOfBounds))
+        case _: StartedScriptProgram =>
+          fail(s"Must have idx out of bounds exception")
+      }
+    }
   }
 
   def testTaprootProgram(
@@ -941,13 +989,10 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
       op: (BigInt, BigInt) => BigInt)
       : Vector[(ExecutionInProgressScriptProgram, ScriptNumber)] = {
     stacks.map { stack =>
-      println(s"stack=$stack")
       val bigInt = stack.reverse.tail.foldLeft(stack.last.toBigInt) {
         case (b1, b2) =>
-          println(s"b1=$b1 b2=${b2.toBigInt}")
           op(b1, b2.toBigInt)
       }
-      println(s"bigInt=$bigInt stack=$stack script=$script")
       val result = ScriptNumber(bigInt)
       (testTaprootProgram(taprootSPK, witness).toExecutionInProgress
          .updateStackAndScript(

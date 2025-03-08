@@ -278,18 +278,31 @@ sealed abstract class ArithmeticInterpreter {
         parseTopTwoStackElementsAsScriptNumbers(program)
       val inputBitMap = parseBitMap(inputScriptNum)
       val outputBitMap = parseBitMap(outputScriptNum)
-      val inputValues: BigInt = inputBitMap
-        .map(idx => taprootTxSigComponent.outputMap.toVector(idx)._2.value)
-        .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
-      val outputValues = outputBitMap
-        .map(idx => taprootTxSigComponent.outputs(idx).value)
-        .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
-      program.updateStackAndScript(
-        ScriptNumber(outputValues) :: ScriptNumber(
-          inputValues) :: program.stack.tail.tail,
-        program.script.tail
-      )
+      val maxInputs = taprootTxSigComponent.outputMap.size
+      val maxOutputs = taprootTxSigComponent.outputs.size
+      if (
+        isOutOfBounds(inputBitMap, maxInputs) || isOutOfBounds(outputBitMap,
+                                                               maxOutputs)
+      ) {
+        program.failExecution(ScriptErrorIndexOutOfBounds)
+      } else {
+        val inputValues: BigInt = inputBitMap
+          .map(idx => taprootTxSigComponent.outputMap.toVector(idx)._2.value)
+          .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
+        val outputValues = outputBitMap
+          .map(idx => taprootTxSigComponent.outputs(idx).value)
+          .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
+        program.updateStackAndScript(
+          ScriptNumber(outputValues) :: ScriptNumber(
+            inputValues) :: program.stack.tail.tail,
+          program.script.tail
+        )
+      }
     }
+  }
+
+  private def isOutOfBounds(bitmap: Vector[Int], maxSize: Int): Boolean = {
+    bitmap.exists(_ >= maxSize)
   }
 
   /** This function checks if a number is <= 4 bytes in size We cannot perform
@@ -304,7 +317,9 @@ sealed abstract class ArithmeticInterpreter {
   }
 
   private def parseBitMap(scriptNum: ScriptNumber): Vector[Int] = {
-    val result = scriptNum.bytes.toBitVector.toIndexedSeq.zipWithIndex
+    println(
+      s"scriptNum=$scriptNum bitVector=${scriptNum.bytes.toBitVector.reverse.toIndexedSeq.zipWithIndex}")
+    val result = scriptNum.bytes.toBitVector.reverse.toIndexedSeq.zipWithIndex
       .filter(_._1)
       .map(_._2)
     result.toVector

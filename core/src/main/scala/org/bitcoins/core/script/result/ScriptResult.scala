@@ -269,6 +269,10 @@ case object ScriptErrorDiscourageUpgradablePubkeyType extends ScriptError {
   override val description: String = "DISCOURAGE_UPGRADABLE_PUBKEYTYPE"
 }
 
+case object ScriptErrorIndexOutOfBounds extends ScriptError {
+  override val description: String = "INDEX_OUT_OF_BOUNDS"
+}
+
 /** Factory companion object for creating ScriptError objects
   */
 object ScriptResult {
@@ -326,7 +330,8 @@ object ScriptResult {
       ScriptErrorTapScriptMinimalIf,
       ScriptErrorDiscourageUpgradableTaprootVersion,
       ScriptErrorDiscourageOpSuccess,
-      ScriptErrorDiscourageUpgradablePubkeyType
+      ScriptErrorDiscourageUpgradablePubkeyType,
+      ScriptErrorIndexOutOfBounds
     )
 
   def apply(str: String): ScriptResult =
