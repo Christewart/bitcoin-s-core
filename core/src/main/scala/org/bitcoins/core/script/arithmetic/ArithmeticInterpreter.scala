@@ -1,5 +1,6 @@
 package org.bitcoins.core.script.arithmetic
 
+import org.bitcoins.core.crypto.TaprootTxSigComponent
 import org.bitcoins.core.protocol.script.SigVersionTapscript64Bit
 import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.{
@@ -257,6 +258,40 @@ sealed abstract class ArithmeticInterpreter {
     }
   }
 
+  def opInOutAmount(
+      program: ExecutionInProgressScriptProgram): StartedScriptProgram = {
+    require(
+      program.script.headOption.contains(OP_INOUT_AMOUNT),
+      s"Script top must be OP_INOUT_AMOUNT, got=${program.script.headOption}")
+    if (program.stack.size < 2) {
+      program.failExecution(ScriptErrorInvalidStackOperation)
+    } else if (
+      !program.txSignatureComponent.isInstanceOf[TaprootTxSigComponent]
+    ) {
+      // better error here?
+      program.failExecution(ScriptErrorUnknownError)
+    } else {
+
+      val taprootTxSigComponent =
+        program.txSignatureComponent.asInstanceOf[TaprootTxSigComponent]
+      val (inputScriptNum, outputScriptNum) =
+        parseTopTwoStackElementsAsScriptNumbers(program)
+      val inputBitMap = parseBitMap(inputScriptNum)
+      val outputBitMap = parseBitMap(outputScriptNum)
+      val inputValues: BigInt = inputBitMap
+        .map(idx => taprootTxSigComponent.outputMap.toVector(idx)._2.value)
+        .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
+      val outputValues = outputBitMap
+        .map(idx => taprootTxSigComponent.outputs(idx).value)
+        .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
+      program.updateStackAndScript(
+        ScriptNumber(outputValues) :: ScriptNumber(
+          inputValues) :: program.stack.tail.tail,
+        program.script.tail
+      )
+    }
+  }
+
   /** This function checks if a number is <= 4 bytes in size We cannot perform
     * arithmetic operations on bitcoin numbers that are larger than 4 bytes.
     * https://github.com/bitcoin/bitcoin/blob/a6a860796a44a2805a58391a009ba22752f64e32/src/script/script.h#L214-L239.
@@ -266,6 +301,13 @@ sealed abstract class ArithmeticInterpreter {
 
   private def isLargerThan8Bytes(scriptNumber: ScriptNumber): Boolean = {
     scriptNumber.bytes.size > 8
+  }
+
+  private def parseBitMap(scriptNum: ScriptNumber): Vector[Int] = {
+    val result = scriptNum.bytes.toBitVector.toIndexedSeq.zipWithIndex
+      .filter(_._1)
+      .map(_._2)
+    result.toVector
   }
 
   /** Performs the given arithmetic operation on the stack head

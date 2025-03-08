@@ -883,6 +883,10 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     }
   }
 
+  it must "support OP_INOUT_AMOUNT" in {
+    fail()
+  }
+
   def testTaprootProgram(
       spk: TaprootScriptPubKey,
       witness: TaprootWitness): PreExecutionScriptProgram = {

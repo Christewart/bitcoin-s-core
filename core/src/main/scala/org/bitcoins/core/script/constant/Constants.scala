@@ -172,6 +172,12 @@ object ScriptNumber
     }
   }
 
+  def fromToken(
+      constant: ScriptToken,
+      requireMinimal: Boolean): Try[ScriptNumber] = {
+    fromBytes(constant.bytes, requireMinimal)
+  }
+
   override def fromNativeNumber(long: Long): ScriptNumber = {
     ScriptNumberImpl(long)
   }
