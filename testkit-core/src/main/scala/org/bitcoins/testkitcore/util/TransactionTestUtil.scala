@@ -9,6 +9,7 @@ import org.bitcoins.core.protocol.Bech32mAddress
 import org.bitcoins.core.protocol.script.*
 import org.bitcoins.core.protocol.transaction.*
 import org.bitcoins.core.psbt.PSBT
+import org.bitcoins.core.script.constant.ScriptToken
 import org.bitcoins.core.wallet.utxo.TxoState
 import org.bitcoins.crypto.*
 
@@ -329,6 +330,23 @@ trait TransactionTestUtil {
     spendingTxIdOpt =
       Some(DoubleSha256DigestBE.fromBytes(ECPrivateKey.freshPrivateKey.bytes))
   )
+
+  def buildTaprootSPK(
+      script: List[ScriptToken]): (TaprootScriptPubKey, TaprootScriptPath) = {
+    val spk = NonStandardScriptPubKey.fromAsm(script)
+    val tapLeaf = TapLeaf.apply(LeafVersion.Tapscript64Bit, spk)
+    val tree = TapscriptTree.buildTapscriptTree(Vector(tapLeaf))
+    val internalKey = ECPublicKey.freshPublicKey.toXOnly
+    val (_, taprootSPK) =
+      TaprootScriptPubKey.fromInternalKeyTapscriptTree(internalKey, tree)
+    val controlBlock: TapscriptControlBlock =
+      TapscriptControlBlock.fromLeaves(LeafVersion.Tapscript64Bit,
+                                       internalKey,
+                                       Vector(tapLeaf))
+    val witness: TaprootScriptPath =
+      TaprootScriptPath(controlBlock = controlBlock, annexOpt = None, spk = spk)
+    (taprootSPK, witness)
+  }
 }
 
 object TransactionTestUtil extends TransactionTestUtil

@@ -1,23 +1,20 @@
 package org.bitcoins.core.script.arithmetic
 
-import org.bitcoins.core.crypto.TaprootTxSigComponent
 import org.bitcoins.core.currency.Bitcoins
-import org.bitcoins.core.number.UInt32
-import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.script.*
-import org.bitcoins.core.protocol.transaction.*
 import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.result.*
-import org.bitcoins.core.script.util.PreviousOutputMap
 import org.bitcoins.core.script.{
   ExecutedScriptProgram,
   ExecutionInProgressScriptProgram,
-  PreExecutionScriptProgram,
   StartedScriptProgram
 }
 import org.bitcoins.core.util.{NumberUtil, ScriptProgramTestUtil}
-import org.bitcoins.crypto.ECPublicKey
-import org.bitcoins.testkitcore.util.{BitcoinSUnitTest, TestUtil}
+import org.bitcoins.testkitcore.util.{
+  BitcoinSUnitTest,
+  TestUtil,
+  TransactionTestUtil
+}
 
 import scala.util.Try
 
@@ -772,7 +769,7 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
              List(ScriptNumber(-5), maxScriptNumber))
     val script = List(OP_ADD)
 
-    val (taprootSPK, witness) = buildTaprootSPK(script)
+    val (taprootSPK, witness) = TransactionTestUtil.buildTaprootSPK(script)
     val programs: Vector[(ExecutionInProgressScriptProgram, ScriptNumber)] =
       buildSuccessTests(stacks = validStacks,
                         taprootSPK = taprootSPK,
@@ -795,7 +792,7 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
              List(maxScriptNumber, ScriptNumber(-4)))
     val script = List(OP_SUB)
 
-    val (taprootSPK, witness) = buildTaprootSPK(script)
+    val (taprootSPK, witness) = TransactionTestUtil.buildTaprootSPK(script)
     val programs: Vector[(ExecutionInProgressScriptProgram, ScriptNumber)] =
       buildSuccessTests(stacks = validStacks,
                         taprootSPK = taprootSPK,
@@ -857,7 +854,7 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
                   (ExecutionInProgressScriptProgram => StartedScriptProgram),
                   (BigInt, BigInt) => BigInt)] = {
       scripts.map { case (script, opCodeFn, fn) =>
-        val t = buildTaprootSPK(script)
+        val t = TransactionTestUtil.buildTaprootSPK(script)
         (t._1, t._2, script, opCodeFn, fn)
       }
     }
@@ -886,9 +883,11 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
   it must "support OP_INOUT_AMOUNT" in {
     val validStacks = Vector(List(ScriptNumber.one, ScriptNumber.one))
     val script = List(OP_INOUT_AMOUNT)
-    val (taprootSPK, witness) = buildTaprootSPK(script)
+    val (taprootSPK, witness) = TransactionTestUtil.buildTaprootSPK(script)
     val programs = validStacks.map { stack =>
-      testTaprootProgram(taprootSPK, witness).toExecutionInProgress
+      TestUtil
+        .testTaprootProgram(taprootSPK, witness, fundingOutputsOpt = None)
+        .toExecutionInProgress
         .updateStackAndScript(
           stack,
           script
@@ -914,9 +913,11 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
       List(ScriptNumber.one, ScriptNumber.negativeZero)
     )
     val script = List(OP_INOUT_AMOUNT)
-    val (taprootSPK, witness) = buildTaprootSPK(script)
+    val (taprootSPK, witness) = TransactionTestUtil.buildTaprootSPK(script)
     val programs = invalidStacks.map { stack =>
-      testTaprootProgram(taprootSPK, witness).toExecutionInProgress
+      TestUtil
+        .testTaprootProgram(taprootSPK, witness, fundingOutputsOpt = None)
+        .toExecutionInProgress
         .updateStackAndScript(
           stack,
           script
@@ -935,52 +936,6 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     }
   }
 
-  def testTaprootProgram(
-      spk: TaprootScriptPubKey,
-      witness: TaprootWitness): PreExecutionScriptProgram = {
-    val creditingOutput = TransactionOutput(Bitcoins.one, spk)
-    val creditingTx = BaseTransaction(version = TransactionConstants.version,
-                                      Vector.empty,
-                                      Vector(creditingOutput),
-                                      TransactionConstants.lockTime)
-    val outPoint = TransactionOutPoint(creditingTx.txIdBE, 0)
-    val input = TransactionInput(outPoint,
-                                 ScriptSignature.empty,
-                                 TransactionConstants.sequence)
-    val wtx: WitnessTransaction = WitnessTransaction(
-      version = TransactionConstants.version,
-      inputs = Vector(input),
-      outputs = Vector.empty,
-      lockTime = TransactionConstants.lockTime,
-      witness = TransactionWitness(Vector(witness))
-    )
-    val t = TaprootTxSigComponent(
-      transaction = wtx,
-      inputIndex = UInt32.zero,
-      outputMap = PreviousOutputMap(Map(outPoint -> creditingOutput)),
-      flags = Policy.standardFlags
-    )
-
-    PreExecutionScriptProgram(t)
-  }
-
-  def buildTaprootSPK(
-      script: List[ScriptToken]): (TaprootScriptPubKey, TaprootWitness) = {
-    val spk = NonStandardScriptPubKey.fromAsm(script)
-    val tapLeaf = TapLeaf.apply(LeafVersion.Tapscript64Bit, spk)
-    val tree = TapscriptTree.buildTapscriptTree(Vector(tapLeaf))
-    val internalKey = ECPublicKey.freshPublicKey.toXOnly
-    val (_, taprootSPK) =
-      TaprootScriptPubKey.fromInternalKeyTapscriptTree(internalKey, tree)
-    val controlBlock: TapscriptControlBlock =
-      TapscriptControlBlock.fromLeaves(LeafVersion.Tapscript64Bit,
-                                       internalKey,
-                                       Vector(tapLeaf))
-    val witness: TaprootScriptPath =
-      TaprootScriptPath(controlBlock = controlBlock, annexOpt = None, spk = spk)
-    (taprootSPK, witness)
-  }
-
   def buildSuccessTests(
       stacks: Vector[List[ScriptNumber]],
       taprootSPK: TaprootScriptPubKey,
@@ -994,7 +949,9 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
           op(b1, b2.toBigInt)
       }
       val result = ScriptNumber(bigInt)
-      (testTaprootProgram(taprootSPK, witness).toExecutionInProgress
+      (TestUtil
+         .testTaprootProgram(taprootSPK, witness, fundingOutputsOpt = None)
+         .toExecutionInProgress
          .updateStackAndScript(
            stack,
            script

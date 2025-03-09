@@ -1,15 +1,11 @@
 package org.bitcoins.testkitcore.util
 
-import org.bitcoins.core.crypto.BaseTxSigComponent
-import org.bitcoins.core.currency.CurrencyUnits
+import org.bitcoins.core.crypto.{BaseTxSigComponent, TaprootTxSigComponent}
+import org.bitcoins.core.currency.{Bitcoins, CurrencyUnits}
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.script.*
-import org.bitcoins.core.protocol.transaction.{
-  Transaction,
-  TransactionInput,
-  TransactionOutput
-}
+import org.bitcoins.core.protocol.transaction.*
 import org.bitcoins.core.protocol.{Bech32Address, BitcoinAddress}
 import org.bitcoins.core.script.bitwise.{OP_EQUAL, OP_EQUALVERIFY}
 import org.bitcoins.core.script.constant.*
@@ -19,6 +15,7 @@ import org.bitcoins.core.script.crypto.{
   OP_HASH160
 }
 import org.bitcoins.core.script.stack.OP_DUP
+import org.bitcoins.core.script.util.PreviousOutputMap
 import org.bitcoins.core.script.{
   ExecutionInProgressScriptProgram,
   PreExecutionScriptProgram
@@ -271,4 +268,37 @@ object TestUtil {
   def multiSigScriptPubKeyHex =
     "695221025878e270211662a27181cf4d6ad4d2cf0e69a98a3815c086f587c7e9388d87182103fc85980e3fac1f3d8a5c3223c3ef5bffc1bd42d2cc42add8c3899cc66e7f1906210215b5bd050869166a70a7341b4f216e268b7c6c7504576dcea2cce7d11cc9a35f53ae"
 
+  def testTaprootProgram(
+      spk: TaprootScriptPubKey,
+      witness: TaprootWitness,
+      outputMapOpt: Option[PreviousOutputMap],
+      spendingOutputsOpt: Option[Vector[TransactionOutput]])
+      : PreExecutionScriptProgram = {
+    val creditingOutputs = outputMapOpt
+      .map(_.outputMap.values)
+      .getOrElse(Vector(TransactionOutput(Bitcoins.one, spk)))
+    val creditingTx = BaseTransaction(version = TransactionConstants.version,
+                                      Vector.empty,
+                                      creditingOutputs,
+                                      TransactionConstants.lockTime)
+    val outPoint = TransactionOutPoint(creditingTx.txIdBE, 0)
+    val input = TransactionInput(outPoint,
+                                 ScriptSignature.empty,
+                                 TransactionConstants.sequence)
+    val wtx: WitnessTransaction = WitnessTransaction(
+      version = TransactionConstants.version,
+      inputs = Vector(input),
+      outputs = spendingOutputsOpt.getOrElse(Vector.empty),
+      lockTime = TransactionConstants.lockTime,
+      witness = TransactionWitness(Vector(witness))
+    )
+    val t = TaprootTxSigComponent(
+      transaction = wtx,
+      inputIndex = UInt32.zero,
+      outputMap = PreviousOutputMap(Map(outPoint -> creditingOutput)),
+      flags = Policy.standardFlags
+    )
+
+    PreExecutionScriptProgram(t)
+  }
 }
