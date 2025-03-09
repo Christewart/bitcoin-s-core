@@ -27,7 +27,8 @@ class InOutAmountTest extends BitcoinSUnitTest {
     val program =
       TestUtil.testTaprootProgram(taprootSPK,
                                   witness,
-                                  fundingOutputsOpt = Some(fundingOutputs))
+                                  fundingOutputsOpt = Some(fundingOutputs),
+                                  spendingOutputsOpt = None)
     val result = ScriptInterpreter.run(program)
     assert(result == ScriptOk)
   }

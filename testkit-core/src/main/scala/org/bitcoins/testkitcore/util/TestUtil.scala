@@ -271,31 +271,38 @@ object TestUtil {
   def testTaprootProgram(
       spk: TaprootScriptPubKey,
       witness: TaprootWitness,
-      outputMapOpt: Option[PreviousOutputMap],
+      fundingOutputsOpt: Option[Vector[TransactionOutput]],
       spendingOutputsOpt: Option[Vector[TransactionOutput]])
       : PreExecutionScriptProgram = {
-    val creditingOutputs = outputMapOpt
-      .map(_.outputMap.values)
-      .getOrElse(Vector(TransactionOutput(Bitcoins.one, spk)))
+    val creditingOutput = TransactionOutput(Bitcoins.one, EmptyScriptPubKey)
+
+    val creditingOutputs = fundingOutputsOpt.getOrElse(Vector(creditingOutput))
     val creditingTx = BaseTransaction(version = TransactionConstants.version,
                                       Vector.empty,
                                       creditingOutputs,
                                       TransactionConstants.lockTime)
     val outPoint = TransactionOutPoint(creditingTx.txIdBE, 0)
+    val builder = Map.newBuilder[TransactionOutPoint, TransactionOutput]
+    creditingOutputs.zipWithIndex.foreach { case (output, idx) =>
+      val outPoint = TransactionOutPoint(creditingTx.txIdBE, idx)
+      builder.addOne((outPoint, output))
+    }
+    val outputMap = PreviousOutputMap(builder.result())
     val input = TransactionInput(outPoint,
                                  ScriptSignature.empty,
                                  TransactionConstants.sequence)
     val wtx: WitnessTransaction = WitnessTransaction(
       version = TransactionConstants.version,
       inputs = Vector(input),
-      outputs = spendingOutputsOpt.getOrElse(Vector.empty),
+      outputs = spendingOutputsOpt.getOrElse(
+        Vector(TransactionOutput(Bitcoins.one, spk))),
       lockTime = TransactionConstants.lockTime,
       witness = TransactionWitness(Vector(witness))
     )
     val t = TaprootTxSigComponent(
       transaction = wtx,
       inputIndex = UInt32.zero,
-      outputMap = PreviousOutputMap(Map(outPoint -> creditingOutput)),
+      outputMap = outputMap,
       flags = Policy.standardFlags
     )
 

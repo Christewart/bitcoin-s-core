@@ -886,7 +886,10 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     val (taprootSPK, witness) = TransactionTestUtil.buildTaprootSPK(script)
     val programs = validStacks.map { stack =>
       TestUtil
-        .testTaprootProgram(taprootSPK, witness, fundingOutputsOpt = None)
+        .testTaprootProgram(taprootSPK,
+                            witness,
+                            fundingOutputsOpt = None,
+                            spendingOutputsOpt = None)
         .toExecutionInProgress
         .updateStackAndScript(
           stack,
@@ -916,7 +919,10 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     val (taprootSPK, witness) = TransactionTestUtil.buildTaprootSPK(script)
     val programs = invalidStacks.map { stack =>
       TestUtil
-        .testTaprootProgram(taprootSPK, witness, fundingOutputsOpt = None)
+        .testTaprootProgram(taprootSPK,
+                            witness,
+                            fundingOutputsOpt = None,
+                            spendingOutputsOpt = None)
         .toExecutionInProgress
         .updateStackAndScript(
           stack,
@@ -950,7 +956,10 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
       }
       val result = ScriptNumber(bigInt)
       (TestUtil
-         .testTaprootProgram(taprootSPK, witness, fundingOutputsOpt = None)
+         .testTaprootProgram(taprootSPK,
+                             witness,
+                             fundingOutputsOpt = None,
+                             spendingOutputsOpt = None)
          .toExecutionInProgress
          .updateStackAndScript(
            stack,
