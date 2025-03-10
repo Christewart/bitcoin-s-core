@@ -1,5 +1,6 @@
 package org.bitcoins.core.script.arithmetic
 import org.bitcoins.core.currency.Bitcoins
+import org.bitcoins.core.protocol.script.{ScriptPubKey, TaprootScriptPath}
 import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.core.script.constant.ScriptNumber
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
@@ -20,15 +21,17 @@ class InOutAmountTest extends BitcoinSUnitTest {
     val script = List(OP_INOUT_AMOUNT, OP_SUB, ONE_BTC, OP_GREATERTHANOREQUAL)
     val witnessStack = Vector(ScriptNumber.one, ScriptNumber.one)
       .map(_.bytes)
-    val (taprootSPK, witnessNoStack) =
+    val (taprootSPK, witnessNoStack: TaprootScriptPath) =
       TransactionTestUtil.buildTaprootSPK(script)
-    val witness = witnessNoStack.copy(witnessNoStack.stack.head +: witnessStack)
+    val witness = witnessNoStack.copy(witnessNoStack.stack ++ witnessStack)
     val fundingOutputs = Vector(TransactionOutput(Bitcoins.two, taprootSPK))
+    val spendingOutputs =
+      Vector(TransactionOutput(Bitcoins.one, ScriptPubKey.empty))
     val program =
       TestUtil.testTaprootProgram(taprootSPK,
                                   witness,
                                   fundingOutputsOpt = Some(fundingOutputs),
-                                  spendingOutputsOpt = None)
+                                  spendingOutputsOpt = Some(spendingOutputs))
     val result = ScriptInterpreter.run(program)
     assert(result == ScriptOk)
   }

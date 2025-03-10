@@ -337,12 +337,13 @@ trait TransactionTestUtil {
     val tapLeaf = TapLeaf.apply(LeafVersion.Tapscript64Bit, spk)
     val tree = TapscriptTree.buildTapscriptTree(Vector(tapLeaf))
     val internalKey = ECPublicKey.freshPublicKey.toXOnly
-    val (_, taprootSPK) =
+    val (keyParity, taprootSPK) =
       TaprootScriptPubKey.fromInternalKeyTapscriptTree(internalKey, tree)
     val controlBlock: TapscriptControlBlock =
-      TapscriptControlBlock.fromLeaves(LeafVersion.Tapscript64Bit,
-                                       internalKey,
-                                       Vector(tapLeaf))
+      TapscriptControlBlock(LeafVersion.Tapscript64Bit,
+                            internalKey,
+                            keyParity,
+                            Vector(tapLeaf.sha256))
     val witness: TaprootScriptPath =
       TaprootScriptPath(controlBlock = controlBlock, annexOpt = None, spk = spk)
     (taprootSPK, witness)
