@@ -274,7 +274,7 @@ object TestUtil {
       fundingOutputsOpt: Option[Vector[TransactionOutput]],
       spendingOutputsOpt: Option[Vector[TransactionOutput]])
       : PreExecutionScriptProgram = {
-    val creditingOutput = TransactionOutput(Bitcoins.one, EmptyScriptPubKey)
+    val creditingOutput = TransactionOutput(Bitcoins.one, spk)
 
     val creditingOutputs = fundingOutputsOpt.getOrElse(Vector(creditingOutput))
     val creditingTx = BaseTransaction(version = TransactionConstants.version,
@@ -295,7 +295,7 @@ object TestUtil {
       version = TransactionConstants.version,
       inputs = Vector(input),
       outputs = spendingOutputsOpt.getOrElse(
-        Vector(TransactionOutput(Bitcoins.one, spk))),
+        Vector(TransactionOutput(Bitcoins.one, EmptyScriptPubKey))),
       lockTime = TransactionConstants.lockTime,
       witness = TransactionWitness(Vector(witness))
     )
