@@ -2,7 +2,7 @@ package org.bitcoins.core.script.arithmetic
 import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.protocol.script.{ScriptPubKey, TaprootScriptPath}
 import org.bitcoins.core.protocol.transaction.TransactionOutput
-import org.bitcoins.core.script.constant.ScriptNumber
+import org.bitcoins.core.script.constant.{BytesToPushOntoStack, ScriptNumber}
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.core.script.result.ScriptOk
 import org.bitcoins.testkitcore.util.{
@@ -18,7 +18,11 @@ class InOutAmountTest extends BitcoinSUnitTest {
   val ONE_BTC = ScriptNumber(Bitcoins.one.satoshis.toLong)
   it must "only allow withdrawing 1 BTC" in {
     // safe to use EmptyTransactionOutPoint because non-taproot
-    val script = List(OP_INOUT_AMOUNT, OP_SUB, ONE_BTC, OP_GREATERTHANOREQUAL)
+    val script = List(OP_INOUT_AMOUNT,
+                      OP_SUB,
+                      BytesToPushOntoStack(ONE_BTC.bytes.size),
+                      ONE_BTC,
+                      OP_GREATERTHANOREQUAL)
     val witnessStack = Vector(ScriptNumber.one, ScriptNumber.one)
       .map(_.bytes)
     val (taprootSPK, witnessNoStack: TaprootScriptPath) =

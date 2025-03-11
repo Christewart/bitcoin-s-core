@@ -4,7 +4,7 @@ import org.bitcoins.core.consensus.Consensus
 import org.bitcoins.core.protocol.script.descriptor.ScriptDescriptorType
 import org.bitcoins.core.script.ScriptType
 import org.bitcoins.core.script.bitwise.{OP_EQUAL, OP_EQUALVERIFY}
-import org.bitcoins.core.script.constant.{BytesToPushOntoStack, *}
+import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.*
 import org.bitcoins.core.script.crypto.{
   OP_CHECKMULTISIG,

@@ -672,7 +672,6 @@ sealed abstract class ScriptInterpreter {
                 program = taprootSPK,
                 tapLeafHash = tapLeafHash)
             if (!isValidTaprootCommitment) {
-              println(s"here?")
               val p = scriptPubKeyExecutedProgram.failExecution(
                 ScriptErrorWitnessProgramMisMatch)
               Success(p)

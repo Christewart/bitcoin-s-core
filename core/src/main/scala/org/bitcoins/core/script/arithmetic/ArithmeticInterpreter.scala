@@ -409,7 +409,6 @@ sealed abstract class ArithmeticInterpreter {
             program.sigVersion != SigVersionTapscript64Bit && (isLargerThan4Bytes(
               x) || isLargerThan4Bytes(y))
           ) {
-            println(s"here1")
             // pretty sure that an error is thrown inside of CScriptNum which in turn is caught by interpreter.cpp here
             // https://github.com/bitcoin/bitcoin/blob/master/src/script/interpreter.cpp#L999-L1002
             program.failExecution(ScriptErrorUnknownError)
@@ -417,10 +416,8 @@ sealed abstract class ArithmeticInterpreter {
             program.sigVersion == SigVersionTapscript64Bit && (isLargerThan8Bytes(
               x) || isLargerThan8Bytes(y))
           ) {
-            println(s"here2")
             program.failExecution(ScriptErrorUnknownError)
           } else {
-            println(s"here3")
             val newStackTop = op(x, y)
             program.updateStackAndScript(newStackTop :: program.stack.tail.tail,
                                          program.script.tail)

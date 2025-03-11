@@ -340,10 +340,9 @@ trait TransactionTestUtil {
     val (keyParity, taprootSPK) =
       TaprootScriptPubKey.fromInternalKeyTapscriptTree(internalKey, tree)
     val controlBlock: TapscriptControlBlock =
-      TapscriptControlBlock(LeafVersion.Tapscript64Bit,
-                            internalKey,
-                            keyParity,
-                            Vector(tapLeaf.sha256))
+      TapscriptControlBlock.fromSingleLeaf(LeafVersion.Tapscript64Bit,
+                                           internalKey,
+                                           keyParity)
     val witness: TaprootScriptPath =
       TaprootScriptPath(controlBlock = controlBlock, annexOpt = None, spk = spk)
     (taprootSPK, witness)
