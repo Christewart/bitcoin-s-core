@@ -292,7 +292,7 @@ sealed abstract class ArithmeticInterpreter {
         val outputValues = outputBitMap
           .map(idx => taprootTxSigComponent.transaction.outputs(idx).value)
           .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
-
+        println(s"inputValues=$inputValues outputValues=$outputValues")
         program.updateStackAndScript(
           ScriptNumber(outputValues) :: ScriptNumber(
             inputValues) :: program.stack.tail.tail,
