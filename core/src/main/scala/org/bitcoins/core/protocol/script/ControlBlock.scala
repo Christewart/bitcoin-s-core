@@ -1,5 +1,10 @@
 package org.bitcoins.core.protocol.script
 
+import org.bitcoins.core.protocol.script.LeafVersion.{
+  Tapscript,
+  Tapscript64Bit,
+  UnknownLeafVersion
+}
 import org.bitcoins.crypto.*
 import scodec.bits.ByteVector
 
@@ -26,7 +31,10 @@ sealed abstract class ControlBlock extends NetworkElement {
     LeafVersion.fromMaskedByte(bytes.head)
 
   val isTapLeafMask: Boolean = {
-    leafVersion == LeafVersion.Tapscript
+    leafVersion match {
+      case Tapscript | Tapscript64Bit => true
+      case _: UnknownLeafVersion      => false
+    }
   }
 
   /** Leaf or branch hashes embedded in the control block */

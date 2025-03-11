@@ -145,7 +145,7 @@ case object OP_RSHIFT extends ArithmeticOperation {
 }
 
 case object OP_INOUT_AMOUNT extends ArithmeticOperation {
-  override val opCode: Int = 0xe3
+  override val opCode: Int = 227
 }
 
 object ArithmeticOperation extends ScriptOperationFactory[ArithmeticOperation] {
@@ -181,6 +181,7 @@ object ArithmeticOperation extends ScriptOperationFactory[ArithmeticOperation] {
     OP_DIV,
     OP_MOD,
     OP_LSHIFT,
-    OP_RSHIFT
+    OP_RSHIFT,
+    OP_INOUT_AMOUNT
   )
 }

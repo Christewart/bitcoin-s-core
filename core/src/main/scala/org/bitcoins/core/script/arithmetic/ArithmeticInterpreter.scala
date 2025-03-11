@@ -290,8 +290,9 @@ sealed abstract class ArithmeticInterpreter {
           .map(idx => taprootTxSigComponent.outputMap.toVector(idx)._2.value)
           .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
         val outputValues = outputBitMap
-          .map(idx => taprootTxSigComponent.outputs(idx).value)
+          .map(idx => taprootTxSigComponent.transaction.outputs(idx).value)
           .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
+
         program.updateStackAndScript(
           ScriptNumber(outputValues) :: ScriptNumber(
             inputValues) :: program.stack.tail.tail,
@@ -317,8 +318,6 @@ sealed abstract class ArithmeticInterpreter {
   }
 
   private def parseBitMap(scriptNum: ScriptNumber): Vector[Int] = {
-    println(
-      s"scriptNum=$scriptNum bitVector=${scriptNum.bytes.toBitVector.reverse.toIndexedSeq.zipWithIndex}")
     val result = scriptNum.bytes.toBitVector.reverse.toIndexedSeq.zipWithIndex
       .filter(_._1)
       .map(_._2)
