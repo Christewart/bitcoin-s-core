@@ -274,12 +274,12 @@ sealed abstract class ArithmeticInterpreter {
 
       val taprootTxSigComponent =
         program.txSignatureComponent.asInstanceOf[TaprootTxSigComponent]
-      val (inputScriptNum, outputScriptNum) =
+      val (outputScriptNum, inputScriptNum) =
         parseTopTwoStackElementsAsScriptNumbers(program)
       val inputBitMap = parseBitMap(inputScriptNum)
       val outputBitMap = parseBitMap(outputScriptNum)
-      val maxInputs = taprootTxSigComponent.outputMap.size
-      val maxOutputs = taprootTxSigComponent.outputs.size
+      val maxInputs = taprootTxSigComponent.fundingOutputs.size
+      val maxOutputs = taprootTxSigComponent.transaction.outputs.size
       if (
         isOutOfBounds(inputBitMap, maxInputs) || isOutOfBounds(outputBitMap,
                                                                maxOutputs)
