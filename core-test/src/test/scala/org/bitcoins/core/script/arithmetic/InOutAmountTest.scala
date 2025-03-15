@@ -1,12 +1,12 @@
 package org.bitcoins.core.script.arithmetic
-import org.bitcoins.core.currency.{Bitcoins, Satoshis}
+import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, Satoshis}
 import org.bitcoins.core.protocol.script.{ScriptPubKey, TaprootScriptPath}
 import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.core.script.bitwise.{OP_EQUAL, OP_EQUALVERIFY}
 import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.core.script.result.{ScriptErrorEvalFalse, ScriptOk}
-import org.bitcoins.core.script.stack.OP_DROP
+import org.bitcoins.core.script.stack.{OP_DROP, OP_DUP}
 import org.bitcoins.testkitcore.util.{
   BitcoinSUnitTest,
   TestUtil,
@@ -142,24 +142,11 @@ class InOutAmountTest extends BitcoinSUnitTest {
   }
 
   it must "enforce uniform output values" in {
-    val script: List[ScriptToken] =
-      List(
-        OP_0,
-        OP_1,
-        OP_INOUT_AMOUNT,
-        PUSH_ONE_BTC,
-        ONE_BTC,
-        OP_EQUALVERIFY,
-        OP_DROP, // drop input amount as its not relevant
-        OP_0,
-        OP_2,
-        OP_INOUT_AMOUNT,
-        PUSH_ONE_BTC,
-        ONE_BTC,
-        OP_EQUALVERIFY,
-        OP_DROP, // drop input amount as its not relevant
-        OP_1
-      )
+    val script: List[ScriptToken] = {
+      generateUniformOutputForIdx(0, Bitcoins.one) ++
+        generateUniformOutputForIdx(1, Bitcoins.one) ++
+        Vector(OP_1)
+    }.toList
 
     val witnessStack = Vector.empty
     val (taprootSPK, witnessNoStack: TaprootScriptPath) =
@@ -183,6 +170,94 @@ class InOutAmountTest extends BitcoinSUnitTest {
                                   spendingOutputsOpt = Some(spendingOutputs))
     val result0 = ScriptInterpreter.run(program0)
     assert(result0 == ScriptOk)
+  }
+
+  it must "showcase transaction malleability" in {
+    val script = List(OP_1,
+                      OP_INOUT_AMOUNT,
+                      PUSH_ONE_BTC,
+                      ONE_BTC,
+                      OP_DUP,
+                      OP_EQUALVERIFY,
+                      OP_EQUAL)
+    val witnessStack = Vector(ScriptNumber.one)
+      .map(_.bytes)
+    val (taprootSPK, witnessNoStack: TaprootScriptPath) =
+      TransactionTestUtil.buildTaprootSPK(script)
+    val witness = witnessNoStack.copy(witnessNoStack.stack ++ witnessStack)
+    val fundingOutputs =
+      Vector(TransactionOutput(Bitcoins.one, taprootSPK),
+             TransactionOutput(Bitcoins.one, ScriptPubKey.empty))
+    val spendingOutputs =
+      Vector(TransactionOutput(Bitcoins.one, ScriptPubKey.empty))
+    val program =
+      TestUtil.testTaprootProgram(taprootSPK,
+                                  witness,
+                                  fundingOutputsOpt = Some(fundingOutputs),
+                                  spendingOutputsOpt = Some(spendingOutputs))
+    val result = ScriptInterpreter.run(program)
+    assert(result == ScriptOk)
+  }
+
+  it must "enforce uniform amounts with different spending paths" in {
+    val script: List[ScriptToken] = {
+      generateUniformOutputForIdx(0, Bitcoins.one) ++
+        generateUniformOutputForIdx(1, Bitcoins.one) ++
+        generateUniformOutputForIdx(2, Bitcoins.one) ++
+        generateUniformOutputForIdx(3, Bitcoins.one) ++
+        generateUniformOutputForIdx(4, Bitcoins.one) ++
+        Vector(OP_1)
+    }.toList
+    println(s"script=$script")
+
+    val witnessStack = Vector.empty
+    val (taprootSPK, witnessNoStack: TaprootScriptPath) =
+      TransactionTestUtil.buildTaprootSPK(script)
+
+    val witness = witnessNoStack.copy(witnessNoStack.stack ++ witnessStack)
+    // fund the transaction with 6BTC
+    val fundingOutputs =
+      Vector(TransactionOutput(Bitcoins(2.1), taprootSPK),
+             TransactionOutput(Bitcoins(3), ScriptPubKey.empty))
+
+    val spendingOutputs =
+      Vector(
+        TransactionOutput(Bitcoins.one, ScriptPubKey.empty),
+        TransactionOutput(Bitcoins.one, ScriptPubKey.empty),
+        TransactionOutput(Bitcoins.one, ScriptPubKey.empty),
+        TransactionOutput(Bitcoins.one, ScriptPubKey.empty),
+        TransactionOutput(Bitcoins.one, ScriptPubKey.empty),
+        TransactionOutput(Bitcoins(0.1), ScriptPubKey.empty)
+      )
+
+    val program0 =
+      TestUtil.testTaprootProgram(taprootSPK,
+                                  witness,
+                                  fundingOutputsOpt = Some(fundingOutputs),
+                                  spendingOutputsOpt = Some(spendingOutputs))
+    val result0 = ScriptInterpreter.run(program0)
+    assert(result0 == ScriptOk)
+  }
+
+  private def generateUniformOutputForIdx(
+      outputIdx: Int,
+      amt: CurrencyUnit): Vector[ScriptToken] = {
+    val amtScriptNumber = ScriptNumber(amt.satoshis.toLong)
+    val pushAmt = BytesToPushOntoStack(ONE_BTC.bytes.size)
+    val idx = 1 << outputIdx
+    val idxOpWPushOp: Vector[ScriptToken] = if (idx >= 0 && idx <= 16) {
+      Vector(ScriptNumberOperation.fromNumber(idx).get)
+    } else {
+      val num = ScriptNumber(idx)
+      Vector(BytesToPushOntoStack(num.byteSize), num)
+    }
+    Vector(OP_0) ++ idxOpWPushOp ++ Vector(
+      OP_INOUT_AMOUNT,
+      pushAmt,
+      amtScriptNumber,
+      OP_EQUALVERIFY,
+      OP_DROP // drop input amount as its not relevant
+    )
   }
 
 }

@@ -1,11 +1,11 @@
 package org.bitcoins.core.script.bitwise
 
-import org.bitcoins.core.script.constant._
+import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.{
   ControlOperationsInterpreter,
   OP_VERIFY
 }
-import org.bitcoins.core.script.result._
+import org.bitcoins.core.script.result.*
 import org.bitcoins.core.script.{
   ExecutedScriptProgram,
   ExecutionInProgressScriptProgram,
@@ -24,6 +24,7 @@ sealed abstract class BitwiseInterpreter {
     if (program.stack.size < 2) {
       program.failExecution(ScriptErrorInvalidStackOperation)
     } else {
+      println(s"stack=${program.stack}")
       val h = program.stack.head
       val h1 = program.stack.tail.head
       val result = (h, h1) match {

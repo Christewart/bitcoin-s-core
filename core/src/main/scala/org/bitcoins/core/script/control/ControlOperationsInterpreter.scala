@@ -1,14 +1,14 @@
 package org.bitcoins.core.script.control
 
-import org.bitcoins.core.protocol.script._
-import org.bitcoins.core.script.constant._
+import org.bitcoins.core.protocol.script.*
+import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.flag.ScriptFlagUtil
-import org.bitcoins.core.script.result._
+import org.bitcoins.core.script.result.*
 import org.bitcoins.core.script.{
   ExecutionInProgressScriptProgram,
   StartedScriptProgram
 }
-import org.bitcoins.core.util._
+import org.bitcoins.core.util.*
 
 /** Created by chris on 1/6/16.
   */
@@ -127,6 +127,7 @@ sealed abstract class ControlOperationsInterpreter {
       program: ExecutionInProgressScriptProgram): StartedScriptProgram = {
     require(program.script.headOption.contains(OP_VERIFY),
             "Script top must be OP_VERIFY")
+    println(s"opVerify stack=${program.stack}")
     program.stack.nonEmpty match {
       case true =>
         if (program.stackTopIsFalse) program.failExecution(ScriptErrorVerify)
