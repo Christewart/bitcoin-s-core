@@ -1,30 +1,31 @@
-package org.bitcoins.server
+package org.bitcoins.commons.jsonmodels.server
 
 import org.bitcoins.commons.jsonmodels.bitcoind.RpcOpts.LockUnspentOutputParameter
 import org.bitcoins.commons.serializers.JsonReaders
+import org.bitcoins.commons.util.WalletNames
 import org.bitcoins.core.api.wallet.CoinSelectionAlgo
 import org.bitcoins.core.config.DLC
-import org.bitcoins.core.crypto._
+import org.bitcoins.core.crypto.*
 import org.bitcoins.core.currency.Satoshis
 import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.protocol.BitcoinAddress
-import org.bitcoins.core.protocol.tlv._
+import org.bitcoins.core.protocol.tlv.*
 import org.bitcoins.core.protocol.transaction.{Transaction, TransactionOutPoint}
 import org.bitcoins.core.psbt.PSBT
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
-import org.bitcoins.crypto._
-import ujson._
+import org.bitcoins.crypto.*
+import ujson.*
 
 import java.io.File
 import java.net.{InetSocketAddress, URI}
 import java.nio.file.Path
-import scala.util._
+import scala.util.*
 
 case class DecodeAccept(accept: DLCAcceptTLV)
 
-object DecodeAccept extends ServerJsonModels {
+object DecodeAccept extends ServerJsonModels[DecodeAccept] {
 
-  def fromJsArr(jsArr: ujson.Arr): Try[DecodeAccept] = {
+  override def fromJsArr(jsArr: ujson.Arr): Try[DecodeAccept] = {
     jsArr.arr.toList match {
       case acceptJs :: Nil =>
         Try {
@@ -54,7 +55,7 @@ object DecodeAccept extends ServerJsonModels {
 
 case class DecodeSign(sign: DLCSignTLV)
 
-object DecodeSign extends ServerJsonModels {
+object DecodeSign extends ServerJsonModels[DecodeSign] {
 
   def fromJsArr(jsArr: ujson.Arr): Try[DecodeSign] = {
     jsArr.arr.toList match {
@@ -86,9 +87,9 @@ object DecodeSign extends ServerJsonModels {
 
 case class DecodeAttestations(announcement: OracleAttestmentV0TLV)
 
-object DecodeAttestations extends ServerJsonModels {
+object DecodeAttestations extends ServerJsonModels[DecodeAttestations] {
 
-  def fromJsArr(jsArr: ujson.Arr): Try[DecodeAttestations] = {
+  override def fromJsArr(jsArr: ujson.Arr): Try[DecodeAttestations] = {
     jsArr.arr.toList match {
       case attestmentJs :: Nil =>
         Try {
@@ -115,9 +116,9 @@ case class DLCDataFromFile(
     externalChangeAddressOpt: Option[BitcoinAddress]
 )
 
-object DLCDataFromFile extends ServerJsonModels {
+object DLCDataFromFile extends ServerJsonModels[DLCDataFromFile] {
 
-  def fromJsArr(jsArr: ujson.Arr): Try[DLCDataFromFile] = {
+  override def fromJsArr(jsArr: ujson.Arr): Try[DLCDataFromFile] = {
     def parseParameters(
         pathJs: Value,
         destJs: Value,
@@ -164,9 +165,9 @@ case class OfferAdd(
     message: Option[String]
 )
 
-object OfferAdd extends ServerJsonModels {
+object OfferAdd extends ServerJsonModels[OfferAdd] {
 
-  def fromJsArr(arr: ujson.Arr): Try[OfferAdd] = {
+  override def fromJsArr(arr: ujson.Arr): Try[OfferAdd] = {
     arr.arr.toList match {
       case offerJs :: peerJs :: messageJs :: Nil =>
         Try {
@@ -211,9 +212,9 @@ case class OfferSend(
     offerE: Either[DLCOfferTLV, Sha256Digest]
 )
 
-object OfferSend extends ServerJsonModels {
+object OfferSend extends ServerJsonModels[OfferSend] {
 
-  def fromJsArr(arr: ujson.Arr): Try[OfferSend] = {
+  override def fromJsArr(arr: ujson.Arr): Try[OfferSend] = {
     arr.arr.toList match {
       case offerJs :: peerAddressJs :: messageJs :: Nil =>
         Try {
@@ -258,7 +259,9 @@ object GetDLCOffer {
   }
 }
 
-trait ServerJsonModels {
+trait ServerJsonModels[T] {
+
+  def fromJsArr(arr: ujson.Arr): Try[T]
 
   def jsToOracleAnnouncementTLV(js: Value): OracleAnnouncementTLV =
     js match {
@@ -443,5 +446,20 @@ trait ServerJsonModels {
       case _: Value =>
         throw Value.InvalidData(js, "Expected a host address")
     }
+  }
+
+  def jsToWalletName(js: Value): Option[String] = {
+    val walletNameOpt = jsToStringOpt(js)
+    if (!walletNameOpt.forall(_.length <= WalletNames.walletNameMaxLen)) {
+      throw new IllegalArgumentException(
+        s"Invalid wallet name length: ${walletNameOpt.map(_.length).getOrElse(0)}. Max length is ${WalletNames.walletNameMaxLen}."
+      )
+    }
+    if (!walletNameOpt.forall(WalletNames.validateWalletName)) {
+      throw new IllegalArgumentException(
+        s"Invalid wallet name `${walletNameOpt.getOrElse("")}`."
+      )
+    }
+    walletNameOpt
   }
 }
