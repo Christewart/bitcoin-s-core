@@ -1,7 +1,8 @@
 package org.bitcoins.core.script.arithmetic
 
-import org.bitcoins.core.crypto.TaprootTxSigComponent
+import org.bitcoins.core.crypto.{TaprootTxSigComponent, TxSigComponent}
 import org.bitcoins.core.protocol.script.SigVersionTapscript64Bit
+import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.{
   ControlOperationsInterpreter,
@@ -258,12 +259,34 @@ sealed abstract class ArithmeticInterpreter {
     }
   }
 
-  def opInOutAmount(
+  def opInAmount(
       program: ExecutionInProgressScriptProgram): StartedScriptProgram = {
+    program.txSignatureComponent match {
+      case t: TaprootTxSigComponent =>
+        amountLockHelper(program,
+                         expectedOpCode = OP_IN_AMOUNT,
+                         outputs = t.fundingOutputs)
+      case _: TxSigComponent =>
+        // better error here?
+        program.failExecution(ScriptErrorUnknownError)
+    }
+  }
+
+  def opOutAmount(
+      program: ExecutionInProgressScriptProgram): StartedScriptProgram = {
+    amountLockHelper(program,
+                     expectedOpCode = OP_OUT_AMOUNT,
+                     program.txSignatureComponent.spendingOutputs)
+  }
+
+  private def amountLockHelper(
+      program: ExecutionInProgressScriptProgram,
+      expectedOpCode: ArithmeticOperation,
+      outputs: Vector[TransactionOutput]): StartedScriptProgram = {
     require(
-      program.script.headOption.contains(OP_INOUT_AMOUNT),
+      program.script.headOption.contains(expectedOpCode),
       s"Script top must be OP_INOUT_AMOUNT, got=${program.script.headOption}")
-    if (program.stack.size < 2) {
+    if (program.stack.size < 1) {
       program.failExecution(ScriptErrorInvalidStackOperation)
     } else if (
       !program.txSignatureComponent.isInstanceOf[TaprootTxSigComponent]
@@ -271,31 +294,19 @@ sealed abstract class ArithmeticInterpreter {
       // better error here?
       program.failExecution(ScriptErrorUnknownError)
     } else {
-
-      val taprootTxSigComponent =
-        program.txSignatureComponent.asInstanceOf[TaprootTxSigComponent]
-      val (outputScriptNum, inputScriptNum) =
-        parseTopTwoStackElementsAsScriptNumbers(program)
-      val inputBitMap = parseBitMap(inputScriptNum)
-      val outputBitMap = parseBitMap(outputScriptNum)
-      val maxInputs = taprootTxSigComponent.fundingOutputs.size
-      val maxOutputs = taprootTxSigComponent.transaction.outputs.size
-      if (
-        isOutOfBounds(inputBitMap, maxInputs) || isOutOfBounds(outputBitMap,
-                                                               maxOutputs)
-      ) {
+      val scriptNum = ScriptNumber.fromBytes(program.stack.head.bytes)
+      val bitmap = parseBitMap(scriptNum)
+      val max = outputs.size
+      if (isOutOfBounds(bitmap, max)) {
+        println(s"bitmap=$bitmap max=$max")
         program.failExecution(ScriptErrorIndexOutOfBounds)
       } else {
-        val inputValues: BigInt = inputBitMap
-          .map(idx => taprootTxSigComponent.outputMap.toVector(idx)._2.value)
+        val result: BigInt = bitmap
+          .map(idx => outputs(idx).value)
           .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
-        val outputValues = outputBitMap
-          .map(idx => taprootTxSigComponent.transaction.outputs(idx).value)
-          .foldLeft(BigInt(0))(_ + _.satoshis.toBigInt)
-        println(s"inputValues=$inputValues outputValues=$outputValues")
+        println(s"${expectedOpCode}=$result")
         program.updateStackAndScript(
-          ScriptNumber(outputValues) :: ScriptNumber(
-            inputValues) :: program.stack.tail.tail,
+          ScriptNumber(result) :: program.stack.tail,
           program.script.tail
         )
       }

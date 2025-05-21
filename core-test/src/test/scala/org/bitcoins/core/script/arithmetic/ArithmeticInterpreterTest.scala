@@ -4,6 +4,7 @@ import org.bitcoins.core.currency.Bitcoins
 import org.bitcoins.core.protocol.script.*
 import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.result.*
+import org.bitcoins.core.script.stack.{OP_SWAP, StackInterpreter}
 import org.bitcoins.core.script.{
   ExecutedScriptProgram,
   ExecutionInProgressScriptProgram,
@@ -882,7 +883,7 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
 
   it must "support OP_INOUT_AMOUNT" in {
     val validStacks = Vector(List(ScriptNumber.one, ScriptNumber.one))
-    val script = List(OP_INOUT_AMOUNT)
+    val script = List(OP_IN_AMOUNT, OP_SWAP, OP_OUT_AMOUNT)
     val (taprootSPK, witness) = TransactionTestUtil.buildTaprootSPK(script)
     val programs = validStacks.map { stack =>
       TestUtil
@@ -899,25 +900,31 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
 
     val ONE_BTC_SN = ScriptNumber(Bitcoins.one.satoshis.toLong)
     programs.foreach { program =>
-      val newProgram = AI.opInOutAmount(program)
-      assert(!newProgram.isInstanceOf[ExecutedScriptProgram])
-      newProgram.stack must be(Vector(ONE_BTC_SN, ONE_BTC_SN))
-      newProgram.script.isEmpty must be(true)
+      val newProgram =
+        AI.opInAmount(program).asInstanceOf[ExecutionInProgressScriptProgram]
+      val swapProgram = StackInterpreter
+        .opSwap(newProgram)
+        .asInstanceOf[ExecutionInProgressScriptProgram]
+      val newProgram2 = AI.opOutAmount(swapProgram)
+      assert(!newProgram2.isInstanceOf[ExecutedScriptProgram])
+      newProgram2.stack must be(Vector(ONE_BTC_SN, ONE_BTC_SN))
+      newProgram2.script.isEmpty must be(true)
     }
   }
 
   it must "OP_INOUT_AMOUNT must return index out of bounds errors" in {
     val invalidStacks = Vector(
-      List(ScriptNumber(2), ScriptNumber.one),
-      List(ScriptNumber.one, ScriptNumber(2)),
-      List(ScriptNumber.negativeOne, ScriptNumber.one),
-      List(ScriptNumber.one, ScriptNumber.negativeOne),
-      List(ScriptNumber.one, ScriptNumber.negativeZero),
-      List(ScriptNumber.one, ScriptNumber.negativeZero)
+      (List(ScriptNumber(2)), List(OP_IN_AMOUNT)),
+      (List(ScriptNumber(2)), List(OP_OUT_AMOUNT)),
+      (List(ScriptNumber.negativeOne), List(OP_IN_AMOUNT)),
+      (List(ScriptNumber.negativeOne), List(OP_OUT_AMOUNT)),
+      (List(ScriptNumber.negativeZero), List(OP_OUT_AMOUNT)),
+      (List(ScriptNumber.negativeZero), List(OP_IN_AMOUNT))
     )
-    val script = List(OP_INOUT_AMOUNT)
-    val (taprootSPK, witness) = TransactionTestUtil.buildTaprootSPK(script)
-    val programs = invalidStacks.map { stack =>
+    // val script = List(OP_IN_AMOUNT, OP_OUT_AMOUNT)
+
+    val programs = invalidStacks.map { case (stack, script) =>
+      val (taprootSPK, witness) = TransactionTestUtil.buildTaprootSPK(script)
       TestUtil
         .testTaprootProgram(taprootSPK,
                             witness,
@@ -931,13 +938,19 @@ class ArithmeticInterpreterTest extends BitcoinSUnitTest {
     }
 
     programs.foreach { program =>
-      val newProgram = AI.opInOutAmount(program)
+      val newProgram =
+        if (program.script.contains(OP_IN_AMOUNT)) {
+          AI.opInAmount(program)
+        } else {
+          AI.opOutAmount(program)
+        }
+
       newProgram match {
         case executedScriptProgram: ExecutedScriptProgram =>
           assert(
             executedScriptProgram.error.contains(ScriptErrorIndexOutOfBounds))
         case _: StartedScriptProgram =>
-          fail(s"Must have idx out of bounds exception")
+          fail(s"Must have output idx out of bounds exception")
       }
     }
   }

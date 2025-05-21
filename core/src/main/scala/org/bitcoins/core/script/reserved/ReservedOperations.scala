@@ -1,7 +1,7 @@
 package org.bitcoins.core.script.reserved
 
 import org.bitcoins.core.script.ScriptOperationFactory
-import org.bitcoins.core.script.arithmetic.OP_INOUT_AMOUNT
+import org.bitcoins.core.script.arithmetic.{OP_IN_AMOUNT, OP_OUT_AMOUNT}
 import org.bitcoins.core.script.constant.ScriptOperation
 
 /** Created by chris on 1/22/16.
@@ -93,7 +93,8 @@ case class UndefinedOP_NOP(opCode: Int) extends ReservedOperation
 object ReservedOperation extends ScriptOperationFactory[ReservedOperation] {
   lazy val undefinedOpCodes = {
     val x = for { i <- 0xbb to 0xff } yield UndefinedOP_NOP(i)
-    x.filterNot(_.opCode == OP_INOUT_AMOUNT.opCode)
+    x.filterNot(_.opCode == OP_IN_AMOUNT.opCode)
+      .filterNot(_.opCode == OP_OUT_AMOUNT.opCode)
   }
 
   override val operations: scala.collection.immutable.Vector[

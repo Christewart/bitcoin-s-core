@@ -1370,10 +1370,15 @@ sealed abstract class ScriptInterpreter {
             (programOrError, newOpCount)
           }
 
-        case OP_INOUT_AMOUNT :: _ =>
-          val programOrError = ArithmeticInterpreter.opInOutAmount(program)
+        case OP_IN_AMOUNT :: _ =>
+          val programOrError = ArithmeticInterpreter.opInAmount(program)
           val newOpCount =
-            calcOpCount(opCount, OP_INOUT_AMOUNT)
+            calcOpCount(opCount, OP_IN_AMOUNT)
+          (programOrError, newOpCount)
+        case OP_OUT_AMOUNT :: _ =>
+          val programOrError = ArithmeticInterpreter.opOutAmount(program)
+          val newOpCount =
+            calcOpCount(opCount, OP_OUT_AMOUNT)
           (programOrError, newOpCount)
         case h :: _ => throw new RuntimeException(s"$h was unmatched")
       }

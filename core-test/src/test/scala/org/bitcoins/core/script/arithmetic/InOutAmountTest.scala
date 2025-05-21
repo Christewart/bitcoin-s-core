@@ -6,7 +6,7 @@ import org.bitcoins.core.script.bitwise.{OP_EQUAL, OP_EQUALVERIFY}
 import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.interpreter.ScriptInterpreter
 import org.bitcoins.core.script.result.{ScriptErrorEvalFalse, ScriptOk}
-import org.bitcoins.core.script.stack.{OP_DROP, OP_DUP}
+import org.bitcoins.core.script.stack.{OP_DUP, OP_SWAP}
 import org.bitcoins.testkitcore.util.{
   BitcoinSUnitTest,
   TestUtil,
@@ -20,7 +20,9 @@ class InOutAmountTest extends BitcoinSUnitTest {
   val ONE_BTC = ScriptNumber(Bitcoins.one.satoshis.toLong)
   val PUSH_ONE_BTC = BytesToPushOntoStack(ONE_BTC.bytes.size)
   it must "only allow withdrawing 1 BTC" in {
-    val script = List(OP_INOUT_AMOUNT,
+    val script = List(OP_IN_AMOUNT,
+                      OP_SWAP,
+                      OP_OUT_AMOUNT,
                       OP_SUB,
                       PUSH_ONE_BTC,
                       ONE_BTC,
@@ -43,7 +45,9 @@ class InOutAmountTest extends BitcoinSUnitTest {
   }
 
   it must "fail if we attempt to withdraw more than 1 BTC" in {
-    val script = List(OP_INOUT_AMOUNT,
+    val script = List(OP_IN_AMOUNT,
+                      OP_SWAP,
+                      OP_OUT_AMOUNT,
                       OP_SUB,
                       PUSH_ONE_BTC,
                       ONE_BTC,
@@ -69,12 +73,14 @@ class InOutAmountTest extends BitcoinSUnitTest {
     val MAX_FEE = Satoshis(100_000)
     val MAX_FEE_SN = ScriptNumber(MAX_FEE.toLong)
     val PUSH_MAX_FEE = BytesToPushOntoStack(MAX_FEE_SN.bytes.size)
-    val script: List[ScriptToken] = List(OP_INOUT_AMOUNT,
+    val script: List[ScriptToken] = List(OP_IN_AMOUNT,
+                                         OP_SWAP,
+                                         OP_OUT_AMOUNT,
                                          OP_SUB,
                                          PUSH_MAX_FEE,
                                          MAX_FEE_SN,
                                          OP_LESSTHANOREQUAL)
-    val witnessStack = Vector(ScriptNumber.one, ScriptNumber(7))
+    val witnessStack = Vector(ScriptNumber(7), ScriptNumber.one)
       .map(_.bytes)
     val (taprootSPK, witnessNoStack: TaprootScriptPath) =
       TransactionTestUtil.buildTaprootSPK(script)
@@ -115,7 +121,7 @@ class InOutAmountTest extends BitcoinSUnitTest {
 
   it must "handle OP_0 correctly" in {
     val script: List[ScriptToken] =
-      List(OP_INOUT_AMOUNT, OP_0, OP_EQUALVERIFY, OP_0, OP_EQUAL)
+      List(OP_OUT_AMOUNT, OP_IN_AMOUNT, OP_0, OP_EQUALVERIFY, OP_0, OP_EQUAL)
 
     val witnessStack = Vector(ScriptNumber.zero, ScriptNumber.zero)
       .map(_.bytes)
@@ -174,7 +180,9 @@ class InOutAmountTest extends BitcoinSUnitTest {
 
   it must "showcase transaction malleability" in {
     val script = List(OP_1,
-                      OP_INOUT_AMOUNT,
+                      OP_OUT_AMOUNT,
+                      OP_SWAP,
+                      OP_IN_AMOUNT,
                       PUSH_ONE_BTC,
                       ONE_BTC,
                       OP_DUP,
@@ -251,12 +259,11 @@ class InOutAmountTest extends BitcoinSUnitTest {
       val num = ScriptNumber(idx)
       Vector(BytesToPushOntoStack(num.byteSize), num)
     }
-    Vector(OP_0) ++ idxOpWPushOp ++ Vector(
-      OP_INOUT_AMOUNT,
+    idxOpWPushOp ++ Vector(
+      OP_OUT_AMOUNT,
       pushAmt,
       amtScriptNumber,
-      OP_EQUALVERIFY,
-      OP_DROP // drop input amount as its not relevant
+      OP_EQUALVERIFY
     )
   }
 

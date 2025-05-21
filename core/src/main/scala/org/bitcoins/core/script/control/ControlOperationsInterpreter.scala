@@ -127,7 +127,6 @@ sealed abstract class ControlOperationsInterpreter {
       program: ExecutionInProgressScriptProgram): StartedScriptProgram = {
     require(program.script.headOption.contains(OP_VERIFY),
             "Script top must be OP_VERIFY")
-    println(s"opVerify stack=${program.stack}")
     program.stack.nonEmpty match {
       case true =>
         if (program.stackTopIsFalse) program.failExecution(ScriptErrorVerify)
