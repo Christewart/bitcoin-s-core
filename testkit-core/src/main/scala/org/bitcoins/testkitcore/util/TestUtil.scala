@@ -270,10 +270,10 @@ object TestUtil {
 
   def testTaprootProgram(
       spk: TaprootScriptPubKey,
-      witness: TaprootWitness,
+      witnesses: Vector[ScriptWitness],
       fundingOutputsOpt: Option[Vector[TransactionOutput]],
-      spendingOutputsOpt: Option[Vector[TransactionOutput]])
-      : PreExecutionScriptProgram = {
+      spendingOutputsOpt: Option[Vector[TransactionOutput]],
+      inputIndex: UInt32 = UInt32.zero): PreExecutionScriptProgram = {
     val creditingOutput = TransactionOutput(Bitcoins.one, spk)
 
     val creditingOutputs = fundingOutputsOpt.getOrElse(Vector(creditingOutput))
@@ -281,27 +281,31 @@ object TestUtil {
                                       Vector.empty,
                                       creditingOutputs,
                                       TransactionConstants.lockTime)
-    val outPoint = TransactionOutPoint(creditingTx.txIdBE, 0)
+    val outPoints = creditingOutputs.indices.map { idx =>
+      TransactionOutPoint(creditingTx.txIdBE, idx)
+    }
     val builder = Map.newBuilder[TransactionOutPoint, TransactionOutput]
     creditingOutputs.zipWithIndex.foreach { case (output, idx) =>
       val outPoint = TransactionOutPoint(creditingTx.txIdBE, idx)
       builder.addOne((outPoint, output))
     }
     val outputMap = PreviousOutputMap(builder.result())
-    val input = TransactionInput(outPoint,
-                                 ScriptSignature.empty,
-                                 TransactionConstants.sequence)
+    val inputs = outPoints.map { outPoint =>
+      TransactionInput(outPoint,
+                       ScriptSignature.empty,
+                       TransactionConstants.sequence)
+    }.toVector
     val wtx: WitnessTransaction = WitnessTransaction(
       version = TransactionConstants.version,
-      inputs = Vector(input),
+      inputs = inputs,
       outputs = spendingOutputsOpt.getOrElse(
         Vector(TransactionOutput(Bitcoins.one, EmptyScriptPubKey))),
       lockTime = TransactionConstants.lockTime,
-      witness = TransactionWitness(Vector(witness))
+      witness = TransactionWitness(witnesses)
     )
     val t = TaprootTxSigComponent(
       transaction = wtx,
-      inputIndex = UInt32.zero,
+      inputIndex = inputIndex,
       outputMap = outputMap,
       flags = Policy.standardFlags
     )

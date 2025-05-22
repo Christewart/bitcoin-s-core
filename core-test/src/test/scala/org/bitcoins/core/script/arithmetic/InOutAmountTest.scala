@@ -1,6 +1,11 @@
 package org.bitcoins.core.script.arithmetic
 import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, Satoshis}
-import org.bitcoins.core.protocol.script.{ScriptPubKey, TaprootScriptPath}
+import org.bitcoins.core.number.UInt32
+import org.bitcoins.core.protocol.script.{
+  ScriptPubKey,
+  ScriptWitness,
+  TaprootScriptPath
+}
 import org.bitcoins.core.protocol.transaction.TransactionOutput
 import org.bitcoins.core.script.bitwise.{OP_EQUAL, OP_EQUALVERIFY}
 import org.bitcoins.core.script.constant.*
@@ -37,7 +42,7 @@ class InOutAmountTest extends BitcoinSUnitTest {
       Vector(TransactionOutput(Bitcoins.one, ScriptPubKey.empty))
     val program =
       TestUtil.testTaprootProgram(taprootSPK,
-                                  witness,
+                                  Vector(witness),
                                   fundingOutputsOpt = Some(fundingOutputs),
                                   spendingOutputsOpt = Some(spendingOutputs))
     val result = ScriptInterpreter.run(program)
@@ -62,7 +67,7 @@ class InOutAmountTest extends BitcoinSUnitTest {
       Vector(TransactionOutput(Bitcoins.one + Satoshis.one, ScriptPubKey.empty))
     val program =
       TestUtil.testTaprootProgram(taprootSPK,
-                                  witness,
+                                  Vector(witness),
                                   fundingOutputsOpt = Some(fundingOutputs),
                                   spendingOutputsOpt = Some(spendingOutputs))
     val result = ScriptInterpreter.run(program)
@@ -96,10 +101,11 @@ class InOutAmountTest extends BitcoinSUnitTest {
       Vector(TransactionOutput(Bitcoins(6), ScriptPubKey.empty))
 
     val program0 =
-      TestUtil.testTaprootProgram(taprootSPK,
-                                  witness,
-                                  fundingOutputsOpt = Some(fundingOutputs),
-                                  spendingOutputsOpt = Some(spendingOutputs))
+      TestUtil.testTaprootProgram(
+        taprootSPK,
+        Vector(witness, ScriptWitness.empty, ScriptWitness.empty),
+        fundingOutputsOpt = Some(fundingOutputs),
+        spendingOutputsOpt = Some(spendingOutputs))
     val result0 = ScriptInterpreter.run(program0)
     assert(result0 == ScriptOk)
 
@@ -110,11 +116,12 @@ class InOutAmountTest extends BitcoinSUnitTest {
                           ScriptPubKey.empty))
 
     val program1 =
-      TestUtil.testTaprootProgram(taprootSPK,
-                                  witness,
-                                  fundingOutputsOpt = Some(fundingOutputs),
-                                  spendingOutputsOpt =
-                                    Some(invaldSpendingOutputs))
+      TestUtil.testTaprootProgram(
+        taprootSPK,
+        Vector(witness, ScriptWitness.empty, ScriptWitness.empty),
+        fundingOutputsOpt = Some(fundingOutputs),
+        spendingOutputsOpt = Some(invaldSpendingOutputs)
+      )
     val result1 = ScriptInterpreter.run(program1)
     assert(result1 == ScriptErrorEvalFalse)
   }
@@ -139,10 +146,11 @@ class InOutAmountTest extends BitcoinSUnitTest {
       Vector(TransactionOutput(Bitcoins(6), ScriptPubKey.empty))
 
     val program0 =
-      TestUtil.testTaprootProgram(taprootSPK,
-                                  witness,
-                                  fundingOutputsOpt = Some(fundingOutputs),
-                                  spendingOutputsOpt = Some(spendingOutputs))
+      TestUtil.testTaprootProgram(
+        taprootSPK,
+        Vector(witness, ScriptWitness.empty, ScriptWitness.empty),
+        fundingOutputsOpt = Some(fundingOutputs),
+        spendingOutputsOpt = Some(spendingOutputs))
     val result0 = ScriptInterpreter.run(program0)
     assert(result0 == ScriptOk)
   }
@@ -170,10 +178,11 @@ class InOutAmountTest extends BitcoinSUnitTest {
              TransactionOutput(Bitcoins.one, ScriptPubKey.empty))
 
     val program0 =
-      TestUtil.testTaprootProgram(taprootSPK,
-                                  witness,
-                                  fundingOutputsOpt = Some(fundingOutputs),
-                                  spendingOutputsOpt = Some(spendingOutputs))
+      TestUtil.testTaprootProgram(
+        taprootSPK,
+        Vector(witness, ScriptWitness.empty, ScriptWitness.empty),
+        fundingOutputsOpt = Some(fundingOutputs),
+        spendingOutputsOpt = Some(spendingOutputs))
     val result0 = ScriptInterpreter.run(program0)
     assert(result0 == ScriptOk)
   }
@@ -200,7 +209,7 @@ class InOutAmountTest extends BitcoinSUnitTest {
       Vector(TransactionOutput(Bitcoins.one, ScriptPubKey.empty))
     val program =
       TestUtil.testTaprootProgram(taprootSPK,
-                                  witness,
+                                  Vector(witness, ScriptWitness.empty),
                                   fundingOutputsOpt = Some(fundingOutputs),
                                   spendingOutputsOpt = Some(spendingOutputs))
     val result = ScriptInterpreter.run(program)
@@ -240,11 +249,54 @@ class InOutAmountTest extends BitcoinSUnitTest {
 
     val program0 =
       TestUtil.testTaprootProgram(taprootSPK,
-                                  witness,
+                                  Vector(witness),
                                   fundingOutputsOpt = Some(fundingOutputs),
                                   spendingOutputsOpt = Some(spendingOutputs))
     val result0 = ScriptInterpreter.run(program0)
     assert(result0 == ScriptOk)
+  }
+
+  it must "map 2 inputs to the same output" in {
+    val script = List(OP_1,
+                      OP_OUT_AMOUNT,
+                      OP_SWAP,
+                      OP_IN_AMOUNT,
+                      PUSH_ONE_BTC,
+                      ONE_BTC,
+                      OP_DUP,
+                      OP_EQUALVERIFY,
+                      OP_EQUAL)
+    val witnessStack = Vector(ScriptNumber.one)
+      .map(_.bytes)
+    val (taprootSPK0, witnessNoStack0: TaprootScriptPath) =
+      TransactionTestUtil.buildTaprootSPK(script)
+    val (taprootSPK1, witnessNoStack1) =
+      TransactionTestUtil.buildTaprootSPK(script)
+    val witness0 = witnessNoStack0.copy(witnessNoStack0.stack ++ witnessStack)
+    val witness1 = witnessNoStack1.copy(witnessNoStack1.stack ++ witnessStack)
+    val fundingOutputs =
+      Vector(TransactionOutput(Bitcoins.one, taprootSPK0),
+             TransactionOutput(Bitcoins.one, taprootSPK1))
+    val spendingOutputs =
+      Vector(TransactionOutput(Bitcoins.one, ScriptPubKey.empty))
+
+    val program0 =
+      TestUtil.testTaprootProgram(taprootSPK0,
+                                  Vector(witness0, witness1),
+                                  fundingOutputsOpt = Some(fundingOutputs),
+                                  spendingOutputsOpt = Some(spendingOutputs))
+
+    val result0 = ScriptInterpreter.run(program0)
+    assert(result0 == ScriptOk)
+
+    val program1 =
+      TestUtil.testTaprootProgram(taprootSPK1,
+                                  Vector(witness0, witness1),
+                                  fundingOutputsOpt = Some(fundingOutputs),
+                                  spendingOutputsOpt = Some(spendingOutputs),
+                                  inputIndex = UInt32.one)
+    val result1 = ScriptInterpreter.run(program1)
+    assert(result1 == ScriptOk)
   }
 
   private def generateUniformOutputForIdx(
