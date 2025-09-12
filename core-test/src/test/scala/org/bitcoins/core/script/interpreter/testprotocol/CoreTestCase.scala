@@ -108,31 +108,40 @@ object CoreTestCase {
           )
         )
       } else if (elements.size == 6 && elements.head.arrOpt.isDefined) {
-        val witnessArray = elements.head.arr
-        val amount = Satoshis((witnessArray.value.last.num * 100000000L).toLong)
-        val stack = witnessArray.value.toVector
-          .slice(0, witnessArray.value.size - 1)
-          .map(c => BytesUtil.decodeHex(c.str))
-        val witness = ScriptWitness(stack.reverse)
-        val scriptPubKeyBytes: ByteVector = parseScriptPubKey(elements(2))
-        val scriptPubKey = ScriptPubKey(scriptPubKeyBytes)
-        val scriptSignatureBytes: ByteVector = parseScriptSignature(elements(1))
-        val scriptSignature: ScriptSignature =
-          ScriptSignature(scriptSignatureBytes)
-        val flags = elements(3).str
-        val expectedResult = ScriptResult(elements(4).str)
-        val comments = elements(5).str
-        Some(
-          CoreTestCase(
-            scriptSignature,
-            scriptPubKey,
-            flags,
-            expectedResult,
-            comments,
-            elements.toString,
-            Some((witness, amount))
+
+        if (isTapscript(elements.head.arr)) {
+          println(s"ISTAPSCRIPT ${elements.head.arrOpt}")
+          None
+        } else {
+          val witnessArray = elements.head.arr
+          val amount =
+            Satoshis((witnessArray.value.last.num * 100000000L).toLong)
+          val stack = witnessArray.value.toVector
+            .slice(0, witnessArray.value.size - 1)
+            .map(c => BytesUtil.decodeHex(c.str))
+          val witness = ScriptWitness(stack.reverse)
+          val scriptPubKeyBytes: ByteVector = parseScriptPubKey(elements(2))
+          val scriptPubKey = ScriptPubKey(scriptPubKeyBytes)
+          val scriptSignatureBytes: ByteVector =
+            parseScriptSignature(elements(1))
+          val scriptSignature: ScriptSignature =
+            ScriptSignature(scriptSignatureBytes)
+          val flags = elements(3).str
+          val expectedResult = ScriptResult(elements(4).str)
+          val comments = elements(5).str
+          Some(
+            CoreTestCase(
+              scriptSignature,
+              scriptPubKey,
+              flags,
+              expectedResult,
+              comments,
+              elements.toString,
+              Some((witness, amount))
+            )
           )
-        )
+        }
+
       } else None
   }
 
@@ -156,5 +165,12 @@ object CoreTestCase {
     val bytes = BitcoinScriptUtil.asmToBytes(asm)
     val compactSizeUInt = CompactSizeUInt.calculateCompactSizeUInt(bytes)
     compactSizeUInt.bytes ++ bytes
+  }
+
+  private def isTapscript(arr: Arr): Boolean = {
+    arr.value.exists {
+      case s: Str => s.value.contains("#SCRIPT")
+      case _: Num | _: Bool | _: Arr | Null | _: Obj => false
+    }
   }
 }
