@@ -1,7 +1,8 @@
 package org.bitcoins.node.networking.peer
 
 import org.bitcoins.core.api.node.Peer
-import org.bitcoins.core.p2p._
+import org.bitcoins.core.api.node.constant.NodeConstants
+import org.bitcoins.core.p2p.*
 import org.bitcoins.core.util.NetworkUtil
 import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.node.networking.peer.ControlMessageHandler.ControlMessageHandlerState
@@ -64,6 +65,14 @@ case class ControlMessageHandler(peerFinder: PeerFinder)(implicit
         Future.successful(None)
       case _: FeeFilterMessage =>
         Future.successful(None)
+      case s: SendCompact =>
+        if (s.versionU64.toLong != NodeConstants.compactBlockVersion) {
+          Future.successful(None)
+        } else {
+          peerFinder.onSendCompactMessage(peer, s)
+          Future.successful(None)
+        }
+
     }
   }
 

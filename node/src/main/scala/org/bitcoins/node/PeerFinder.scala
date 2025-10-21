@@ -6,7 +6,7 @@ import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.chain.config.ChainAppConfig
 import org.bitcoins.core.api.node.{Peer, PeerManagerApi}
 import org.bitcoins.core.config.{MainNet, RegTest, SigNet, TestNet3, TestNet4}
-import org.bitcoins.core.p2p.{ServiceIdentifier, VersionMessage}
+import org.bitcoins.core.p2p.{SendCompact, ServiceIdentifier, VersionMessage}
 import org.bitcoins.core.util.StartStopAsync
 import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.node.models.{PeerDAO, PeerDb}
@@ -349,6 +349,17 @@ case class PeerFinder(
 
   def onVersionMessage(peer: Peer, versionMsg: VersionMessage): Option[Unit] = {
     getPeerData(peer).map(_.setVersionMessage(versionMsg))
+  }
+
+  def onSendCompactMessage(peer: Peer, sendCompact: SendCompact): Unit = {
+    if (hasPeer(peer)) {
+      val pd = getPeerData(peer).get
+      pd.setProvidesCompactBlocks()
+      pd.setRequestedHbCompactBlocks(sendCompact.wantsCompactBlocks)
+      pd.setHighbandwidthFrom(sendCompact.wantsCompactBlocks)
+    } else {
+      logger.warn(s"onSendCompactMessage called for unknown peer=$peer")
+    }
   }
 
   def buildPeerData(p: Peer, isPersistent: Boolean): PeerData = {

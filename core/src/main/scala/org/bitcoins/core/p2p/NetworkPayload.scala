@@ -1553,11 +1553,11 @@ object VersionMessage extends Factory[VersionMessage] {
   }
 }
 
-case class SendCompact(willSendCompactBlocks: Boolean, versionU64: UInt64)
+case class SendCompact(wantsCompactBlocks: Boolean, versionU64: UInt64)
     extends ControlPayload {
   override val commandName: String = NetworkPayload.sendcmpctCommandName
   override def bytes: ByteVector = {
-    ByteVector.fromByte(if (willSendCompactBlocks) 1 else 0) ++ versionU64.bytes
+    ByteVector.fromByte(if (wantsCompactBlocks) 1 else 0) ++ versionU64.bytes
   }
 }
 

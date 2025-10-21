@@ -40,8 +40,18 @@ sealed trait PeerData {
   def versionMessage: VersionMessage = _versionMessage.getOrElse {
     throw new RuntimeException(
       s"Tried using VersionMessage for uninitialized peer=$peer"
-    )
   }
+  /** Whether this peer wants invs or cmpctblocks (when possible) for block
+    * announcements.
+    */
+  private var _providesCompactBlocks: Boolean = false
+
+  /** Whether this peer will send us cmpctblocks if we request them. */
+  private var _requestedHbCompactBlocks: Boolean = false
+
+  /** Peer selected us as (compact blocks) high-bandwidth peer (BIP152) */
+  private var _bip152HighbandwidthFrom: Boolean = false
+
   def serviceIdentifier: ServiceIdentifier = {
     versionMessage.services
   }
@@ -53,6 +63,23 @@ sealed trait PeerData {
   def userAgent: String = _versionMessage.map(_.userAgent).getOrElse {
     sys.error(s"Tried using user agent for uninitialized peer=$peer")
   }
+
+  def setProvidesCompactBlocks(): Unit = {
+    _providesCompactBlocks = true
+  }
+  def providesCOmpactBlocks: Boolean = _providesCompactBlocks
+
+  def setRequestedHbCompactBlocks(flag: Boolean): Unit = {
+    _requestedHbCompactBlocks = flag
+  }
+
+  def requestedHbCompactBlocks: Boolean = _requestedHbCompactBlocks
+
+  def setHighbandwidthFrom(flag: Boolean): Unit = {
+    _bip152HighbandwidthFrom = flag
+  }
+
+  def highBandwidthBip152Peer: Boolean = _bip152HighbandwidthFrom
 }
 
 /** A peer we plan on being connected to persistently */

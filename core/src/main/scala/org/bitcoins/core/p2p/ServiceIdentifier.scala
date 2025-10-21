@@ -224,6 +224,7 @@ object ServiceIdentifier
       case _: RejectMessage                      => NODE_NETWORK
       case _: FeeFilterMessage                   => NODE_NETWORK
       case _: GetDataMessage                     => NODE_NETWORK
+      case _: SendCompact                        => NODE_NETWORK
     }
   }
 }
