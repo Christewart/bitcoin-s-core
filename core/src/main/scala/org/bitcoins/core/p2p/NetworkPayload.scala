@@ -1553,6 +1553,29 @@ object VersionMessage extends Factory[VersionMessage] {
   }
 }
 
+case class SendCompact(willSendCompactBlocks: Boolean, versionU64: UInt64)
+    extends ControlPayload {
+  override val commandName: String = NetworkPayload.sendcmpctCommandName
+  override def bytes: ByteVector = {
+    ByteVector.fromByte(if (willSendCompactBlocks) 1 else 0) ++ versionU64.bytes
+  }
+}
+
+object SendCompact extends Factory[SendCompact] {
+  override def fromBytes(bytes: ByteVector): SendCompact = {
+    val willSendCompactBlocks =
+      if (bytes.head == 0) false
+      else if (bytes.head == 1) true
+      else {
+        sys.error(
+          s"Cannot interpretet willSendCompactBlocks, got=${bytes.head}")
+      }
+    val version = bytes.slice(1, 9)
+    val versionU64 = UInt64.fromBytes(version)
+    SendCompact(willSendCompactBlocks, versionU64)
+  }
+}
+
 object NetworkPayload {
   private[core] val alertCommandName = "alert"
   private[core] val blockCommandName = "block"
@@ -1585,6 +1608,7 @@ object NetworkPayload {
   private[core] val compactFilterHeadersCommandName = "cfheaders"
   private[core] val getCompactFilterCheckpointCommandName = "getcfcheckpt"
   private[core] val compactFilterCheckpointCommandName = "cfcheckpt"
+  private[core] val sendcmpctCommandName = "sendcmpct"
 
   /** Contains all the valid command names with their deserializer on the p2p
     * protocol. These commands all have the null bytes appended to the end of
@@ -1635,7 +1659,8 @@ object NetworkPayload {
     getCompactFilterHeadersCommandName -> RawGetCompactFilterHeadersMessageSerializer.read,
     compactFilterHeadersCommandName -> RawCompactFilterHeadersMessageSerializer.read,
     getCompactFilterCheckpointCommandName -> RawGetCompactFilterCheckpointMessageSerializer.read,
-    compactFilterCheckpointCommandName -> RawCompactFilterCheckpointMessageSerializer.read
+    compactFilterCheckpointCommandName -> RawCompactFilterCheckpointMessageSerializer.read,
+    sendcmpctCommandName -> SendCompact.fromBytes
   )
 
   /** All command names for P2P messages */
