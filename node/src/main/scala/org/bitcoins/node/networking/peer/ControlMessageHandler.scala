@@ -66,6 +66,7 @@ case class ControlMessageHandler(peerFinder: PeerFinder)(implicit
       case _: FeeFilterMessage =>
         Future.successful(None)
       case s: SendCompact =>
+        //TODO: need to check appropriate protocol version here
         if (s.versionU64.toLong != NodeConstants.compactBlockVersion) {
           Future.successful(None)
         } else {
