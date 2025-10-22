@@ -37,10 +37,6 @@ sealed trait PeerData {
 
   private var _versionMessage: Option[VersionMessage] = None
 
-  def versionMessage: VersionMessage = _versionMessage.getOrElse {
-    throw new RuntimeException(
-      s"Tried using VersionMessage for uninitialized peer=$peer"
-  }
   /** Whether this peer wants invs or cmpctblocks (when possible) for block
     * announcements.
     */
@@ -51,6 +47,11 @@ sealed trait PeerData {
 
   /** Peer selected us as (compact blocks) high-bandwidth peer (BIP152) */
   private var _bip152HighbandwidthFrom: Boolean = false
+
+  def versionMessage: VersionMessage = _versionMessage.getOrElse {
+    throw new RuntimeException(
+      s"Tried using VersionMessage for uninitialized peer=$peer")
+  }
 
   def serviceIdentifier: ServiceIdentifier = {
     versionMessage.services

@@ -351,14 +351,14 @@ case class PeerFinder(
     getPeerData(peer).map(_.setVersionMessage(versionMsg))
   }
 
-  def onSendCompactMessage(peer: Peer, sendCompact: SendCompact): Unit = {
-    if (hasPeer(peer)) {
-      val pd = getPeerData(peer).get
+  def onSendCompactMessage(
+      peer: Peer,
+      sendCompact: SendCompact): Option[Unit] = {
+    getPeerData(peer).map { pd =>
       pd.setProvidesCompactBlocks()
       pd.setRequestedHbCompactBlocks(sendCompact.wantsCompactBlocks)
       pd.setHighbandwidthFrom(sendCompact.wantsCompactBlocks)
-    } else {
-      logger.warn(s"onSendCompactMessage called for unknown peer=$peer")
+      ()
     }
   }
 

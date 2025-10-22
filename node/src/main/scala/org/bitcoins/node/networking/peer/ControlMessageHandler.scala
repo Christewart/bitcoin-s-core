@@ -69,8 +69,14 @@ case class ControlMessageHandler(peerFinder: PeerFinder)(implicit
         if (s.versionU64.toLong != NodeConstants.compactBlockVersion) {
           Future.successful(None)
         } else {
-          peerFinder.onSendCompactMessage(peer, s)
-          Future.successful(None)
+          peerFinder.onSendCompactMessage(peer, s) match {
+            case Some(_) =>
+              Future.successful(None)
+            case None =>
+              //do i want to handle these cases differently if we don't
+              //have the peer in our PeerFinder?
+              Future.successful(None)
+          }
         }
 
     }
