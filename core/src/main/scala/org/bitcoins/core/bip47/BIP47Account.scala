@@ -1,15 +1,27 @@
 package org.bitcoins.core.bip47
 
 import org.bitcoins.core.config.{MainNet, NetworkParameters}
-import org.bitcoins.core.crypto._
+import org.bitcoins.core.crypto.*
 import org.bitcoins.core.crypto.ExtKeyVersion.LegacyMainNetPriv
 import org.bitcoins.core.crypto.ExtKeyVersion.LegacyTestNet3Priv
 import org.bitcoins.core.crypto.ExtKeyPubVersion.LegacyMainNetPub
 import org.bitcoins.core.crypto.ExtKeyPubVersion.LegacyTestNet3Pub
+import org.bitcoins.core.hd.{
+  BIP32Node,
+  BIP32Path,
+  HDCoinType,
+  HDPurpose,
+  HardenedType
+}
 import org.bitcoins.core.number.{UInt32, UInt8}
 import org.bitcoins.core.protocol.{Bech32Address, P2PKHAddress}
 import org.bitcoins.core.protocol.script.P2WPKHWitnessSPKV0
-import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey, ECPublicKey}
+import org.bitcoins.crypto.{
+  CryptoUtil,
+  ECPrivateKey,
+  ECPublicKey,
+  StringFactory
+}
 import scodec.bits.ByteVector
 
 import scala.util.Try
@@ -18,11 +30,20 @@ import scala.util.Try
   * @see
   *   [[https://github.com/bitcoin/bips/blob/master/bip-0047.mediawiki BIP47]]
   */
-sealed abstract class BIP47Account {
+sealed abstract class BIP47Account extends BIP32Path {
 
+  override def path: Vector[BIP32Node] = {
+    val p = Vector(
+      BIP32Node(coinType.toInt, hardenedOpt = HardenedType.defaultOpt),
+      BIP32Node(accountIndex, hardenedOpt = HardenedType.defaultOpt)
+    )
+    BIP47Account.Purpose.path.appendedAll(p)
+  }
   def extPrivKey: ExtPrivateKey
 
   def network: NetworkParameters
+
+  def coinType: HDCoinType = HDCoinType.fromNetwork(network)
 
   def accountIndex: Int
 
@@ -85,8 +106,8 @@ sealed abstract class BIP47Account {
   }
 }
 
-object BIP47Account {
-  val Purpose: Int = 47
+object BIP47Account extends StringFactory[BIP47Account] {
+  val Purpose: HDPurpose = HDPurpose.Bip47
   val HardenedOffset: Long = 0x80000000L
 
   private case class BIP47AccountImpl(
@@ -115,7 +136,7 @@ object BIP47Account {
     val master = ExtPrivateKey(version, Some(seed))
 
     val purposeKey =
-      master.deriveChildPrivKey(UInt32(Purpose + HardenedOffset))
+      master.deriveChildPrivKey(UInt32(Purpose.constant + HardenedOffset))
     val coinTypeKey =
       purposeKey.deriveChildPrivKey(UInt32(coinType(network) + HardenedOffset))
     val accountKey =
@@ -140,6 +161,15 @@ object BIP47Account {
   private def coinType(network: NetworkParameters): Long = network match {
     case _: MainNet => 0L
     case _          => 1L
+  }
+
+  override def fromString(string: String): BIP47Account = {
+    val p = BIP32Path.fromString(string)
+    require(
+      p.path.length == 4 && p.path.head.index == Purpose.constant,
+      s"Invalid BIP47 account path: $p"
+    )
+    BIP47AccountImpl
   }
 }
 

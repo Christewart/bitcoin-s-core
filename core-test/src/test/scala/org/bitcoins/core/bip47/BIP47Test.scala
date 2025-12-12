@@ -19,7 +19,6 @@ class BIP47Test extends BitcoinSUnitTest {
   it must "create a payment code from seed" in {
     val account = BIP47Account.fromSeed(testSeedAlice, MainNet, 0)
     val paymentCode = account.paymentCode
-
     assert(paymentCode.isValid)
     assert(paymentCode.pubKey.bytes.size == 33)
     assert(paymentCode.chainCode.bytes.size == 32)
@@ -35,6 +34,14 @@ class BIP47Test extends BitcoinSUnitTest {
     assert(deserialized.pubKey == paymentCode.pubKey)
     assert(deserialized.chainCode == paymentCode.chainCode)
     assert(deserialized.version == paymentCode.version)
+  }
+
+  it must "serialize and deserialize a bip47 account symmetrically" in {
+    val account = BIP47Account.fromSeed(testSeedAlice, MainNet, 0)
+    val toStringAccount = account.toString
+    val fromStringAccount = BIP47Account.fromString(toStringAccount)
+    println(s"toStringAccount: $toStringAccount")
+    assert(fromStringAccount == account)
   }
 
   it must "compute symmetric ECDH shared secrets" in {
