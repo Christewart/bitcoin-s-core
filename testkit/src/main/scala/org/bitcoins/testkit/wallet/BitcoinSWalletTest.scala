@@ -265,7 +265,7 @@ object BitcoinSWalletTest extends WalletLogger {
 
       walletConfig.start().flatMap { _ =>
         val wallet =
-          Wallet(nodeApi, chainQueryApi)(walletConfig)
+          Wallet(nodeApi, chainQueryApi)(using walletConfig)
         Wallet.initialize(wallet)
       }
     }
@@ -287,13 +287,13 @@ object BitcoinSWalletTest extends WalletLogger {
     } yield ()
 
     initConfs.flatMap { _ =>
-      val wallet = Wallet(nodeApi, chainQueryApi)(config.walletConf)
+      val wallet = Wallet(nodeApi, chainQueryApi)(using config.walletConf)
 
       Wallet
         .initialize(wallet)
         .map(w =>
           DLCWallet(w)(
-            config.dlcConf,
+            using config.dlcConf,
             w.walletConfig
           ))
     }
@@ -304,7 +304,7 @@ object BitcoinSWalletTest extends WalletLogger {
       implicit walletAppConfig: WalletAppConfig
   ): Future[Wallet] = {
     createNewWallet(nodeApi = nodeApi, chainQueryApi = chainQueryApi)(
-      walletAppConfig
+      using walletAppConfig
     )() // get the standard config
   }
 
@@ -327,7 +327,7 @@ object BitcoinSWalletTest extends WalletLogger {
           None
         ),
         chainQueryApi = bitcoind
-      )(wallet.walletConfig)
+      )(using wallet.walletConfig)
     } yield WalletWithBitcoindRpc(
       walletWithCallback,
       bitcoind,
@@ -382,7 +382,7 @@ object BitcoinSWalletTest extends WalletLogger {
     val bitcoindF = BitcoinSFixture.createBitcoindWithFunds()
     bitcoindF.map(bitcoind =>
       WalletWithBitcoindRpc(wallet, bitcoind, wallet.walletConfig))(
-      system.dispatcher)
+      using system.dispatcher)
   }
 
   /** Pairs the given wallet with a bitcoind instance that has money in the
@@ -432,7 +432,7 @@ object BitcoinSWalletTest extends WalletLogger {
       wallet <- BitcoinSWalletTest.createWallet2Accounts(
         nodeApi,
         chainQueryApi
-      )(config.walletConf, system)
+      )(using config.walletConf, system)
       withBitcoind <- createWalletWithBitcoind(wallet, versionOpt)
       funded <- FundWalletUtil.fundWalletWithBitcoind(withBitcoind)
     } yield funded
@@ -462,10 +462,11 @@ object BitcoinSWalletTest extends WalletLogger {
       wallet <- BitcoinSWalletTest.createWallet2Accounts(
         nodeApi = nodeApi,
         chainQueryApi = chainQueryApi
-      )(config.walletConf, system)
+      )(using config.walletConf, system)
       // add callbacks for wallet
       nodeCallbacks <-
-        BitcoinSWalletTest.createNeutrinoNodeCallbacksForWallet(wallet)(system)
+        BitcoinSWalletTest.createNeutrinoNodeCallbacksForWallet(wallet)(
+          using system)
       _ = config.nodeConf.addCallbacks(nodeCallbacks)
       withBitcoind <- createWalletWithBitcoind(wallet, bitcoindRpcClient)
       funded <- FundWalletUtil.fundWalletWithBitcoind(withBitcoind)
@@ -533,7 +534,7 @@ object BitcoinSWalletTest extends WalletLogger {
       conditionF = () => isSameWalletBalances(fundedWallet),
       interval = 1.seconds,
       maxTries = 100
-    )(system.dispatcher)
+    )(using system.dispatcher)
   }
 
   private def isSameWalletBalances(

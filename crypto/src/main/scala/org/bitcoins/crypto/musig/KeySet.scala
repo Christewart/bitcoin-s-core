@@ -85,6 +85,10 @@ object KeySet {
   def apply(keys: Vector[ECPublicKey]): LexicographicKeySet = {
     fromUnsorted(keys)
   }
+  def apply(keys: Vector[SchnorrPublicKey]): LexicographicKeySet = {
+    val sortedKeys = keys.sorted(using NetworkElement.lexicographicalOrdering)
+    LexicographicKeySet(sortedKeys)
+  }
 
   def apply(keys: ECPublicKey*): LexicographicKeySet = {
     KeySet(keys.toVector)
@@ -103,7 +107,7 @@ object KeySet {
   def fromUnsorted(
       keys: Vector[ECPublicKey],
       tweaks: Vector[MuSigTweak]): LexicographicKeySet = {
-    val sortedKeys = keys.sorted(NetworkElement.lexicographicalOrdering)
+    val sortedKeys = keys.sorted(using NetworkElement.lexicographicalOrdering)
     LexicographicKeySet(sortedKeys, tweaks)
   }
 
