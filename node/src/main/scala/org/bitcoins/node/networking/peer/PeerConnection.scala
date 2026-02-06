@@ -1,11 +1,9 @@
 package org.bitcoins.node.networking.peer
 
-import org.apache.pekko.{Done, NotUsed}
 import org.apache.pekko.actor.{ActorSystem, Cancellable}
 import org.apache.pekko.event.Logging
 import org.apache.pekko.io.Inet.SocketOption
 import org.apache.pekko.io.Tcp.SO.KeepAlive
-import org.apache.pekko.stream.{Attributes, KillSwitches, UniqueKillSwitch}
 import org.apache.pekko.stream.scaladsl.{
   BidiFlow,
   Flow,
@@ -17,7 +15,9 @@ import org.apache.pekko.stream.scaladsl.{
   SourceQueue,
   Tcp
 }
+import org.apache.pekko.stream.{Attributes, KillSwitches, UniqueKillSwitch}
 import org.apache.pekko.util.ByteString
+import org.apache.pekko.{Done, NotUsed}
 import org.bitcoins.chain.blockchain.ChainHandler
 import org.bitcoins.chain.config.ChainAppConfig
 import org.bitcoins.commons.util.BitcoinSLogger
@@ -405,7 +405,8 @@ object PeerConnection extends BitcoinSLogger {
     logger.trace(s"Bytes for message parsing: ${bytes.toHex}")
     val (messages, newUnalignedBytes) =
       NetworkUtil.parseIndividualMessages(bytes)
-
+    messages.foreach(m =>
+      logger.debug(s"Parsed message=${m.header.commandName} from peer"))
     (ByteString.fromArray(newUnalignedBytes.toArray), messages)
   }
 
