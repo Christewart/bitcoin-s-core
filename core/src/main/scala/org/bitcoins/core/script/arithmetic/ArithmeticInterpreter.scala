@@ -1,12 +1,12 @@
 package org.bitcoins.core.script.arithmetic
 
-import org.bitcoins.core.script.constant._
+import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.{
   ControlOperationsInterpreter,
   OP_VERIFY
 }
 import org.bitcoins.core.script.flag.ScriptFlagUtil
-import org.bitcoins.core.script.result._
+import org.bitcoins.core.script.result.*
 import org.bitcoins.core.script.{
   ExecutedScriptProgram,
   ExecutionInProgressScriptProgram,
@@ -135,13 +135,13 @@ sealed abstract class ArithmeticInterpreter {
     } else {
       val numEqualProgram = program.updateStackAndScript(
         program.stack,
-        OP_NUMEQUAL :: program.script.tail)
+        OP_NUMEQUAL +: program.script.tail)
       val numEqualResultOrError = opNumEqual(numEqualProgram)
       numEqualResultOrError match {
         case numEqualResult: ExecutionInProgressScriptProgram =>
           val verifyProgram = numEqualResult.updateStackAndScript(
             numEqualResult.stack,
-            OP_VERIFY :: numEqualResult.script)
+            OP_VERIFY +: numEqualResult.script)
           val verifyResult =
             ControlOperationsInterpreter.opVerify(verifyProgram)
           verifyResult

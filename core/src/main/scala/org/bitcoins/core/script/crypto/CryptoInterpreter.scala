@@ -1,24 +1,18 @@
 package org.bitcoins.core.script.crypto
 
 import org.bitcoins.core.consensus.Consensus
-import org.bitcoins.core.crypto._
-import org.bitcoins.core.protocol.script.{
-  SigVersionBase,
-  SigVersionTaproot,
-  SigVersionTaprootKeySpend,
-  SigVersionTapscript,
-  SigVersionWitnessV0
-}
-import org.bitcoins.core.script._
-import org.bitcoins.core.script.constant._
+import org.bitcoins.core.crypto.*
+import org.bitcoins.core.protocol.script.*
+import org.bitcoins.core.script.*
+import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.{
   ControlOperationsInterpreter,
   OP_VERIFY
 }
 import org.bitcoins.core.script.flag.ScriptFlagUtil
-import org.bitcoins.core.script.result._
+import org.bitcoins.core.script.result.*
 import org.bitcoins.core.util.BitcoinScriptUtil
-import org.bitcoins.crypto._
+import org.bitcoins.crypto.*
 import scodec.bits.ByteVector
 
 import scala.util.Try
@@ -253,7 +247,7 @@ sealed abstract class CryptoInterpreter {
     if (program.stack.size < 2) {
       program.failExecution(ScriptErrorInvalidStackOperation)
     } else {
-      val newScript = OP_CHECKSIG :: OP_VERIFY :: program.script.tail
+      val newScript = OP_CHECKSIG +: OP_VERIFY +: program.script.tail
       val newProgram = program.updateScript(newScript)
       val programFromOpCheckSig = opCheckSig(newProgram)
       programFromOpCheckSig match {
@@ -409,7 +403,7 @@ sealed abstract class CryptoInterpreter {
     if (program.stack.size < 3) {
       program.failExecution(ScriptErrorInvalidStackOperation)
     } else {
-      val newScript = OP_CHECKMULTISIG :: OP_VERIFY :: program.script.tail
+      val newScript = OP_CHECKMULTISIG +: OP_VERIFY +: program.script.tail
       val newProgram = program.updateScript(newScript)
       val programFromOpCheckMultiSig = opCheckMultiSig(newProgram)
       programFromOpCheckMultiSig match {
@@ -515,7 +509,7 @@ sealed abstract class CryptoInterpreter {
     if (program.stack.nonEmpty) {
       val stackTop = program.stack.head
       val hash = ScriptConstant(hashFunction(stackTop.bytes).bytes)
-      program.updateStackAndScript(hash :: program.stack.tail,
+      program.updateStackAndScript(hash +: program.stack.tail,
                                    program.script.tail)
     } else {
       program.failExecution(ScriptErrorInvalidStackOperation)

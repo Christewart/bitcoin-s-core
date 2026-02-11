@@ -1,7 +1,7 @@
 package org.bitcoins.core.script.constant
 
 import org.bitcoins.core.script.flag.ScriptFlagUtil
-import org.bitcoins.core.script.result._
+import org.bitcoins.core.script.result.*
 import org.bitcoins.core.script.{
   ExecutionInProgressScriptProgram,
   StartedScriptProgram
@@ -56,11 +56,11 @@ sealed abstract class ConstantInterpreter {
     /** Parses the script tokens that need to be pushed onto our stack. */
     @tailrec
     def takeUntilBytesNeeded(
-        scriptTokens: List[ScriptToken],
-        accum: List[ScriptToken]): (List[ScriptToken], List[ScriptToken]) = {
+        scriptTokens: Vector[ScriptToken],
+        accum: List[ScriptToken]): (Vector[ScriptToken], List[ScriptToken]) = {
       val bytesSum = accum.map(_.bytes.size).sum
       if (bytesSum == bytesNeeded) (scriptTokens, accum)
-      else if (scriptTokens.isEmpty) (Nil, accum)
+      else if (scriptTokens.isEmpty) (Vector.empty, accum)
       else if (bytesSum > bytesNeeded)
         throw new RuntimeException(
           "We cannot have more bytes than what our script number specified")
@@ -103,7 +103,7 @@ sealed abstract class ConstantInterpreter {
         .isMinimalPush(program.script.head, constant)
     ) {
       program.failExecution(ScriptErrorMinimalData)
-    } else program.updateStackAndScript(constant :: program.stack, newScript)
+    } else program.updateStackAndScript(constant +: program.stack, newScript)
   }
 
   /** Checks if the MINIMALDATA script flag is set, if so checks if we are using
@@ -117,7 +117,7 @@ sealed abstract class ConstantInterpreter {
       if (ScriptFlagUtil.requireMinimalData(program.flags)) {
         program.failExecution(ScriptErrorMinimalData)
       } else {
-        program.updateStackAndScript(ScriptNumber.zero :: program.stack,
+        program.updateStackAndScript(ScriptNumber.zero +: program.stack,
                                      program.script.tail.tail)
       }
     }

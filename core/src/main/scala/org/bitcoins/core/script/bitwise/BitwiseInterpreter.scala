@@ -1,11 +1,11 @@
 package org.bitcoins.core.script.bitwise
 
-import org.bitcoins.core.script.constant._
+import org.bitcoins.core.script.constant.*
 import org.bitcoins.core.script.control.{
   ControlOperationsInterpreter,
   OP_VERIFY
 }
-import org.bitcoins.core.script.result._
+import org.bitcoins.core.script.result.*
 import org.bitcoins.core.script.{
   ExecutedScriptProgram,
   ExecutionInProgressScriptProgram,
@@ -52,7 +52,7 @@ sealed abstract class BitwiseInterpreter {
             "Script operation must be OP_EQUALVERIFY")
     if (program.stack.size > 1) {
       // first replace OP_EQUALVERIFY with OP_EQUAL and OP_VERIFY
-      val simpleScript = OP_EQUAL :: OP_VERIFY :: program.script.tail
+      val simpleScript = OP_EQUAL +: OP_VERIFY +: program.script.tail
       val newProgram = opEqual(program.updateScript(simpleScript))
       val verifiedOrErr = newProgram match {
         case err: ExecutedScriptProgram => err
