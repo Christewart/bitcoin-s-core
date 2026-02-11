@@ -64,8 +64,8 @@ sealed abstract class ScriptInterpreter {
           val scriptPubKeyProgram = PreExecutionScriptProgram(
             txSignatureComponent = sigComponent,
             stack = scriptSigExecutedProgram.stack,
-            script = sigComponent.scriptPubKey.asm.toList,
-            originalScript = sigComponent.scriptPubKey.asm.toList,
+            script = sigComponent.scriptPubKey.asm.toVector,
+            originalScript = sigComponent.scriptPubKey.asm.toVector,
             altStack = Nil,
             flags = scriptSigExecutedProgram.flags
           )
@@ -210,7 +210,7 @@ sealed abstract class ScriptInterpreter {
     val p2shRedeemScriptProgram = PreExecutionScriptProgram(
       txSignatureComponent = p.txSignatureComponent,
       stack = p.stack.tail,
-      script = s.asm.toList,
+      script = s.asm.toVector,
       originalScript = p.originalScript,
       altStack = Nil,
       flags = p.flags
@@ -528,9 +528,9 @@ sealed abstract class ScriptInterpreter {
               val newProgram = newWTxSigComponent.map { comp =>
                 PreExecutionScriptProgram(txSignatureComponent = comp,
                                           stack = stack.toList,
-                                          script = scriptPubKey.asm.toList,
+                                          script = scriptPubKey.asm.toVector,
                                           originalScript =
-                                            scriptPubKey.asm.toList,
+                                            scriptPubKey.asm.toVector,
                                           altStack = Nil,
                                           flags = comp.flags)
               }
@@ -542,8 +542,8 @@ sealed abstract class ScriptInterpreter {
             val program = ExecutedScriptProgram(
               txSignatureComponent = wTxSigComponent,
               stack = Nil,
-              script = Nil,
-              originalScript = Nil,
+              script = Vector.empty,
+              originalScript = Vector.empty,
               altStack = Nil,
               flags = wTxSigComponent.flags,
               lastCodeSeparator = None,
@@ -573,8 +573,8 @@ sealed abstract class ScriptInterpreter {
             val program = ExecutedScriptProgram(
               txSignatureComponent = wTxSigComponent,
               stack = Nil,
-              script = Nil,
-              originalScript = Nil,
+              script = Vector.empty,
+              originalScript = Vector.empty,
               altStack = Nil,
               flags = wTxSigComponent.flags,
               lastCodeSeparator = None,
@@ -590,8 +590,8 @@ sealed abstract class ScriptInterpreter {
           val program = ExecutedScriptProgram(
             txSignatureComponent = wTxSigComponent,
             stack = Nil,
-            script = Nil,
-            originalScript = Nil,
+            script = Vector.empty,
+            originalScript = Vector.empty,
             altStack = Nil,
             flags = wTxSigComponent.flags,
             lastCodeSeparator = None,
@@ -703,8 +703,8 @@ sealed abstract class ScriptInterpreter {
                   val newProgram = PreExecutionScriptProgram(
                     txSignatureComponent = taprootTxSigComponent,
                     stack = stackNoControlBlockOrScript.toList,
-                    script = rebuiltSPK.asm.toList,
-                    originalScript = rebuiltSPK.asm.toList,
+                    script = rebuiltSPK.asm.toVector,
+                    originalScript = rebuiltSPK.asm.toVector,
                     altStack = Nil,
                     flags = taprootTxSigComponent.flags
                   )
@@ -855,270 +855,270 @@ sealed abstract class ScriptInterpreter {
           (program.failExecution(ScriptErrorStackSize), opCount)
 
         // no more script operations to run, return whether the program is valid and the final state of the program
-        case Nil =>
+        case Vector() =>
           (program.toExecutedProgram, opCount)
 
         case _ if !program.shouldExecuteNextOperation =>
           (program.updateScript(program.script.tail), opCount)
 
         // stack operations
-        case OP_DUP :: _ =>
+        case OP_DUP +: _ =>
           val programOrError = StackInterpreter.opDup(program)
           val newOpCount =
             calcOpCount(opCount, OP_DUP)
           (programOrError, newOpCount)
 
-        case OP_DEPTH :: _ =>
+        case OP_DEPTH +: _ =>
           val programOrError = StackInterpreter.opDepth(program)
           val newOpCount =
             calcOpCount(opCount, OP_DEPTH)
           (programOrError, newOpCount)
 
-        case OP_TOALTSTACK :: _ =>
+        case OP_TOALTSTACK +: _ =>
           val programOrError = StackInterpreter.opToAltStack(program)
           val newOpCount =
             calcOpCount(opCount, OP_TOALTSTACK)
           (programOrError, newOpCount)
 
-        case OP_FROMALTSTACK :: _ =>
+        case OP_FROMALTSTACK +: _ =>
           val programOrError = StackInterpreter.opFromAltStack(program)
           val newOpCount =
             calcOpCount(opCount, OP_FROMALTSTACK)
           (programOrError, newOpCount)
 
-        case OP_DROP :: _ =>
+        case OP_DROP +: _ =>
           val programOrError = StackInterpreter.opDrop(program)
           val newOpCount =
             calcOpCount(opCount, OP_DROP)
           (programOrError, newOpCount)
 
-        case OP_IFDUP :: _ =>
+        case OP_IFDUP +: _ =>
           val programOrError = StackInterpreter.opIfDup(program)
           val newOpCount =
             calcOpCount(opCount, OP_IFDUP)
           (programOrError, newOpCount)
 
-        case OP_NIP :: _ =>
+        case OP_NIP +: _ =>
           val programOrError = StackInterpreter.opNip(program)
           val newOpCount =
             calcOpCount(opCount, OP_NIP)
           (programOrError, newOpCount)
 
-        case OP_OVER :: _ =>
+        case OP_OVER +: _ =>
           val programOrError = StackInterpreter.opOver(program)
           val newOpCount =
             calcOpCount(opCount, OP_OVER)
           (programOrError, newOpCount)
 
-        case OP_PICK :: _ =>
+        case OP_PICK +: _ =>
           val programOrError = StackInterpreter.opPick(program)
           val newOpCount =
             calcOpCount(opCount, OP_PICK)
           (programOrError, newOpCount)
 
-        case OP_ROLL :: _ =>
+        case OP_ROLL +: _ =>
           val programOrError = StackInterpreter.opRoll(program)
           val newOpCount =
             calcOpCount(opCount, OP_ROLL)
           (programOrError, newOpCount)
 
-        case OP_ROT :: _ =>
+        case OP_ROT +: _ =>
           val programOrError = StackInterpreter.opRot(program)
           val newOpCount =
             calcOpCount(opCount, OP_ROT)
           (programOrError, newOpCount)
 
-        case OP_2ROT :: _ =>
+        case OP_2ROT +: _ =>
           val programOrError = StackInterpreter.op2Rot(program)
           val newOpCount =
             calcOpCount(opCount, OP_2ROT)
           (programOrError, newOpCount)
 
-        case OP_2DROP :: _ =>
+        case OP_2DROP +: _ =>
           val programOrError = StackInterpreter.op2Drop(program)
           val newOpCount =
             calcOpCount(opCount, OP_2DROP)
           (programOrError, newOpCount)
 
-        case OP_SWAP :: _ =>
+        case OP_SWAP +: _ =>
           val programOrError = StackInterpreter.opSwap(program)
           val newOpCount =
             calcOpCount(opCount, OP_SWAP)
           (programOrError, newOpCount)
 
-        case OP_TUCK :: _ =>
+        case OP_TUCK +: _ =>
           val programOrError = StackInterpreter.opTuck(program)
           val newOpCount =
             calcOpCount(opCount, OP_TUCK)
           (programOrError, newOpCount)
 
-        case OP_2DUP :: _ =>
+        case OP_2DUP +: _ =>
           val programOrError = StackInterpreter.op2Dup(program)
           val newOpCount =
             calcOpCount(opCount, OP_2DUP)
           (programOrError, newOpCount)
 
-        case OP_3DUP :: _ =>
+        case OP_3DUP +: _ =>
           val programOrError = StackInterpreter.op3Dup(program)
           val newOpCount =
             calcOpCount(opCount, OP_3DUP)
           (programOrError, newOpCount)
 
-        case OP_2OVER :: _ =>
+        case OP_2OVER +: _ =>
           val programOrError = StackInterpreter.op2Over(program)
           val newOpCount =
             calcOpCount(opCount, OP_2OVER)
           (programOrError, newOpCount)
 
-        case OP_2SWAP :: _ =>
+        case OP_2SWAP +: _ =>
           val programOrError = StackInterpreter.op2Swap(program)
           val newOpCount =
             calcOpCount(opCount, OP_2SWAP)
           (programOrError, newOpCount)
 
         // arithmetic operations
-        case OP_ADD :: _ =>
+        case OP_ADD +: _ =>
           val programOrError = ArithmeticInterpreter.opAdd(program)
           val newOpCount =
             calcOpCount(opCount, OP_ADD)
           (programOrError, newOpCount)
 
-        case OP_1ADD :: _ =>
+        case OP_1ADD +: _ =>
           val programOrError = ArithmeticInterpreter.op1Add(program)
           val newOpCount =
             calcOpCount(opCount, OP_1ADD)
           (programOrError, newOpCount)
 
-        case OP_1SUB :: _ =>
+        case OP_1SUB +: _ =>
           val programOrError = ArithmeticInterpreter.op1Sub(program)
           val newOpCount =
             calcOpCount(opCount, OP_1SUB)
           (programOrError, newOpCount)
 
-        case OP_SUB :: _ =>
+        case OP_SUB +: _ =>
           val programOrError = ArithmeticInterpreter.opSub(program)
           val newOpCount =
             calcOpCount(opCount, OP_SUB)
           (programOrError, newOpCount)
 
-        case OP_ABS :: _ =>
+        case OP_ABS +: _ =>
           val programOrError = ArithmeticInterpreter.opAbs(program)
           val newOpCount =
             calcOpCount(opCount, OP_ABS)
           (programOrError, newOpCount)
 
-        case OP_NEGATE :: _ =>
+        case OP_NEGATE +: _ =>
           val programOrError = ArithmeticInterpreter.opNegate(program)
           val newOpCount =
             calcOpCount(opCount, OP_NEGATE)
           (programOrError, newOpCount)
 
-        case OP_NOT :: _ =>
+        case OP_NOT +: _ =>
           val programOrError = ArithmeticInterpreter.opNot(program)
           val newOpCount =
             calcOpCount(opCount, OP_NOT)
           (programOrError, newOpCount)
 
-        case OP_0NOTEQUAL :: _ =>
+        case OP_0NOTEQUAL +: _ =>
           val programOrError = ArithmeticInterpreter.op0NotEqual(program)
           val newOpCount =
             calcOpCount(opCount, OP_0NOTEQUAL)
           (programOrError, newOpCount)
 
-        case OP_BOOLAND :: _ =>
+        case OP_BOOLAND +: _ =>
           val programOrError = ArithmeticInterpreter.opBoolAnd(program)
           val newOpCount =
             calcOpCount(opCount, OP_BOOLAND)
           (programOrError, newOpCount)
 
-        case OP_BOOLOR :: _ =>
+        case OP_BOOLOR +: _ =>
           val programOrError = ArithmeticInterpreter.opBoolOr(program)
           val newOpCount =
             calcOpCount(opCount, OP_BOOLOR)
           (programOrError, newOpCount)
 
-        case OP_NUMEQUAL :: _ =>
+        case OP_NUMEQUAL +: _ =>
           val programOrError = ArithmeticInterpreter.opNumEqual(program)
           val newOpCount =
             calcOpCount(opCount, OP_NUMEQUAL)
           (programOrError, newOpCount)
 
-        case OP_NUMEQUALVERIFY :: _ =>
+        case OP_NUMEQUALVERIFY +: _ =>
           val programOrError = ArithmeticInterpreter.opNumEqualVerify(program)
           val newOpCount =
             calcOpCount(opCount, OP_NUMEQUALVERIFY)
           (programOrError, newOpCount)
 
-        case OP_NUMNOTEQUAL :: _ =>
+        case OP_NUMNOTEQUAL +: _ =>
           val programOrError = ArithmeticInterpreter.opNumNotEqual(program)
           val newOpCount =
             calcOpCount(opCount, OP_NUMNOTEQUAL)
           (programOrError, newOpCount)
 
-        case OP_LESSTHAN :: _ =>
+        case OP_LESSTHAN +: _ =>
           val programOrError = ArithmeticInterpreter.opLessThan(program)
           val newOpCount =
             calcOpCount(opCount, OP_LESSTHAN)
           (programOrError, newOpCount)
 
-        case OP_GREATERTHAN :: _ =>
+        case OP_GREATERTHAN +: _ =>
           val programOrError = ArithmeticInterpreter.opGreaterThan(program)
           val newOpCount =
             calcOpCount(opCount, OP_GREATERTHAN)
           (programOrError, newOpCount)
 
-        case OP_LESSTHANOREQUAL :: _ =>
+        case OP_LESSTHANOREQUAL +: _ =>
           val programOrError = ArithmeticInterpreter.opLessThanOrEqual(program)
           val newOpCount =
             calcOpCount(opCount, OP_LESSTHANOREQUAL)
           (programOrError, newOpCount)
 
-        case OP_GREATERTHANOREQUAL :: _ =>
+        case OP_GREATERTHANOREQUAL +: _ =>
           val programOrError =
             ArithmeticInterpreter.opGreaterThanOrEqual(program)
           val newOpCount =
             calcOpCount(opCount, OP_GREATERTHANOREQUAL)
           (programOrError, newOpCount)
 
-        case OP_MIN :: _ =>
+        case OP_MIN +: _ =>
           val programOrError = ArithmeticInterpreter.opMin(program)
           val newOpCount =
             calcOpCount(opCount, OP_MIN)
           (programOrError, newOpCount)
 
-        case OP_MAX :: _ =>
+        case OP_MAX +: _ =>
           val programOrError = ArithmeticInterpreter.opMax(program)
           val newOpCount =
             calcOpCount(opCount, OP_MAX)
           (programOrError, newOpCount)
 
-        case OP_WITHIN :: _ =>
+        case OP_WITHIN +: _ =>
           val programOrError = ArithmeticInterpreter.opWithin(program)
           val newOpCount =
             calcOpCount(opCount, OP_WITHIN)
           (programOrError, newOpCount)
 
         // bitwise operations
-        case OP_EQUAL :: _ =>
+        case OP_EQUAL +: _ =>
           val programOrError = BitwiseInterpreter.opEqual(program)
           val newOpCount =
             calcOpCount(opCount, OP_EQUAL)
           (programOrError, newOpCount)
 
-        case OP_EQUALVERIFY :: _ =>
+        case OP_EQUALVERIFY +: _ =>
           val programOrError = BitwiseInterpreter.opEqualVerify(program)
           val newOpCount =
             calcOpCount(opCount, OP_EQUALVERIFY)
           (programOrError, newOpCount)
 
-        case OP_0 :: t =>
+        case OP_0 +: t =>
           val programOrError =
             program.updateStackAndScript(ScriptNumber.zero :: program.stack, t)
           val newOpCount =
             calcOpCount(opCount, OP_0)
           (programOrError, newOpCount)
 
-        case (scriptNumberOp: ScriptNumberOperation) :: t =>
+        case (scriptNumberOp: ScriptNumberOperation) +: t =>
           val programOrError =
             program.updateStackAndScript(
               ScriptNumber(scriptNumberOp.toLong) :: program.stack,
@@ -1127,39 +1127,39 @@ sealed abstract class ScriptInterpreter {
             calcOpCount(opCount, scriptNumberOp)
           (programOrError, newOpCount)
 
-        case (bytesToPushOntoStack: BytesToPushOntoStack) :: _ =>
+        case (bytesToPushOntoStack: BytesToPushOntoStack) +: _ =>
           val programOrError =
             ConstantInterpreter.pushScriptNumberBytesToStack(program)
           val newOpCount =
             calcOpCount(opCount, bytesToPushOntoStack)
           (programOrError, newOpCount)
 
-        case (scriptNumber: ScriptNumber) :: t =>
+        case (scriptNumber: ScriptNumber) +: t =>
           val programOrError =
             program.updateStackAndScript(scriptNumber :: program.stack, t)
           val newOpCount =
             calcOpCount(opCount, scriptNumber)
           (programOrError, newOpCount)
 
-        case OP_PUSHDATA1 :: _ =>
+        case OP_PUSHDATA1 +: _ =>
           val programOrError = ConstantInterpreter.opPushData1(program)
           val newOpCount =
             calcOpCount(opCount, OP_PUSHDATA1)
           (programOrError, newOpCount)
 
-        case OP_PUSHDATA2 :: _ =>
+        case OP_PUSHDATA2 +: _ =>
           val programOrError = ConstantInterpreter.opPushData2(program)
           val newOpCount =
             calcOpCount(opCount, OP_PUSHDATA2)
           (programOrError, newOpCount)
 
-        case OP_PUSHDATA4 :: _ =>
+        case OP_PUSHDATA4 +: _ =>
           val programOrError = ConstantInterpreter.opPushData4(program)
           val newOpCount =
             calcOpCount(opCount, OP_PUSHDATA4)
           (programOrError, newOpCount)
 
-        case (x: ScriptConstant) :: t =>
+        case (x: ScriptConstant) +: t =>
           val programOrError =
             program.updateStackAndScript(x :: program.stack, t)
           val newOpCount =
@@ -1167,97 +1167,97 @@ sealed abstract class ScriptInterpreter {
           (programOrError, newOpCount)
 
         // control operations
-        case OP_IF :: _ =>
+        case OP_IF +: _ =>
           val programOrError = ControlOperationsInterpreter.opIf(program)
           val newOpCount =
             calcOpCount(opCount, OP_IF)
           (programOrError, newOpCount)
 
-        case OP_NOTIF :: _ =>
+        case OP_NOTIF +: _ =>
           val programOrError = ControlOperationsInterpreter.opNotIf(program)
           val newOpCount =
             calcOpCount(opCount, OP_NOTIF)
           (programOrError, newOpCount)
 
-        case OP_ELSE :: _ =>
+        case OP_ELSE +: _ =>
           val programOrError = ControlOperationsInterpreter.opElse(program)
           val newOpCount =
             calcOpCount(opCount, OP_ELSE)
           (programOrError, newOpCount)
 
-        case OP_ENDIF :: _ =>
+        case OP_ENDIF +: _ =>
           val programOrError = ControlOperationsInterpreter.opEndIf(program)
           val newOpCount =
             calcOpCount(opCount, OP_ENDIF)
           (programOrError, newOpCount)
 
-        case OP_RETURN :: _ =>
+        case OP_RETURN +: _ =>
           val programOrError = ControlOperationsInterpreter.opReturn(program)
           val newOpCount =
             calcOpCount(opCount, OP_RETURN)
           (programOrError, newOpCount)
 
-        case OP_VERIFY :: _ =>
+        case OP_VERIFY +: _ =>
           val programOrError = ControlOperationsInterpreter.opVerify(program)
           val newOpCount =
             calcOpCount(opCount, OP_VERIFY)
           (programOrError, newOpCount)
 
         // crypto operations
-        case OP_HASH160 :: _ =>
+        case OP_HASH160 +: _ =>
           val programOrError = CryptoInterpreter.opHash160(program)
           val newOpCount =
             calcOpCount(opCount, OP_HASH160)
           (programOrError, newOpCount)
 
-        case OP_CHECKSIG :: _ =>
+        case OP_CHECKSIG +: _ =>
           val programOrError = CryptoInterpreter.opCheckSig(program)
           val newOpCount =
             calcOpCount(opCount, OP_CHECKSIG)
           (programOrError, newOpCount)
 
-        case OP_CHECKSIGVERIFY :: _ =>
+        case OP_CHECKSIGVERIFY +: _ =>
           val programOrError = CryptoInterpreter.opCheckSigVerify(program)
           val newOpCount =
             calcOpCount(opCount, OP_CHECKSIGVERIFY)
           (programOrError, newOpCount)
-        case OP_CHECKSIGADD :: _ =>
+        case OP_CHECKSIGADD +: _ =>
           val programOrError = CryptoInterpreter.opCheckSigAdd(program)
           val newOpCount =
             calcOpCount(opCount, OP_CHECKSIGVERIFY)
           (programOrError, newOpCount)
 
-        case OP_SHA1 :: _ =>
+        case OP_SHA1 +: _ =>
           val programOrError = CryptoInterpreter.opSha1(program)
           val newOpCount =
             calcOpCount(opCount, OP_SHA1)
           (programOrError, newOpCount)
 
-        case OP_RIPEMD160 :: _ =>
+        case OP_RIPEMD160 +: _ =>
           val programOrError = CryptoInterpreter.opRipeMd160(program)
           val newOpCount =
             calcOpCount(opCount, OP_RIPEMD160)
           (programOrError, newOpCount)
 
-        case OP_SHA256 :: _ =>
+        case OP_SHA256 +: _ =>
           val programOrError = CryptoInterpreter.opSha256(program)
           val newOpCount =
             calcOpCount(opCount, OP_SHA256)
           (programOrError, newOpCount)
 
-        case OP_HASH256 :: _ =>
+        case OP_HASH256 +: _ =>
           val programOrError = CryptoInterpreter.opHash256(program)
           val newOpCount =
             calcOpCount(opCount, OP_HASH256)
           (programOrError, newOpCount)
 
-        case OP_CODESEPARATOR :: _ =>
+        case OP_CODESEPARATOR +: _ =>
           val programOrError = CryptoInterpreter.opCodeSeparator(program)
           val newOpCount =
             calcOpCount(opCount, OP_CODESEPARATOR)
           (programOrError, newOpCount)
 
-        case OP_CHECKMULTISIG :: _ =>
+        case OP_CHECKMULTISIG +: _ =>
           CryptoInterpreter.opCheckMultiSig(program) match {
             case newProgram: ExecutedScriptProgram =>
               // script was marked invalid for other reasons, don't need to update the opcount
@@ -1271,7 +1271,7 @@ sealed abstract class ScriptInterpreter {
               (programOrError, newOpCount)
 
           }
-        case OP_CHECKMULTISIGVERIFY :: _ =>
+        case OP_CHECKMULTISIGVERIFY +: _ =>
           CryptoInterpreter.opCheckMultiSigVerify(program) match {
             case newProgram: ExecutedScriptProgram =>
               // script was marked invalid for other reasons, don't need to update the opcount
@@ -1286,7 +1286,7 @@ sealed abstract class ScriptInterpreter {
 
           }
         // reserved operations
-        case OP_NOP :: t =>
+        case OP_NOP +: t =>
           // script discourage upgradeable flag does not apply to a OP_NOP
           val programOrError = program.updateScript(t)
           val newOpCount =
@@ -1294,41 +1294,41 @@ sealed abstract class ScriptInterpreter {
           (programOrError, newOpCount)
 
         // if we see an OP_NOP and the DISCOURAGE_UPGRADABLE_OP_NOPS flag is set we must fail our program
-        case (nop: NOP) :: _
+        case (nop: NOP) +: _
             if ScriptFlagUtil.discourageUpgradableNOPs(program.flags) =>
           (program.failExecution(ScriptErrorDiscourageUpgradableNOPs),
            calcOpCount(opCount, nop))
-        case (nop: NOP) :: t =>
+        case (nop: NOP) +: t =>
           val programOrError = program.updateScript(t)
           val newOpCount =
             calcOpCount(opCount, nop)
           (programOrError, newOpCount)
 
-        case OP_RESERVED :: _ =>
+        case OP_RESERVED +: _ =>
           (program.failExecution(ScriptErrorBadOpCode),
            calcOpCount(opCount, OP_RESERVED))
-        case OP_VER :: _ =>
+        case OP_VER +: _ =>
           (program.failExecution(ScriptErrorBadOpCode),
            calcOpCount(opCount, OP_VER))
-        case OP_RESERVED1 :: _ =>
+        case OP_RESERVED1 +: _ =>
           (program.failExecution(ScriptErrorBadOpCode),
            calcOpCount(opCount, OP_RESERVED1))
-        case OP_RESERVED2 :: _ =>
+        case OP_RESERVED2 +: _ =>
           (program.failExecution(ScriptErrorBadOpCode),
            calcOpCount(opCount, OP_RESERVED2))
 
-        case (reservedOperation: ReservedOperation) :: _ =>
+        case (reservedOperation: ReservedOperation) +: _ =>
           (program.failExecution(ScriptErrorBadOpCode),
            calcOpCount(opCount, reservedOperation))
         // splice operations
-        case OP_SIZE :: _ =>
+        case OP_SIZE +: _ =>
           val programOrError = SpliceInterpreter.opSize(program)
           val newOpCount =
             calcOpCount(opCount, OP_SIZE)
           (programOrError, newOpCount)
 
         // locktime operations
-        case OP_CHECKLOCKTIMEVERIFY :: _ =>
+        case OP_CHECKLOCKTIMEVERIFY +: _ =>
           // check if CLTV is enforced yet
           if (ScriptFlagUtil.checkLockTimeVerifyEnabled(program.flags)) {
             val programOrError =
@@ -1349,7 +1349,7 @@ sealed abstract class ScriptInterpreter {
             (programOrError, newOpCount)
           }
 
-        case OP_CHECKSEQUENCEVERIFY :: _ =>
+        case OP_CHECKSEQUENCEVERIFY +: _ =>
           // check if CLTV is enforced yet
           if (ScriptFlagUtil.checkSequenceVerifyEnabled(program.flags)) {
             val programOrError =
@@ -1370,7 +1370,7 @@ sealed abstract class ScriptInterpreter {
             (programOrError, newOpCount)
           }
 
-        case h :: _ => throw new RuntimeException(s"$h was unmatched")
+        case h +: _ => throw new RuntimeException(s"$h was unmatched")
       }
 
       nextProgram match {
@@ -1498,8 +1498,8 @@ sealed abstract class ScriptInterpreter {
       val executed = ExecutedScriptProgram(
         txSignatureComponent = txSigComponent,
         stack = Nil,
-        script = Nil,
-        originalScript = txSigComponent.scriptPubKey.asm.toList,
+        script = Vector.empty,
+        originalScript = txSigComponent.scriptPubKey.asm.toVector,
         altStack = Nil,
         flags = flags,
         lastCodeSeparator = None,
@@ -1513,8 +1513,8 @@ sealed abstract class ScriptInterpreter {
       val inProgress = PreExecutionScriptProgram(
         txSignatureComponent = txSigComponent,
         stack = List(OP_TRUE),
-        script = Nil,
-        originalScript = txSigComponent.scriptPubKey.asm.toList,
+        script = Vector.empty,
+        originalScript = txSigComponent.scriptPubKey.asm.toVector,
         altStack = Nil,
         flags = flags
       )

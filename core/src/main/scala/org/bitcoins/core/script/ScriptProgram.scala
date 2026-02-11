@@ -26,10 +26,10 @@ sealed trait ScriptProgram {
   def stack: List[ScriptToken]
 
   /** The script operations that need to still be executed. */
-  def script: List[ScriptToken]
+  def script: Vector[ScriptToken]
 
   /** The original script that was given. */
-  def originalScript: List[ScriptToken]
+  def originalScript: Vector[ScriptToken]
 
   /** The alternative stack is used in some Script op codes. */
   def altStack: List[ScriptToken]
@@ -104,8 +104,8 @@ sealed trait ScriptProgram {
 case class PreExecutionScriptProgram(
     txSignatureComponent: TxSigComponent,
     stack: List[ScriptToken],
-    script: List[ScriptToken],
-    originalScript: List[ScriptToken],
+    script: Vector[ScriptToken],
+    originalScript: Vector[ScriptToken],
     altStack: List[ScriptToken],
     flags: Seq[ScriptFlag])
     extends ScriptProgram {
@@ -146,12 +146,12 @@ case class PreExecutionScriptProgram(
   }
 
   def updateScript(tokens: Seq[ScriptToken]): PreExecutionScriptProgram = {
-    this.copy(script = tokens.toList)
+    this.copy(script = tokens.toVector)
   }
 
   def updateOriginalScript(
       tokens: Seq[ScriptToken]): PreExecutionScriptProgram = {
-    this.copy(originalScript = tokens.toList)
+    this.copy(originalScript = tokens.toVector)
   }
 
   def updateStackAndScript(
@@ -171,8 +171,8 @@ object PreExecutionScriptProgram {
     PreExecutionScriptProgram(
       txSignatureComponent = txSigComponent,
       stack = Nil,
-      script = txSigComponent.scriptSignature.asm.toList,
-      originalScript = txSigComponent.scriptSignature.asm.toList,
+      script = txSigComponent.scriptSignature.asm.toVector,
+      originalScript = txSigComponent.scriptSignature.asm.toVector,
       altStack = Nil,
       flags = txSigComponent.flags
     )
@@ -286,8 +286,8 @@ object ConditionalCounter {
 case class ExecutionInProgressScriptProgram(
     txSignatureComponent: TxSigComponent,
     stack: List[ScriptToken],
-    script: List[ScriptToken],
-    originalScript: List[ScriptToken],
+    script: Vector[ScriptToken],
+    originalScript: Vector[ScriptToken],
     altStack: List[ScriptToken],
     flags: Seq[ScriptFlag],
     lastCodeSeparator: Option[Int],
@@ -390,7 +390,7 @@ case class ExecutionInProgressScriptProgram(
 
   def updateScript(
       tokens: Seq[ScriptToken]): ExecutionInProgressScriptProgram = {
-    this.copy(script = tokens.toList)
+    this.copy(script = tokens.toVector)
   }
 
   def updateStackAndScript(
@@ -403,7 +403,7 @@ case class ExecutionInProgressScriptProgram(
 
   def updateOriginalScript(
       tokens: Seq[ScriptToken]): ExecutionInProgressScriptProgram = {
-    this.copy(originalScript = tokens.toList)
+    this.copy(originalScript = tokens.toVector)
   }
 
   def updateLastCodeSeparator(
@@ -440,8 +440,8 @@ case class ExecutionInProgressScriptProgram(
 case class ExecutedScriptProgram(
     txSignatureComponent: TxSigComponent,
     stack: List[ScriptToken],
-    script: List[ScriptToken],
-    originalScript: List[ScriptToken],
+    script: Vector[ScriptToken],
+    originalScript: Vector[ScriptToken],
     altStack: List[ScriptToken],
     flags: Seq[ScriptFlag],
     lastCodeSeparator: Option[Int],
