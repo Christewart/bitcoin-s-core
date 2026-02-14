@@ -392,6 +392,10 @@ object FrostUtil {
         8)
     val polygen = CryptoUtil.sha256(vssPreimage).bytes
     val vssCommitments = vssCommitment(polygen, threshold)
+    require(
+      vssCommitments.size == threshold,
+      s"Number of commitments must match threshold: " +
+        s"got ${vssCommitments.size} commitments for threshold $threshold")
     val idSharesTuple: Vector[(Long, FieldElement)] = 0L
       .until(numShares)
       .map { i =>
@@ -401,6 +405,7 @@ object FrostUtil {
         (id, share)
       }
       .toVector
+    println(s"idSharesTuple: $idSharesTuple")
     FrostShareGenResult(
       ids = idSharesTuple.map(_._1),
       shares = idSharesTuple.map(_._2),
@@ -420,8 +425,9 @@ object FrostUtil {
       id: Long): FieldElement = {
     var idx = 0L
     var shareI = FieldElement.zero
-    0.until(threshold).foreach { i =>
-      val coeff = deriveCoefficient(polygen, i)
+    1.until(threshold + 1).reverse.foreach { i =>
+      val coeff = deriveShare(polygen, i)
+      println(s"i=$i coeff=$coeff")
       shareI = coeff.add(shareI)
       if (i < threshold - 1) {
         idx = id + 1
@@ -435,6 +441,7 @@ object FrostUtil {
       polygen: ByteVector,
       threshold: Int): Vector[ECPublicKey] = {
     deriveCoefficients(polygen, threshold).map { coeff =>
+      println(s"coeff=$coeff commitment=${CryptoParams.getG.multiply(coeff)}")
       CryptoParams.getG.multiply(coeff)
     }
   }
@@ -443,12 +450,12 @@ object FrostUtil {
       polygen: ByteVector,
       threshold: Int): Vector[FieldElement] = {
     0.until(threshold)
-      .map(deriveCoefficient(polygen, _))
+      .map(deriveShare(polygen, _))
       .toVector
   }
 
-  private def deriveCoefficient(polygen: ByteVector, idx: Int): FieldElement = {
-    val coeffPreimage = polygen ++ ByteVector.fromLong(idx, 8)
+  def deriveShare(seed: ByteVector, idx: Int): FieldElement = {
+    val coeffPreimage = seed ++ ByteVector.fromLong(idx, 8)
     val coeff = hashFrostCoeffGen(coeffPreimage)
     FieldElement.fromBytes(coeff)
   }
@@ -461,14 +468,17 @@ object FrostUtil {
       commitments: Vector[ECPublicKey]): Boolean = {
     require(id > 0, s"Identifier must be positive, got: $id")
     val lhs = CryptoParams.getG.multiply(share)
+    println(s"vssVerify.share=$share id=$id")
+    println(s"commitments: ${commitments}")
     val rhs: SecpPoint =
       commitments.zipWithIndex.foldLeft[SecpPoint](SecpPointInfinity) {
         case (acc, (commitment, j)) =>
-          println(s"j=$j commitment=$commitment")
-          val y = FieldElement(id).pow(BigInteger.valueOf(j + 1))
+          val y = FieldElement(id).pow(BigInteger.valueOf(j))
+          println(s"id=$id j=$j y=$y")
           val x = commitment.multiply(y)
           acc.add(x.toPoint)
       }
+    println(s"lhs=${lhs} rhs=${ECPublicKey.fromBytes(rhs.bytes)}")
     lhs.toPoint == rhs
   }
 }
