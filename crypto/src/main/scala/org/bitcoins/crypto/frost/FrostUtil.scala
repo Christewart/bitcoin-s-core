@@ -367,10 +367,12 @@ object FrostUtil {
       isXOnly = isXonlyT,
       message = message
     )
+    println(
+      s"ids=$ids aggnonce=${aggNonce} pubnonce=${pubnonces(ids.indexOf(signerId))}")
     partialSigVerifyInternal(
       partialSig,
       signerId = signerId,
-      pubNonce = pubnonces(ids.indexOf(signerId)),
+      pubNonce = aggNonce,
       pubshare = pubshares(ids.indexOf(signerId)),
       sessionCtx = sessionCtx
     )
