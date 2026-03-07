@@ -2,7 +2,7 @@ package org.bitcoins.db
 
 import org.bitcoins.commons.util.BitcoinSLogger
 import org.bitcoins.core.util.FutureUtil
-import org.bitcoins.db.DatabaseDriver._
+import org.bitcoins.db.DatabaseDriver.*
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.{CleanResult, MigrateResult}
 import org.flywaydb.core.api.{FlywayException, MigrationInfoService}
@@ -183,6 +183,7 @@ trait DbManagement extends BitcoinSLogger {
         flyway.baseline()
         flyway.migrate()
     }
+
   }
 
   /** Runs flyway clean

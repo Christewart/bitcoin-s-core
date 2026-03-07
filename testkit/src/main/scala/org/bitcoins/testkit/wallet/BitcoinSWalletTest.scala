@@ -44,8 +44,6 @@ trait BitcoinSWalletTest
   }
 
   override def beforeAll(): Unit = {
-    AppConfig.throwIfDefaultDatadir(getFreshConfig.walletConf)
-    AppConfig.throwIfDefaultDatadir(getFreshConfig.dlcConf)
     super[PostgresTestDatabase].beforeAll()
   }
 

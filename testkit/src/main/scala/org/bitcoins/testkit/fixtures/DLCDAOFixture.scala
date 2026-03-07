@@ -6,7 +6,6 @@ import org.bitcoins.dlc.wallet.models.*
 import org.bitcoins.server.BitcoinSAppConfig
 import org.bitcoins.testkit.{BitcoinSTestAppConfig, PostgresTestDatabase}
 import org.scalatest.*
-
 import java.nio.file.Files
 
 trait DLCDAOFixture extends BitcoinSFixture with PostgresTestDatabase {
