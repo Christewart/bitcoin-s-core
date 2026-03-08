@@ -40,15 +40,19 @@ sealed trait TestDAOFixture
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
     makeFixture(
       build = () => testConfig.start().map(_ => TestDAO()),
-      destroy = () => dropAll()
+      destroy = () => dropAll()(testConfig)
     )(test)
   }
 
-  def dropAll(): Future[Unit] = Future {
-    testConfig.clean()
+  def dropAll()(testAppConfig: TestAppConfig): Future[Unit] = Future {
+    // these tables aren't managed by flyway so can't just call .clean()
+    import testAppConfig.profile.api.*
+    val testDAO = TestDAO()(executionContext, testAppConfig)
+    val action = testDAO.table.schema.dropIfExists
+    testDAO.safeDatabase.run(action)
   }
 
-  val testDb: TestDb = TestDb("abc", hex"0054")
+  val testDb: TestDb = TestDb("abcd", hex"0054")
 
   val testDbs: Vector[TestDb] = Vector(
     TestDb("abc", hex"0050"),

@@ -32,8 +32,8 @@ trait TestAppConfigFixture
     val config =
       TestAppConfig(BitcoinSTestAppConfig.tmpDir(), Vector(configOverride))
 
-    val _ = config.migrate()
     config.start().map { _ =>
+      val _ = config.migrate()
       config
     }
   }

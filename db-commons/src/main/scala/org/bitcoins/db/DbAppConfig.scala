@@ -148,6 +148,14 @@ abstract class DbAppConfig extends AppConfig {
     if (slickDbConfigOpt.isEmpty && isStarted.get()) {
       logger.info(s"Starting database connection pool for module=$moduleName")
       // Create overrides if modules want to change their path or db name
+      // For SQLite, set WAL journal mode on every new HikariCP connection.
+      // connectionInitSql must NOT be set for PostgreSQL — PRAGMA is
+      // SQLite-only syntax and Postgres will reject it with a syntax error,
+      // causing every new pool connection to fail.
+      val connectionInitSqlLine = driver match {
+        case SQLite     => """connectionInitSql = "PRAGMA journal_mode=WAL;""""
+        case PostgreSQL => ""
+      }
       val overrideConf = ConfigFactory.parseString {
         s"""
            |bitcoin-s {

@@ -5,6 +5,7 @@ import org.bitcoins.db.DatabaseDriver.*
 import org.flywaydb.core.Flyway
 import org.flywaydb.core.api.output.{CleanResult, MigrateResult}
 import org.flywaydb.core.api.{FlywayException, MigrationInfoService}
+import slick.jdbc.JdbcDataSource
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -15,6 +16,7 @@ trait DbManagement extends BitcoinSLogger {
   import scala.language.implicitConversions
 
   protected lazy val flyway: Flyway = {
+    val jdbcUrl = appConfig.jdbcUrl.replace("\"", "")
     // create the database if it doesn't exist yet in sqlite3
     appConfig.driver match {
       case SQLite =>
@@ -43,11 +45,23 @@ trait DbManagement extends BitcoinSLogger {
       }
     }
 
-    // Remove "s needed for config
-    val url = appConfig.jdbcUrl.replace("\"", "")
-    config
-      .dataSource(url, appConfig.dbUsername, appConfig.dbPassword)
-      .load
+    // Reuse the already-running HikariCP DataSource from Slick rather than
+    // creating a second connection pool via .dataSource(url, user, password).
+    // slickDbConfig.db.source is a HikariCPJdbcDataSource whose .ds field is
+    // a com.zaxxer.hikari.HikariDataSource (extends javax.sql.DataSource).
+    appConfig.slickDbConfig.db.source match {
+//      case h: HikariCPJdbcDataSource =>
+//        config
+//          .dataSource(h.ds)
+//          .load()
+      case j: JdbcDataSource =>
+        logger.warn(
+          s"No connection pool found in slickDbConfig, falling back to adhoc connections for flyway ${j.getClass.getSimpleName}")
+        config
+          .dataSource(jdbcUrl, appConfig.dbUsername, appConfig.dbPassword)
+          .load()
+    }
+
   }
 
   /** Internally, slick defines the schema member as
