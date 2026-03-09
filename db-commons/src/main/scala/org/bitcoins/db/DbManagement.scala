@@ -50,10 +50,6 @@ trait DbManagement extends BitcoinSLogger {
     // slickDbConfig.db.source is a HikariCPJdbcDataSource whose .ds field is
     // a com.zaxxer.hikari.HikariDataSource (extends javax.sql.DataSource).
     appConfig.slickDbConfig.db.source match {
-//      case h: HikariCPJdbcDataSource =>
-//        config
-//          .dataSource(h.ds)
-//          .load()
       case j: JdbcDataSource =>
         logger.warn(
           s"No connection pool found in slickDbConfig, falling back to adhoc connections for flyway ${j.getClass.getSimpleName}")
