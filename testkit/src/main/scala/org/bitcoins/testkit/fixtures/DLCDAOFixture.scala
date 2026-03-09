@@ -8,8 +8,6 @@ import org.bitcoins.testkit.{BitcoinSTestAppConfig, PostgresTestDatabase}
 import org.scalatest.*
 import java.nio.file.Files
 
-import java.nio.file.Files
-
 trait DLCDAOFixture extends BitcoinSFixture with PostgresTestDatabase {
 
   private def daos()(implicit dlcAppConfig: DLCAppConfig): DLCDAOs = {
