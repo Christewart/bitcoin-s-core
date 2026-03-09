@@ -1,11 +1,13 @@
 package org.bitcoins.testkit.db
 
+import org.bitcoins.db.DatabaseDriver.{PostgreSQL, SQLite}
 import org.bitcoins.testkit.BitcoinSTestAppConfig.ProjectType
 import org.bitcoins.testkit.{BitcoinSTestAppConfig, PostgresTestDatabase}
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.scalatest.{BeforeAndAfterAll, FutureOutcome}
 import org.scalatest.flatspec.FixtureAsyncFlatSpec
 
+import java.nio.file.Files
 import scala.concurrent.Future
 
 trait TestAppConfigFixture
@@ -39,9 +41,18 @@ trait TestAppConfigFixture
   }
 
   def destroyTestConfig(testConfig: TestAppConfig): Future[Unit] = {
-    testConfig.clean()
     for {
       _ <- testConfig.stop()
+      _ = testConfig.driver match {
+        case SQLite =>
+          Files.deleteIfExists(testConfig.dbPath.resolve(testConfig.dbName))
+          Files.deleteIfExists(
+            testConfig.dbPath.resolve(testConfig.dbName + "-wal"))
+          Files.deleteIfExists(
+            testConfig.dbPath.resolve(testConfig.dbName + "-shm"))
+        case PostgreSQL =>
+          testConfig.clean()
+      }
     } yield ()
   }
 }

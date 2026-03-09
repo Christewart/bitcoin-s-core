@@ -7,7 +7,10 @@ import org.bitcoins.core.hd._
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.util.FutureUtil
 import org.bitcoins.core.wallet.keymanagement.KeyManagerParams
+import org.bitcoins.db.DatabaseDriver.{PostgreSQL, SQLite}
 import org.bitcoins.testkit.BitcoinSTestAppConfig
+
+import java.nio.file.Files
 import org.bitcoins.testkit.chain.MockChainQueryApi
 import org.bitcoins.testkit.fixtures.EmptyFixture
 import org.bitcoins.testkit.node.MockNodeApi
@@ -296,9 +299,18 @@ class TrezorAddressTest extends BitcoinSWalletTest with EmptyFixture {
       assertions
     }
 
-    assertionsF.map { _ =>
-      conf.clean()
-      succeed
+    assertionsF.flatMap { _ =>
+      conf.stop().map { _ =>
+        conf.driver match {
+          case SQLite =>
+            Files.deleteIfExists(conf.dbPath.resolve(conf.dbName))
+            Files.deleteIfExists(conf.dbPath.resolve(conf.dbName + "-wal"))
+            Files.deleteIfExists(conf.dbPath.resolve(conf.dbName + "-shm"))
+          case PostgreSQL =>
+            conf.clean()
+        }
+        succeed
+      }
     }
   }
 

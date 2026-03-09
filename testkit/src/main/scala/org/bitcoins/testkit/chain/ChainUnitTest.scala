@@ -28,15 +28,17 @@ import org.bitcoins.testkit.chain.models.{
   ReorgFixtureChainApi
 }
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
+import org.bitcoins.db.DatabaseDriver.{PostgreSQL, SQLite}
 import org.bitcoins.testkit.rpc.BitcoindRpcTestUtil
 import org.bitcoins.testkit.{BitcoinSTestAppConfig, chain}
+
+import java.nio.file.Files
 import org.bitcoins.testkitcore.chain.ChainTestUtil
 import org.bitcoins.zmq.ZMQSubscriber
 import org.scalatest.*
 import play.api.libs.json.{JsError, JsSuccess, Json}
 
 import java.net.InetSocketAddress
-import java.nio.file.Files
 import scala.annotation.tailrec
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
@@ -677,7 +679,20 @@ object ChainUnitTest extends ChainVerificationLogger {
       appConfig: ChainAppConfig,
       ec: ExecutionContext
   ): Future[Unit] = {
-    Future { appConfig.clean() }
+    Future {
+      appConfig.driver match {
+        case SQLite =>
+          // Delete files directly to avoid SQLITE_BUSY from flyway.clean()
+          // competing with HikariCP connections that may still be open.
+          Files.deleteIfExists(appConfig.dbPath.resolve(appConfig.dbName))
+          Files.deleteIfExists(
+            appConfig.dbPath.resolve(appConfig.dbName + "-wal"))
+          Files.deleteIfExists(
+            appConfig.dbPath.resolve(appConfig.dbName + "-shm"))
+        case PostgreSQL =>
+          appConfig.clean()
+      }
+    }
   }
 
   def setupHeaderTableWithGenesisHeader()(implicit

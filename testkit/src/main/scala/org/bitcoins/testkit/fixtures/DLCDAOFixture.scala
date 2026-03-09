@@ -8,6 +8,8 @@ import org.bitcoins.testkit.{BitcoinSTestAppConfig, PostgresTestDatabase}
 import org.scalatest.*
 import java.nio.file.Files
 
+import java.nio.file.Files
+
 trait DLCDAOFixture extends BitcoinSFixture with PostgresTestDatabase {
 
   private def daos()(implicit dlcAppConfig: DLCAppConfig): DLCDAOs = {
@@ -55,7 +57,6 @@ trait DLCDAOFixture extends BitcoinSFixture with PostgresTestDatabase {
       },
       destroy = { (daos: DLCDAOs) =>
         val config = daos.dlcConf
-        val _ = config.clean()
         for {
           _ <- config.stop()
           _ = config.driver match {

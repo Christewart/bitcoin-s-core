@@ -19,6 +19,7 @@ import org.bitcoins.wallet.callback.WalletCallbacks
 import org.scalatest.FutureOutcome
 
 import java.net.InetSocketAddress
+import java.nio.file.Files
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -515,12 +516,32 @@ object NodeUnitTest extends P2PLogger {
     * tests with postgres rather an entire test suite shares the same postgres
     * database. therefore, we need to clean the database after each test, so
     * that migrations can be applied during the setup phase for the next test.
+    *
+    * For SQLite we delete the database files directly (after stop() has closed
+    * HikariCP) rather than using flyway.clean(), which needs an exclusive write
+    * lock and can race with HikariCP teardown causing [SQLITE_BUSY].
     * @param appConfig
     */
   private def cleanTables(appConfig: BitcoinSAppConfig): Unit = {
-    appConfig.nodeConf.clean()
-    appConfig.walletConf.clean()
-    appConfig.chainConf.clean()
+    import org.bitcoins.db.DatabaseDriver.{PostgreSQL, SQLite}
+    appConfig.nodeConf.driver match {
+      case SQLite =>
+        def deleteDbFiles(
+            dbPath: java.nio.file.Path,
+            dbName: String
+        ): Unit = {
+          Files.deleteIfExists(dbPath.resolve(dbName))
+          Files.deleteIfExists(dbPath.resolve(dbName + "-wal"))
+          Files.deleteIfExists(dbPath.resolve(dbName + "-shm"))
+        }
+        deleteDbFiles(appConfig.nodeConf.dbPath, appConfig.nodeConf.dbName)
+        deleteDbFiles(appConfig.walletConf.dbPath, appConfig.walletConf.dbName)
+        deleteDbFiles(appConfig.chainConf.dbPath, appConfig.chainConf.dbName)
+      case PostgreSQL =>
+        appConfig.nodeConf.clean()
+        appConfig.walletConf.clean()
+        appConfig.chainConf.clean()
+    }
     ()
   }
 }

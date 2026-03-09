@@ -1,5 +1,6 @@
 package org.bitcoins.testkit.fixtures
 
+import org.bitcoins.db.DatabaseDriver.{PostgreSQL, SQLite}
 import org.bitcoins.node.config.NodeAppConfig
 import org.bitcoins.node.models.{BroadcastAbleTransactionDAO, PeerDAO}
 import org.bitcoins.server.BitcoinSAppConfig
@@ -7,6 +8,7 @@ import org.bitcoins.testkit.BitcoinSTestAppConfig
 import org.bitcoins.testkit.node.{NodeUnitTest}
 import org.scalatest._
 
+import java.nio.file.Files
 import scala.concurrent.Future
 
 case class NodeDAOs(
@@ -47,9 +49,18 @@ trait NodeDAOFixture extends NodeUnitTest {
   }
 
   private def destroyAppConfig(nodeConfig: NodeAppConfig): Future[Unit] = {
-    nodeConfig.clean()
     for {
       _ <- nodeConfig.stop()
+      _ = nodeConfig.driver match {
+        case SQLite =>
+          Files.deleteIfExists(nodeConfig.dbPath.resolve(nodeConfig.dbName))
+          Files.deleteIfExists(
+            nodeConfig.dbPath.resolve(nodeConfig.dbName + "-wal"))
+          Files.deleteIfExists(
+            nodeConfig.dbPath.resolve(nodeConfig.dbName + "-shm"))
+        case PostgreSQL =>
+          nodeConfig.clean()
+      }
     } yield ()
   }
 

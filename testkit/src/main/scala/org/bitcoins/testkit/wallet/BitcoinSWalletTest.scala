@@ -29,6 +29,7 @@ import org.bitcoins.wallet.{Wallet, WalletLogger}
 import org.scalatest.*
 import org.testcontainers.postgresql.PostgreSQLContainer
 
+import java.nio.file.Files
 import java.util.UUID
 import scala.concurrent.*
 import scala.concurrent.duration.*
@@ -516,9 +517,30 @@ object BitcoinSWalletTest extends WalletLogger {
   def destroyWalletAppConfig(
       walletAppConfig: WalletAppConfig
   )(implicit ec: ExecutionContext): Future[Unit] = {
-    walletAppConfig.clean()
     for {
+      // Stop the connection pool first so HikariCP closes all connections
+      // before we attempt to clean up the database.
       _ <- walletAppConfig.stop()
+      _ = walletAppConfig.driver match {
+        case org.bitcoins.db.DatabaseDriver.SQLite =>
+          // For SQLite, delete the database files directly rather than calling
+          // flyway.clean(). flyway.clean() opens its own JDBC connection and
+          // needs an exclusive write lock to DROP tables. Even after
+          // HikariCP.close() the SQLite WAL reader snapshot can still be held
+          // by the OS/JDBC driver briefly, causing [SQLITE_BUSY]. Deleting the
+          // files is simpler, faster, and race-free once stop() has returned.
+          val dbFile = walletAppConfig.dbPath.resolve(walletAppConfig.dbName)
+          val walFile =
+            walletAppConfig.dbPath.resolve(walletAppConfig.dbName + "-wal")
+          val shmFile =
+            walletAppConfig.dbPath.resolve(walletAppConfig.dbName + "-shm")
+          Files.deleteIfExists(dbFile)
+          Files.deleteIfExists(walFile)
+          Files.deleteIfExists(shmFile)
+        case org.bitcoins.db.DatabaseDriver.PostgreSQL =>
+          // For PostgreSQL there is no locking issue, keep using flyway.
+          walletAppConfig.clean()
+      }
     } yield ()
   }
 
