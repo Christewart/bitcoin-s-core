@@ -195,10 +195,11 @@ object NodeUnitTest extends P2PLogger {
 
     for {
       _ <- node.stop()
+      _ = cleanTables(appConfig)
       _ <- node.nodeAppConfig.stop()
       _ <- node.chainAppConfig.stop()
     } yield {
-      cleanTables(appConfig)
+      ()
     }
   }
 
@@ -539,7 +540,9 @@ object NodeUnitTest extends P2PLogger {
         deleteDbFiles(appConfig.chainConf.dbPath, appConfig.chainConf.dbName)
       case PostgreSQL =>
         appConfig.nodeConf.clean()
-        appConfig.walletConf.clean()
+        // check this, is 'cleanTables()' dependend on by
+        // any tests that use the wallet in nodeTest/test
+        // appConfig.walletConf.clean()
         appConfig.chainConf.clean()
     }
     ()
