@@ -1,6 +1,11 @@
 package org.bitcoins.crypto.musig
 
-import org.bitcoins.crypto.{ECPublicKey, FieldElement, NetworkElement}
+import org.bitcoins.crypto.{
+  ECPublicKey,
+  FieldElement,
+  NetworkElement,
+  SchnorrPublicKey
+}
 import scodec.bits.ByteVector
 
 /** Represents an ordered set of MuSig signers and their tweaks. This is the
@@ -82,17 +87,10 @@ sealed trait KeySet {
 
 object KeySet {
 
-  def apply(keys: Vector[ECPublicKey]): LexicographicKeySet = {
-    fromUnsorted(keys)
-  }
-  def apply(keys: Vector[SchnorrPublicKey]): LexicographicKeySet = {
-    val sortedKeys = keys.sorted(using NetworkElement.lexicographicalOrdering)
-    LexicographicKeySet(sortedKeys)
-  }
-
-  def apply(keys: ECPublicKey*): LexicographicKeySet = {
-    KeySet(keys.toVector)
-  }
+//  def apply(keys: Vector[SchnorrPublicKey]): LexicographicKeySet = {
+//    val sortedKeys = keys.sorted(using NetworkElement.lexicographicalOrdering)
+//    LexicographicKeySet(sortedKeys)
+//  }
 
   def apply(
       keys: Vector[ECPublicKey],
