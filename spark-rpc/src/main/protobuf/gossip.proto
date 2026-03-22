@@ -1,0 +1,202 @@
+syntax = "proto3";
+
+package gossip;
+
+option go_package = "github.com/lightsparkdev/spark/proto/gossip";
+import "scalapb/scalapb.proto";
+import "spark.proto";
+import "common.proto";
+import "google/protobuf/any.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "spark_internal.proto";
+
+option (scalapb.options) = {
+    package_name: "org.bitcoins.spark.rpc.proto.gossip"
+    flat_package: true
+};
+
+service GossipService {
+    rpc gossip(GossipMessage) returns (google.protobuf.Empty);
+}
+message GossipMessage {
+    string message_id = 1;
+    reserved 3;
+    oneof message {
+        GossipMessageCancelTransfer cancel_transfer = 2;
+        GossipMessageSettleSenderKeyTweak settle_sender_key_tweak = 4;
+        GossipMessageRollbackTransfer rollback_transfer = 5;
+        GossipMessageMarkTreesExited mark_trees_exited = 6;
+        GossipMessageFinalizeTreeCreation finalize_tree_creation = 7;
+        GossipMessageFinalizeTransfer finalize_transfer = 8;
+        GossipMessageFinalizeRefreshTimelock finalize_refresh_timelock = 9 [deprecated = true];
+        GossipMessageFinalizeExtendLeaf finalize_extend_leaf = 10 [deprecated = true];
+        GossipMessageRollbackUtxoSwap rollback_utxo_swap = 11;
+        GossipMessageDepositCleanup deposit_cleanup = 12;
+        GossipMessagePreimage preimage = 13;
+        GossipMessageFinalizeRenewRefundTimelock finalize_refund_timelock = 14;
+        GossipMessageFinalizeRenewNodeTimelock finalize_node_timelock = 15;
+        GossipMessageSettleSwapKeyTweak settle_swap_key_tweak = 16;
+        GossipMessageUpdateWalletSetting update_wallet_setting = 17;
+        GossipMessageArchiveStaticDepositAddress archive_static_deposit_address = 18;
+        GossipMessageRollbackInstantUtxoSwap rollback_instant_utxo_swap = 19;
+        GossipMessageFinalizeTransferReceiver finalize_transfer_receiver = 20;
+        GossipMessageFinalizeTreeNode finalize_tree_node = 21;
+        GossipMessageConsensusCommit consensus_commit = 22;
+        GossipMessageConsensusRollback consensus_rollback = 23;
+    }
+}
+
+message GossipMessageCancelTransfer {
+    string transfer_id = 1;
+}
+
+// Rolling back a transfer reverts it to its initial state. Only transfers that
+// have not been key-tweaked by the sender are eligible for rollback.
+message GossipMessageRollbackTransfer {
+    string transfer_id = 1;
+}
+
+
+message GossipMessageSettleSenderKeyTweak {
+    string transfer_id = 1;
+    // The key tweak proofs for the leaves that this message is to commit.
+    // This is a safe guard to ensure that we can detect mismatch key tweaks, but if the proofs
+    // don't match, there's no way to recover at this point.
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 2;
+}
+
+message GossipMessageMarkTreesExited {
+    repeated string tree_ids = 1;
+}
+
+message GossipMessageFinalizeTreeCreation {
+    repeated spark_internal.TreeNode internal_nodes = 1;
+    spark.Network proto_network = 2;
+}
+
+message GossipMessageFinalizeTransfer {
+    string transfer_id = 1;
+    repeated spark_internal.TreeNode internal_nodes = 2;
+    google.protobuf.Timestamp completion_timestamp = 3;
+}
+
+// FinalizeTransferReceiver is sent when an individual receiver completes their
+// claim in a MIMO transfer. It carries the receiver's tree node updates and
+// marks that receiver as Completed on non-coordinator SOs.
+message GossipMessageFinalizeTransferReceiver {
+    string transfer_id = 1;
+    bytes receiver_identity_public_key = 2;
+    repeated spark_internal.TreeNode internal_nodes = 3;
+    google.protobuf.Timestamp completion_timestamp = 4;
+}
+
+message GossipMessageFinalizeRefreshTimelock {
+    repeated spark_internal.TreeNode internal_nodes = 1;
+}
+
+message GossipMessageFinalizeExtendLeaf {
+    repeated spark_internal.TreeNode internal_nodes = 1;
+}
+
+message GossipMessageFinalizeRenewRefundTimelock {
+  spark_internal.TreeNode node = 1;
+}
+
+message GossipMessageFinalizeRenewNodeTimelock {
+  spark_internal.TreeNode split_node = 1;
+  spark_internal.TreeNode node = 2;
+}
+
+// Rollback UTXO swap is called when Create UTXO swap transaction failed to
+// fully complete. This reverts the state back to before the swap, allowing the
+// user to initiate the UTXO swap again.
+message GossipMessageRollbackUtxoSwap {
+    // UTXO swap is identified by UTXO
+    spark.UTXO on_chain_utxo = 1;
+    // Signature of the Coordinator that started the Create UTXO swap transaction
+    bytes signature = 2;
+    // Identity key of the Coordinator
+    bytes coordinator_public_key = 3;
+}
+
+// Rollback UTXO swap is called when Create UTXO swap transaction failed to
+// fully complete. This reverts the state back to before the swap, allowing the
+// user to initiate the UTXO swap again.
+message GossipMessageRollbackInstantUtxoSwap {
+    // UTXO swap is identified by UTXO
+    spark.UTXO on_chain_utxo = 1;
+    // Signature of the Coordinator that started the Create UTXO swap transaction
+    bytes signature = 2;
+    // Identity key of the Coordinator
+    bytes coordinator_public_key = 3;
+    // Statuses that are ok to rollback from
+    repeated spark.UtxoSwapStatus rollback_from_statuses = 4;
+    // Status that we want to rollback to
+    spark.UtxoSwapStatus rollback_to_status = 5;
+}
+
+message GossipMessageDepositCleanup {
+    string tree_id = 1;
+}
+
+message GossipMessagePreimage {
+    bytes preimage = 1;
+    bytes payment_hash = 2;
+}
+
+// SettleSwapKeyTweak is called in Swap V3 flow when a counter transfer is
+// created to settle both primary and counter transfer key tweaks atomically in the
+// same DB transaction.
+message GossipMessageSettleSwapKeyTweak {
+    string counter_transfer_id = 1;
+}
+
+message GossipMessageUpdateWalletSetting {
+    bytes owner_identity_public_key = 1;
+    optional bool private_enabled = 2;
+    oneof master_identity_public_key {
+        bytes set_master_identity_public_key = 3;
+        bool clear_master_identity_public_key = 4;
+    }
+}
+
+// Archives a specific static deposit address for a user during address rotation.
+// This marks the old address as archived (is_default=false) on all SOs.
+// Archived addresses are still queryable and able to accept deposits.
+// The coordinator signs this operation to prevent unauthorized archiving by rogue SOs.
+message GossipMessageArchiveStaticDepositAddress {
+    bytes owner_identity_public_key = 1;
+    spark.Network network = 2;
+    string address = 3;  // Specific address to archive
+    bytes signature = 4;  // Coordinator's signature over the operation
+    bytes coordinator_public_key = 5;  // Identity public key of the SO that initiated the rotation
+}
+
+message GossipMessageFinalizeTreeNode {
+    repeated spark_internal.TreeNode nodes = 1;
+}
+
+// ConsensusOperationType identifies the domain flow for consensus operations.
+// Each value maps to a registered FlowHandler in the TwoPCEngine.
+enum ConsensusOperationType {
+    CONSENSUS_OPERATION_TYPE_UNSPECIFIED = 0;
+}
+
+// GossipMessageConsensusCommit delivers the commit phase of a consensus operation.
+// The op_type identifies the registered FlowHandler, and operation carries
+// the serialized domain-specific proto payload for FlowHandler.Commit.
+message GossipMessageConsensusCommit {
+    ConsensusOperationType op_type = 1;
+    // Domain-specific proto message passed to FlowHandler.Commit.
+    google.protobuf.Any operation = 2;
+}
+
+// GossipMessageConsensusRollback delivers the rollback phase of a consensus operation.
+// The op_type identifies the registered FlowHandler, and operation carries
+// the domain-specific proto payload for FlowHandler.Rollback.
+message GossipMessageConsensusRollback {
+    ConsensusOperationType op_type = 1;
+    // Domain-specific proto message passed to FlowHandler.Rollback.
+    google.protobuf.Any operation = 2;
+}

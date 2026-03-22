@@ -151,6 +151,20 @@ lazy val clightningRpc = project
   .settings(CommonSettings.prodSettings: _*)
   .dependsOn(asyncUtilsJVM, bitcoindRpc)
 
+lazy val sparkRpc = project
+  .in(file("spark-rpc"))
+  .settings(name := "bitcoin-s-spark-rpc")
+  .settings(scalacOptions += "-Xsource:3")
+  // Silence deprecation warnings in protobuf/pekko-grpc generated sources
+  // (ScalaPB generates code that references fields marked [deprecated=true] in proto)
+  .settings(
+    Compile / scalacOptions += "-Wconf:cat=deprecation:src=target/.*:silent"
+  )
+  .settings(CommonSettings.prodSettings: _*)
+  .settings(libraryDependencies ++= Deps.sparkRpc)
+  .dependsOn(coreJVM)
+  .enablePlugins(PekkoGrpcPlugin)
+
 lazy val tor = project
   .in(file("tor"))
   .settings(scalacOptions += "-Xsource:3")

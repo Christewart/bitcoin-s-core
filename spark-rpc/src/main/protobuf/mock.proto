@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package mock;
+
+option go_package = "github.com/lightsparkdev/spark/proto/mock";
+import "google/protobuf/empty.proto";
+import "scalapb/scalapb.proto";
+option (scalapb.options) = {
+    package_name: "org.bitcoins.spark.rpc.proto.mock"
+    flat_package: true
+};
+service MockService {
+    rpc clean_up_preimage_share(CleanUpPreimageShareRequest) returns (google.protobuf.Empty) {}
+    rpc update_nodes_status(UpdateNodesStatusRequest) returns (google.protobuf.Empty) {}
+    // Triggers the execution of a scheduled task immediately by name. Used by hermetic tests
+    rpc trigger_task(TriggerTaskRequest) returns (google.protobuf.Empty) {}
+    rpc query_preimage_share(QueryPreimageShareRequest) returns (QueryPreimageShareResponse) {}
+    rpc modify_node_timelock(ModifyNodeTimelockRequest) returns (google.protobuf.Empty) {}
+}
+
+message CleanUpPreimageShareRequest {
+    bytes payment_hash = 1;
+}
+
+message UpdateNodesStatusRequest {
+    repeated string node_ids = 1;
+    string status = 2;
+}
+
+// TriggerTaskRequest is used to trigger a scheduled task immediately in hermetic tests.
+message TriggerTaskRequest {
+    string task_name = 1;
+}
+
+message QueryPreimageShareRequest {
+    bytes payment_hash = 1;
+}
+
+message QueryPreimageShareResponse {
+    bytes preimage_share = 1;
+    int32 threshold = 2;
+    string invoice_string = 3;
+}
+
+message ModifyNodeTimelockRequest {
+    string node_id = 1;
+    uint32 node_timelock = 2;
+    uint32 refund_timelock = 3;
+}

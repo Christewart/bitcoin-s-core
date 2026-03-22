@@ -1,0 +1,542 @@
+syntax = "proto3";
+
+package spark_internal;
+
+import "common.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "spark.proto";
+import "validate/validate.proto";
+import "scalapb/scalapb.proto";
+option (scalapb.options) = {
+    package_name: "org.bitcoins.spark.rpc.proto.spark.internal"
+    flat_package: true
+};
+option go_package = "github.com/lightsparkdev/spark/proto/spark_internal";
+
+service SparkInternalService {
+    rpc mark_keyshares_as_used(MarkKeysharesAsUsedRequest) returns (google.protobuf.Empty) {}
+    rpc mark_keyshare_for_deposit_address(MarkKeyshareForDepositAddressRequest) returns (MarkKeyshareForDepositAddressResponse) {}
+    rpc reserve_entity_dkg_key(ReserveEntityDkgKeyRequest) returns (google.protobuf.Empty) {}
+    rpc finalize_tree_creation(FinalizeTreeCreationRequest) returns (google.protobuf.Empty) {}
+
+    rpc frost_round1(FrostRound1Request) returns (FrostRound1Response) {}
+    rpc frost_round2(FrostRound2Request) returns (FrostRound2Response) {}
+
+    rpc finalize_transfer(FinalizeTransferRequest) returns (google.protobuf.Empty) {}
+
+    rpc finalize_refresh_timelock(FinalizeRefreshTimelockRequest) returns (google.protobuf.Empty) {
+        option deprecated = true;
+    }
+    rpc finalize_extend_leaf(FinalizeExtendLeafRequest) returns (google.protobuf.Empty) {
+        option deprecated = true;
+    }
+
+   rpc finalize_renew_refund_timelock(FinalizeRenewRefundTimelockRequest) returns (google.protobuf.Empty) {}
+   rpc finalize_renew_node_timelock(FinalizeRenewNodeTimelockRequest) returns (google.protobuf.Empty) {}
+   rpc node_available_for_renew(NodeAvailableForRenewRequest) returns (google.protobuf.Empty) {}
+
+    rpc initiate_preimage_swap(spark.InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
+    rpc initiate_preimage_swap_v2(InitiatePreimageSwapRequest) returns (InitiatePreimageSwapResponse) {}
+    rpc provide_preimage(ProvidePreimageRequest) returns (google.protobuf.Empty) {}
+    rpc update_preimage_request(UpdatePreimageRequestRequest) returns (google.protobuf.Empty) {}
+    rpc store_preimage_share(spark.StorePreimageShareV2Request) returns (google.protobuf.Empty) {}
+
+    rpc prepare_tree_address(PrepareTreeAddressRequest) returns (PrepareTreeAddressResponse) {}
+
+    rpc initiate_transfer(InitiateTransferRequest) returns (google.protobuf.Empty) {}
+    rpc initiate_transfer_v2(InitiateTransferV2Request) returns (google.protobuf.Empty) {}
+
+    rpc deliver_sender_key_tweak(DeliverSenderKeyTweakRequest) returns (google.protobuf.Empty) {}
+
+    rpc initiate_cooperative_exit(InitiateCooperativeExitRequest) returns (google.protobuf.Empty) {}
+
+    rpc initiate_settle_receiver_key_tweak(InitiateSettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
+    rpc settle_receiver_key_tweak(SettleReceiverKeyTweakRequest) returns (google.protobuf.Empty) {}
+    rpc settle_sender_key_tweak(SettleSenderKeyTweakRequest) returns (google.protobuf.Empty) {}
+
+    // Create UTXO swap record to claim UTXO by SSP in the static deposit flow
+    rpc create_static_deposit_utxo_swap(CreateStaticDepositUtxoSwapRequest) returns (CreateStaticDepositUtxoSwapResponse) {}
+    // Create UTXO swap record to refund UTXO to the user in the static deposit flow
+    rpc create_static_deposit_utxo_refund(CreateStaticDepositUtxoRefundRequest) returns (CreateStaticDepositUtxoRefundResponse) {}
+    // Create instant static deposit UTXO swap record across all SOs
+    rpc create_instant_static_deposit_utxo_swap(CreateInstantStaticDepositUtxoSwapRequest) returns (CreateInstantStaticDepositUtxoSwapResponse) {}
+    // Save utxo for an instant static deposit across all SOs
+    rpc save_utxo_for_instant_static_deposit(SaveUtxoForInstantStaticDepositRequest) returns (SaveUtxoForInstantStaticDepositResponse) {}
+    // Link transfer edge to utxo swap on non-coordinator SOs (used by instant static deposits)
+    rpc link_utxo_swap_transfer(LinkUtxoSwapTransferRequest) returns (LinkUtxoSwapTransferResponse) {}
+
+    // Internal method to cancel a swap for other SOs if one of them failed to ack it
+    rpc rollback_utxo_swap(RollbackUtxoSwapRequest) returns (RollbackUtxoSwapResponse) {}
+    // Internal method to cancel an instant UTXO swap for other SOs if one of them failed to ack it
+    rpc rollback_instant_utxo_swap(RollbackInstantUtxoSwapRequest) returns (RollbackInstantUtxoSwapResponse) {}
+    // Internal method to mark a swap as COMPLETE in all SOs
+    rpc utxo_swap_completed(UtxoSwapCompletedRequest) returns (UtxoSwapCompletedResponse) {}
+
+    rpc query_leaf_signing_pubkeys(QueryLeafSigningPubkeysRequest) returns (QueryLeafSigningPubkeysResponse) {}
+    rpc resolve_leaf_investigation(ResolveLeafInvestigationRequest) returns (google.protobuf.Empty) {}
+
+    rpc fix_keyshare(FixKeyshareRequest) returns (google.protobuf.Empty) {}
+    rpc fix_keyshare_round1(FixKeyshareRound1Request) returns (FixKeyshareRound1Response) {}
+    rpc fix_keyshare_round2(FixKeyshareRound2Request) returns (FixKeyshareRound2Response) {}
+
+    rpc get_transfers(GetTransfersRequest) returns (GetTransfersResponse) {}
+
+    // Generate proofs of possession for a static deposit address.
+    // The client can use them to validate that all SOs know about this address.
+    // The coordinator can use them to validate if an address was created correctly.
+    rpc generate_static_deposit_address_proofs(GenerateStaticDepositAddressProofsRequest) returns (GenerateStaticDepositAddressProofsResponse) {}
+
+    // This method fixes bad leaves by querying a designated "good" SO for its
+    // leaves, and copying it over to this SO's DB.
+    rpc sync_node(SyncNodeRequest) returns (google.protobuf.Empty) {}
+}
+
+message MarkKeysharesAsUsedRequest {
+    repeated string keyshare_id = 1;
+}
+
+message MarkKeyshareForDepositAddressRequest {
+    string keyshare_id = 1;
+    string address = 2;
+    bytes owner_identity_public_key = 3;
+    bytes owner_signing_public_key = 4;
+    // Static deposit address flag
+    optional bool is_static = 5;
+}
+
+message MarkKeyshareForDepositAddressResponse {
+    bytes address_signature = 1;
+}
+
+message FrostRound1Request {
+    // DEPRECATED: This field is ignored when random_nonce_count is set.
+    // Prefer setting random_nonce_count directly.
+    repeated string keyshare_ids = 1 [deprecated = true];
+
+    // DEPRECATED: Not used by the handler. Commitments are independent of long-term public keys.
+    map<string, bytes> public_keys = 2 [deprecated = true];
+
+    // DEPRECATED: This field is ignored when random_nonce_count is set. Prefer random_nonce_count.
+    uint32 count = 3 [deprecated = true];
+
+    // If this is set to non-zero, the keyshare_ids will be ignored and the random keys will be used.
+    uint32 random_nonce_count = 4;
+}
+
+message FrostRound1Response {
+    repeated common.SigningCommitment signing_commitments = 1;
+}
+
+message SigningJob {
+    // The unique identifier for the signing job.
+    string job_id = 1 [(validate.rules).string.uuid = true];
+
+    // The message to sign.
+    bytes message = 2;
+
+    // The secret package from DKG round 3.
+    string keyshare_id = 3;
+
+    // The verifying key. This should be the total public key for both user and StatechainEntity.
+    bytes verifying_key = 4;
+
+    // The commitments for all participants of the statechain.
+    map<string, common.SigningCommitment> commitments = 5;
+
+    // The commitments for all participants of the user.
+    common.SigningCommitment user_commitments = 6;
+
+    // The adaptor for the message.
+    bytes adaptor_public_key = 7;
+}
+
+message FrostRound2Request {
+    repeated SigningJob signing_jobs = 1;
+}
+
+message FrostRound2Response {
+    map<string, common.SigningResult> results = 1;
+}
+
+message FinalizeTreeCreationRequest {
+    repeated TreeNode nodes = 1;
+    spark.Network network = 2;
+}
+
+message FinalizeTransferRequest {
+    string transfer_id = 1;
+    repeated TreeNode nodes = 2;
+    google.protobuf.Timestamp timestamp = 3;
+}
+
+message FinalizeRefreshTimelockRequest {
+    repeated TreeNode nodes = 1;
+}
+
+message FinalizeExtendLeafRequest {
+    TreeNode node = 1;
+}
+
+message FinalizeRenewRefundTimelockRequest {
+    TreeNode node = 1;
+}
+
+message FinalizeRenewNodeTimelockRequest {
+    TreeNode split_node = 1;
+    TreeNode node = 2;
+}
+
+message NodeAvailableForRenewRequest {
+    string node_id = 1;
+}
+
+message TreeNode {
+    string id = 1;
+    uint64 value = 2;
+    bytes verifying_pubkey = 3;
+    bytes owner_identity_pubkey = 4;
+    bytes owner_signing_pubkey = 5;
+    bytes raw_tx = 6;
+    bytes raw_refund_tx = 7;
+    string tree_id = 8;
+    optional string parent_node_id = 9;
+    string signing_keyshare_id = 10;
+    uint32 vout = 11;
+    uint32 refund_timelock = 12;
+    bytes direct_tx = 13;
+    bytes direct_refund_tx = 14;
+    bytes direct_from_cpfp_refund_tx = 15;
+}
+
+message InitiatePreimageSwapRequest {
+    spark.InitiatePreimageSwapRequest request = 1;
+    map<string, bytes> cpfp_refund_signatures = 2;
+    map<string, bytes> direct_refund_signatures = 3;
+    map<string, bytes> direct_from_cpfp_refund_signatures = 4;
+}
+
+message InitiatePreimageSwapResponse {
+    bytes preimage_share = 1;
+}
+
+message PrepareTreeAddressNode {
+    string signing_keyshare_id = 1;
+    bytes user_public_key = 2;
+    repeated PrepareTreeAddressNode children = 3;
+}
+
+message PrepareTreeAddressRequest {
+    string target_keyshare_id = 1;
+    PrepareTreeAddressNode node = 2;
+
+    // TODO: This should be removed once we have a proper auth process.
+    bytes user_identity_public_key = 3;
+    spark.Network network = 4;
+}
+
+message PrepareTreeAddressResponse {
+    map<string, bytes> signatures = 1;
+}
+
+
+message InitiateTransferLeaf {
+    string leaf_id = 1;
+    bytes raw_refund_tx = 2;
+    bytes direct_refund_tx = 3;
+    bytes direct_from_cpfp_refund_tx = 4;
+}
+
+message InitiateTransferRequest {
+    string transfer_id = 1;
+    bytes sender_identity_public_key = 2;
+    bytes receiver_identity_public_key = 3;
+    google.protobuf.Timestamp expiry_time = 4;
+    repeated InitiateTransferLeaf leaves = 5;
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 6;
+    spark.TransferType type = 7;
+    spark.TransferPackage transfer_package = 8;
+    // The finalized signatures for the cpfp refund transactions.
+    map<string, bytes> refund_signatures = 9;
+    // The finalized signatures for the direct refund transactions.
+    map<string, bytes> direct_refund_signatures = 10;
+    // The finalized signatures for the direct from cpfp refund transactions.
+    map<string, bytes> direct_from_cpfp_refund_signatures = 11;
+    // The invoice this transfer pays.
+    string spark_invoice = 12;
+    // Adaptor public keys to verify adapted signatures for tree node refund transactions.
+    spark.AdaptorPublicKeyPackage adaptor_public_keys = 13;
+    // Primary transfer ID of a counter transfer in Swap V3 flow. Transfers are
+    // required to be connected so their keys can be tweaked at the same time.
+    // For non-SwapV3 flows this field will be an empty string.
+    string primary_transfer_id = 14;
+}
+
+// Per-sender data within an InitiateTransferV2Request.
+message InitiateTransferSenderPackage {
+    bytes sender_identity_public_key = 1;
+    spark.TransferPackage transfer_package = 2;
+    // leaf_id → receiver_identity_public_key for each leaf in this sender's package.
+    map<string, bytes> receiver_identity_public_keys = 3;
+    // Finalized CPFP refund signatures (leaf_id → signature).
+    map<string, bytes> refund_signatures = 4;
+    // Finalized direct refund signatures (leaf_id → signature).
+    map<string, bytes> direct_refund_signatures = 5;
+    // Finalized direct-from-CPFP refund signatures (leaf_id → signature).
+    map<string, bytes> direct_from_cpfp_refund_signatures = 6;
+}
+
+// Internal SO-to-SO request to create one Transfer with multiple senders and receivers.
+// Receiving SOs must accept all sender packages atomically (all or nothing).
+message InitiateTransferV2Request {
+    string transfer_id = 1;
+    // One entry per sender. Leaf IDs must be disjoint across entries.
+    repeated InitiateTransferSenderPackage sender_packages = 2;
+    // FROST key-tweak proofs keyed by leaf_id (across all senders).
+    map<string, spark.SecretProof> sender_key_tweak_proofs = 3;
+    google.protobuf.Timestamp expiry_time = 4;
+}
+
+message DeliverSenderKeyTweakRequest {
+    string transfer_id = 1;
+    bytes sender_identity_public_key = 2;
+    spark.TransferPackage transfer_package = 3;
+}
+
+message InitiateCooperativeExitRequest {
+    InitiateTransferRequest transfer = 1;
+    string exit_id = 2;
+    bytes exit_txid = 3;
+    bytes connector_tx = 4;
+}
+
+message UpdatePreimageRequestRequest {
+    string preimage_request_id = 1;
+    bytes preimage = 2;
+    bytes identity_public_key = 3;
+}
+
+message InitiateSettleReceiverKeyTweakRequest {
+    string transfer_id = 1;
+    map<string, spark.SecretProof> key_tweak_proofs = 2;
+    map<string, bytes> user_public_keys = 3;
+    // Full ECIES-encrypted key tweak package (SO identifier -> ciphertext).
+    // Each SO verifies the user signature against this full map, then decrypts its own portion.
+    map<string, bytes> encrypted_claim_key_tweak_package = 4;
+    // User signature over the encrypted claim key tweak package.
+    bytes claim_signature = 5;
+    bytes receiver_identity_public_key = 6;
+}
+
+enum SettleKeyTweakAction {
+    NONE = 0;
+    COMMIT = 1;
+    ROLLBACK = 2;
+}
+
+message SettleReceiverKeyTweakRequest {
+    string transfer_id = 1;
+    SettleKeyTweakAction action = 3;
+    bytes receiver_identity_public_key = 4;
+
+    reserved 2;
+}
+
+message SettleSenderKeyTweakRequest {
+    string transfer_id = 1;
+    SettleKeyTweakAction action = 2;
+}
+
+message ReserveInstantStaticDepositUtxoSwapRequest {
+    spark.UTXO on_chain_utxo = 1;
+    // SSP signature of a message consenting to transfer a specific amount of funds
+    // in exchange for a specific UTXO.
+    bytes ssp_signature = 2;
+    // User signature of a message consenting to exchange a specific UTXO for a fund
+    // transfer from a specific SSP.
+    bytes user_signature = 3;
+    // Transfer package to send from SSP to User.
+    spark.StartTransferRequest transfer = 4;
+    // Destination address for the static deposit UTXO.
+    string destination_address = 5;
+    // UTXO output value in satoshis.
+    int64 value_sats = 6;
+    // credit amount in satoshis.
+    int64 credit_amount_sats = 7;
+    // secondary credit amount in satoshis.
+    int64 secondary_credit_amount_sats = 8;
+    // expiry time of the swap
+    google.protobuf.Timestamp expiry_time = 9;
+    // Optional: requested secondary transfer ID for secondary credit amount.
+    string requested_secondary_transfer_id = 10;
+}
+
+message CreateInstantStaticDepositUtxoSwapRequest {
+    ReserveInstantStaticDepositUtxoSwapRequest request = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message CreateInstantStaticDepositUtxoSwapResponse {
+    string swap_id = 1;
+}
+
+message SaveUtxoForInstantStaticDepositRequest {
+    spark.UTXO on_chain_utxo = 1;
+    string utxo_swap_id = 2;
+    bytes signature = 3;
+    bytes coordinator_public_key = 4;
+    string transfer_id = 5;
+}
+
+message SaveUtxoForInstantStaticDepositResponse {}
+
+message InitiateStaticDepositUtxoSwapRequest {
+    spark.UTXO on_chain_utxo = 1;
+    // SSP signature of a message consenting to transfer a specific amount of funds
+    // in exchange for a specific UTXO.
+    bytes ssp_signature = 2;
+    // User signature of a message consenting to exchange a specific UTXO for a fund
+    // transfer from a specific SSP.
+    bytes user_signature = 3;
+    // Transfer package to send from SSP to User.
+    spark.StartTransferRequest transfer = 4;
+    // Transaction constructed by the SSP spending the UTXO to an address it owns.
+    spark.SigningJob spend_tx_signing_job = 5;
+    // Optional: which hash variant was used to create user_signature.
+    spark.HashVariant hash_variant = 6;
+    // Optional: minimum confirmations required. Defaults to 3 if unset/0. Min 1.
+    optional uint32 confirmation_threshold = 7;
+}
+
+message CreateStaticDepositUtxoSwapRequest {
+    InitiateStaticDepositUtxoSwapRequest request = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message CreateStaticDepositUtxoSwapResponse {
+    string UtxoDepositAddress = 1;
+}
+
+message CreateStaticDepositUtxoRefundRequest {
+    spark.InitiateStaticDepositUtxoRefundRequest request = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message CreateStaticDepositUtxoRefundResponse {
+    string UtxoDepositAddress = 1;
+}
+
+message RollbackUtxoSwapRequest {
+    spark.UTXO on_chain_utxo = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message RollbackUtxoSwapResponse {
+}
+
+message RollbackInstantUtxoSwapRequest {
+    spark.UTXO on_chain_utxo = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+    repeated spark.UtxoSwapStatus rollback_from_statuses = 4;
+    spark.UtxoSwapStatus rollback_to_status = 5;
+}
+
+message RollbackInstantUtxoSwapResponse {
+}
+
+message UtxoSwapCompletedRequest {
+    spark.UTXO on_chain_utxo = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message UtxoSwapCompletedResponse {
+}
+
+message LinkUtxoSwapTransferRequest {
+    string transfer_id = 1;
+    bytes signature = 2;
+    bytes coordinator_public_key = 3;
+}
+
+message LinkUtxoSwapTransferResponse {}
+
+message QueryLeafSigningPubkeysRequest {
+    repeated string leaf_ids = 1;
+}
+
+message QueryLeafSigningPubkeysResponse {
+    map<string, bytes> signing_pubkeys = 1;
+}
+
+message ResolveLeafInvestigationRequest {
+    repeated string lost_leaf_ids = 1;
+    repeated string available_leaf_ids = 2;
+}
+
+message ProvidePreimageRequest {
+    bytes payment_hash = 1;
+    bytes preimage = 2;
+    bytes identity_public_key = 3;
+    // The key tweak proofs for the leaves, to validate that each SO holds the correct key tweak.
+    map<string, spark.SecretProof> key_tweak_proofs = 4;
+}
+
+message ReserveEntityDkgKeyRequest {
+    string keyshare_id = 1;
+}
+
+message FixKeyshareRequest {
+    string bad_keyshare_id = 1;
+    string bad_operator_id = 2;
+    repeated string good_operator_ids = 3;
+}
+
+message FixKeyshareRound1Request {
+    string bad_keyshare_id = 1;
+    string bad_operator_id = 2;
+    repeated string good_operator_ids = 3;
+}
+
+message FixKeyshareRound1Response {
+    repeated bytes message = 1;
+}
+
+message FixKeyshareRound2Request {
+    string bad_keyshare_id = 1;
+    string bad_operator_id = 2;
+    repeated string good_operator_ids = 3;
+    repeated bytes message = 4;
+}
+
+message FixKeyshareRound2Response {
+    bytes message = 1;
+}
+
+message GetTransfersRequest {
+    repeated string transfer_ids = 1;
+}
+
+message GetTransfersResponse {
+    repeated spark.Transfer transfers = 1;
+}
+
+message GenerateStaticDepositAddressProofsRequest {
+    string keyshare_id = 1;
+    string address = 2;
+    bytes owner_identity_public_key = 3;
+}
+
+message GenerateStaticDepositAddressProofsResponse {
+    bytes address_signature = 1;
+}
+
+message SyncNodeRequest {
+    repeated string node_ids = 1;
+    string operator_id = 2;
+}
