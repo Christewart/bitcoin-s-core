@@ -1,0 +1,155 @@
+syntax = "proto3";
+
+package spark_token;
+
+import "spark_token.proto";
+import "validate/validate.proto";
+import "spark.proto";
+import "scalapb/scalapb.proto";
+option (scalapb.options) = {
+    package_name: "org.bitcoins.spark.rpc.proto.spark.token.internal"
+    flat_package: true
+};
+option go_package = "github.com/lightsparkdev/spark/proto/spark_token_internal";
+
+service SparkTokenInternalService {
+    // Validate input and prepare transaction (SO-to-SO)
+    rpc prepare_transaction(PrepareTransactionRequest)
+        returns (PrepareTransactionResponse) {}
+
+    // Sign the token transaction from coordination
+    rpc sign_token_transaction_from_coordination(
+        SignTokenTransactionFromCoordinationRequest)
+        returns (SignTokenTransactionFromCoordinationResponse) {}
+
+    // Exchange revocation secrets between SOs after all signatures are gathered
+    // Once an SO has all the revocation secret shares, it can finalize the
+    // transaction.
+    rpc exchange_revocation_secrets_shares(
+        ExchangeRevocationSecretsSharesRequest)
+        returns (ExchangeRevocationSecretsSharesResponse) {}
+
+    // Create and Sign a token transaction on non-coordinator operators (V3+).
+    rpc sign_token_transaction(SignTokenTransactionRequest)
+        returns (SignTokenTransactionResponse) {}
+
+    // Internal freeze tokens (SO-to-SO coordination)
+    rpc internal_freeze_tokens(InternalFreezeTokensRequest)
+        returns (InternalFreezeTokensResponse) {}
+}
+
+message PrepareTransactionRequest {
+    spark_token.TokenTransaction final_token_transaction = 1;
+    repeated spark_token.SignatureWithIndex
+        token_transaction_signatures = 2;
+    repeated string keyshare_ids = 3 [
+        (validate.rules).repeated.items.string.uuid = true
+    ];
+    bytes coordinator_public_key = 4;
+}
+
+message PrepareTransactionResponse {}
+
+// === Coordination Signing ===
+message SignTokenTransactionFromCoordinationRequest {
+    spark_token.TokenTransaction final_token_transaction = 1;
+    bytes final_token_transaction_hash = 2 [(validate.rules).bytes.len = 32];
+    spark_token.InputTtxoSignaturesPerOperator
+        input_ttxo_signatures_per_operator = 3;
+    bytes owner_identity_public_key = 4 [(validate.rules).bytes.len = 33];
+}
+
+message SignTokenTransactionFromCoordinationResponse {
+    // The signature from this SO
+    bytes spark_operator_signature = 1 [
+        (validate.rules).bytes.min_len = 64,
+        (validate.rules).bytes.max_len = 73
+    ];
+}
+
+message OperatorTransactionSignature {
+    bytes operator_identity_public_key = 1 [(validate.rules).bytes.len = 33];
+    bytes signature                    = 2 [
+        (validate.rules).bytes.min_len = 64,
+        (validate.rules).bytes.max_len = 73
+    ];
+}
+
+message RevocationSecretShare {
+    string input_ttxo_id = 1 [deprecated = true];  // Deprecated: TTXO IDs differ per SO; use input_ttxo_ref instead
+    bytes secret_share   = 2;
+    spark_token.TokenOutputToSpend input_ttxo_ref = 3;
+}
+
+message OperatorRevocationShares {
+    bytes operator_identity_public_key    = 1 [(validate.rules).bytes.len = 33];
+    repeated RevocationSecretShare shares = 2;
+}
+
+// === Revocation Secret Exchange ===
+message ExchangeRevocationSecretsSharesRequest {
+    spark_token.TokenTransaction final_token_transaction = 1;
+    bytes final_token_transaction_hash = 2 [(validate.rules).bytes.len = 32];
+    repeated OperatorTransactionSignature operator_transaction_signatures = 3;
+    // The revocation secret shares this SO is revealing, grouped by operator
+    repeated OperatorRevocationShares operator_shares = 4;
+    bytes operator_identity_public_key = 5 [(validate.rules).bytes.len = 33];
+    repeated OutputToSpend outputs_to_spend = 6;
+}
+
+message ExchangeRevocationSecretsSharesResponse {
+    // The revocation secret shares from other SOs, grouped by operator
+    repeated OperatorRevocationShares received_operator_shares = 1;
+}
+
+message OutputToSpend {
+    bytes created_token_transaction_hash = 1 [(validate.rules).bytes.len = 32];
+    uint32 created_token_transaction_vout = 2;
+    uint32 spent_token_transaction_vout = 3;
+    bytes spent_ownership_signature = 4 [
+        (validate.rules).bytes.min_len = 64,
+        (validate.rules).bytes.max_len = 73
+    ];
+}
+
+message UnencodedTokenIdentifier {
+    uint32 version = 1; 
+    bytes issuer_public_key = 2 [(validate.rules).bytes.len = 33];
+    string token_name = 3 [(validate.rules).string = {max_len: 20}];  
+    string token_ticker = 4 [(validate.rules).string = {max_len: 6}];
+    uint32 decimals = 5 [(validate.rules).uint32.lte = 255];
+    bytes max_supply = 6 [(validate.rules).bytes.len = 16];
+    bool is_freezable = 7;
+    spark.Network network = 8 [(validate.rules).enum.defined_only = true];
+    bytes creation_entity_public_key = 9 [(validate.rules).bytes.len = 33];
+    optional bytes extra_metadata = 10 [(validate.rules).bytes = {max_len: 1024}];
+}
+message SignTokenTransactionRequest {
+    // TODO: After the switch to require V3+ transactions, stop accepting the legacy tx shape in favor of the new Partial/Final shapes.
+    spark_token.TokenTransaction final_token_transaction = 1;
+    repeated spark_token.SignatureWithIndex
+        token_transaction_signatures = 2;
+    repeated string keyshare_ids = 3 [
+        (validate.rules).repeated.items.string.uuid = true
+    ];
+    bytes coordinator_public_key = 4  [(validate.rules).bytes.len = 33];
+}
+
+message SignTokenTransactionResponse {
+    // The signature from this SO
+    bytes spark_operator_signature = 1 [
+        (validate.rules).bytes.min_len = 64,
+        (validate.rules).bytes.max_len = 73
+    ];
+}
+
+// Internal freeze tokens request (SO-to-SO)
+message InternalFreezeTokensRequest {
+    spark_token.FreezeTokensPayload freeze_tokens_payload = 1;
+    bytes issuer_signature = 2 [(validate.rules).bytes.min_len = 64, (validate.rules).bytes.max_len = 73];
+}
+
+message InternalFreezeTokensResponse {
+    repeated spark_token.TokenOutputRef impacted_token_outputs = 1;
+    bytes impacted_token_amount = 2;  // Decoded uint128
+}

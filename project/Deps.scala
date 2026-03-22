@@ -697,4 +697,6 @@ object Deps {
     Compile.akkaStream,
     Compile.slf4j
   )
+
+  def sparkRpc = lndRpc
 }
