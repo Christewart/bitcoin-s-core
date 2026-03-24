@@ -699,4 +699,6 @@ object Deps {
   )
 
   def sparkRpc = lndRpc
+
+  def sparkRpcTest = eclairRpcTest
 }
