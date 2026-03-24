@@ -245,7 +245,8 @@ lazy val `bitcoin-s` = project
     torTest,
     scripts,
     clightningRpc,
-    clightningRpcTest
+    clightningRpcTest,
+    sparkRpc
   )
   .dependsOn(
     secp256k1jni,
@@ -299,7 +300,8 @@ lazy val `bitcoin-s` = project
     torTest,
     scripts,
     clightningRpc,
-    clightningRpcTest
+    clightningRpcTest,
+    sparkRpc
   )
   .settings(CommonSettings.settings: _*)
   // unidoc aggregates Scaladocs for all subprojects into one big doc
