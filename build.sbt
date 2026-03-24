@@ -165,6 +165,16 @@ lazy val sparkRpc = project
   .dependsOn(coreJVM)
   .enablePlugins(PekkoGrpcPlugin)
 
+lazy val sparkRpcTest = project
+  .in(file("spark-rpc-test"))
+  .settings(scalacOptions += "-Xsource:3")
+  .settings(CommonSettings.testSettings: _*)
+  .settings(
+    libraryDependencies ++= Deps.sparkRpcTest.value,
+    name := "bitcoin-s-spark-rpc-test"
+  )
+  .dependsOn(coreJVM % testAndCompile, testkit, sparkRpc)
+
 lazy val tor = project
   .in(file("tor"))
   .settings(scalacOptions += "-Xsource:3")
@@ -301,7 +311,8 @@ lazy val `bitcoin-s` = project
     scripts,
     clightningRpc,
     clightningRpcTest,
-    sparkRpc
+    sparkRpc,
+    sparkRpcTest
   )
   .settings(CommonSettings.settings: _*)
   // unidoc aggregates Scaladocs for all subprojects into one big doc
