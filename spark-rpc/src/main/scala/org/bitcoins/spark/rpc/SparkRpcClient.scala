@@ -1,15 +1,30 @@
 package org.bitcoins.spark.rpc
 
+import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
+import io.grpc.{
+  CallOptions,
+  Channel,
+  ClientCall,
+  ClientInterceptor,
+  Metadata,
+  MethodDescriptor
+}
+import io.grpc.ForwardingClientCall.SimpleForwardingClientCall
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.grpc.GrpcClientSettings
 import org.apache.pekko.stream.scaladsl.Source
 import org.bitcoins.core.util.StartStopAsync
+import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey}
 import org.bitcoins.spark.rpc.proto.spark._
 import org.bitcoins.spark.rpc.proto.spark.authn._
 import org.bitcoins.spark.rpc.proto.spark.token._
+import scodec.bits.ByteVector
 
+import java.security.cert.X509Certificate
+import java.util.concurrent.atomic.AtomicReference
+import javax.net.ssl.X509TrustManager
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A client for the Spark RPC server
@@ -20,12 +35,69 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
 
   implicit val ec: ExecutionContext = system.dispatcher
 
-  private val settings = GrpcClientSettings
+  /** A TrustManager that accepts any certificate — for local dev only. */
+  private val trustAllCerts: X509TrustManager = new X509TrustManager {
+    override def checkClientTrusted(
+        chain: Array[X509Certificate],
+        authType: String): Unit = ()
+    override def checkServerTrusted(
+        chain: Array[X509Certificate],
+        authType: String): Unit = ()
+    override def getAcceptedIssuers: Array[X509Certificate] = Array.empty
+  }
+
+  private val useTls = instance.rpcUri.getScheme == "https"
+
+  // Holds the session token obtained after a successful login().
+  // All gRPC calls automatically include it via authInterceptor once set.
+  private val tokenRef: AtomicReference[Option[String]] =
+    new AtomicReference(None)
+
+  private val AUTH_HEADER: Metadata.Key[String] =
+    Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER)
+
+  /** gRPC interceptor that attaches `Authorization: bearer <token>` to every
+    * outbound call whenever a session token is present.
+    */
+  private val authInterceptor: ClientInterceptor = new ClientInterceptor {
+
+    override def interceptCall[ReqT, RespT](
+        method: MethodDescriptor[ReqT, RespT],
+        callOptions: CallOptions,
+        next: Channel): ClientCall[ReqT, RespT] = {
+      new SimpleForwardingClientCall[ReqT, RespT](
+        next.newCall(method, callOptions)) {
+
+        override def start(
+            responseListener: ClientCall.Listener[RespT],
+            headers: Metadata): Unit = {
+          tokenRef.get().foreach { token =>
+            headers.put(AUTH_HEADER, token)
+          }
+          super.start(responseListener, headers)
+        }
+      }
+    }
+  }
+
+  private val baseSettings = GrpcClientSettings
     .connectToServiceAt(
       instance.rpcUri.getHost,
       instance.rpcUri.getPort
     )
-    .withTls(instance.rpcUri.getScheme == "https")
+    .withTls(useTls)
+
+  private val settings = {
+    val withTlsSettings = instance match {
+      case local: SparkInstanceLocal if local.trustSelfSigned && useTls =>
+        baseSettings.withTrustManager(trustAllCerts)
+      case _ =>
+        baseSettings
+    }
+    withTlsSettings.withChannelBuilderOverrides(
+      _.intercept(authInterceptor)
+    )
+  }
 
   // Assuming generated client name
   private val sparkClient = SparkServiceClient(settings)
@@ -40,6 +112,48 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
       _ <- sparkAuthnClient.close()
       _ <- sparkTokenClient.close()
     } yield this
+  }
+
+  /** Authenticate with the Spark operator using a secp256k1 identity key.
+    *
+    * Performs the challenge-response flow:
+    *   1. Requests a challenge for the identity public key. 2. Signs the
+    *      serialized [[Challenge]] proto bytes with the private key. 3. Sends
+    *      the signature back and stores the returned session token.
+    *
+    * All subsequent calls on this client will automatically include the token
+    * in the `Authorization` header.
+    */
+  def login(identityKey: ECPrivateKey): Future[Unit] = {
+    val pubKeyBytes: ByteString =
+      ByteString.copyFrom(identityKey.publicKey.bytes.toArray)
+
+    val challengeReq = GetChallengeRequest(publicKey = pubKeyBytes)
+
+    sparkAuthnClient.get_challenge(challengeReq).flatMap { challengeResp =>
+      val protectedChallenge = challengeResp.protectedChallenge.getOrElse(
+        throw new RuntimeException(
+          "Spark operator returned no protected_challenge")
+      )
+      val challenge = protectedChallenge.challenge.getOrElse(
+        throw new RuntimeException("Protected challenge contained no challenge")
+      )
+
+      // Sign the SHA-256 hash of the serialized Challenge proto bytes.
+      val challengeBytes = ByteVector(challenge.toByteArray)
+      val hash = CryptoUtil.sha256(challengeBytes)
+      val signature = identityKey.sign(hash.bytes)
+
+      val verifyReq = VerifyChallengeRequest(
+        protectedChallenge = Some(protectedChallenge),
+        signature = ByteString.copyFrom(signature.bytes.toArray),
+        publicKey = pubKeyBytes
+      )
+
+      sparkAuthnClient.verify_challenge(verifyReq).map { verifyResp =>
+        tokenRef.set(Some(verifyResp.sessionToken))
+      }
+    }
   }
 
   def generateDepositAddress(
