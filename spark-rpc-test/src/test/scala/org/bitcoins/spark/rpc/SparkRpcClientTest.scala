@@ -2,7 +2,10 @@ package org.bitcoins.spark.rpc
 
 import com.google.protobuf.ByteString
 import org.bitcoins.crypto.{ECPrivateKey, ECPublicKey}
-import org.bitcoins.spark.rpc.proto.spark.GenerateDepositAddressRequest
+import org.bitcoins.spark.rpc.proto.spark.{
+  GenerateDepositAddressRequest,
+  Network
+}
 import org.bitcoins.testkit.util.BitcoinSAsyncTest
 import scodec.bits.ByteVector
 
@@ -28,10 +31,12 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     // Signing key is the secp256k1 key associated with the deposit address.
     val identityKey = ECPrivateKey.freshPrivateKey
     val signingKey = ECPublicKey.freshPublicKey
+    val network = Network.REGTEST
 
     val req = GenerateDepositAddressRequest(
       signingPublicKey = signingKey.bytes,
-      identityPublicKey = identityKey.publicKey.bytes
+      identityPublicKey = identityKey.publicKey.bytes,
+      network = network
     )
     for {
       _ <- client.login(identityKey)
