@@ -24,7 +24,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
   implicit def byteStringToByteVec(byteString: ByteString): ByteVector =
     ByteVector(byteString.toByteArray)
 
-  it must "generate a deposit address" in {
+  it must "deposit into a spark entity" in {
     val sparkInstance =
       SparkInstanceLocal(
         new java.net.URI("https://localhost:8535"),
