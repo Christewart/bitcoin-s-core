@@ -17,9 +17,10 @@ import org.apache.pekko.grpc.GrpcClientSettings
 import org.apache.pekko.stream.scaladsl.Source
 import org.bitcoins.core.util.StartStopAsync
 import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey}
-import org.bitcoins.spark.rpc.proto.spark._
-import org.bitcoins.spark.rpc.proto.spark.authn._
-import org.bitcoins.spark.rpc.proto.spark.token._
+import org.bitcoins.spark.rpc.proto.frost.*
+import org.bitcoins.spark.rpc.proto.spark.*
+import org.bitcoins.spark.rpc.proto.spark.authn.*
+import org.bitcoins.spark.rpc.proto.spark.token.*
 import scodec.bits.ByteVector
 
 import java.security.cert.X509Certificate
@@ -103,6 +104,7 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
   private val sparkClient = SparkServiceClient(settings)
   private val sparkAuthnClient = SparkAuthnServiceClient(settings)
   private val sparkTokenClient = SparkTokenServiceClient(settings)
+  private val frostClient = FrostServiceClient(settings)
 
   override def start(): Future[SparkRpcClient] = Future.successful(this)
 
@@ -111,6 +113,7 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
       _ <- sparkClient.close()
       _ <- sparkAuthnClient.close()
       _ <- sparkTokenClient.close()
+      _ <- frostClient.close()
     } yield this
   }
 
@@ -440,5 +443,59 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
       request: BroadcastTransactionRequest
   ): Future[BroadcastTransactionResponse] = {
     sparkTokenClient.broadcast_transaction(request)
+  }
+
+  // FrostService methods
+
+  def echo(request: EchoRequest): Future[EchoResponse] = {
+    frostClient.echo(request)
+  }
+
+  def dkgRound1(request: DkgRound1Request): Future[DkgRound1Response] = {
+    frostClient.dkg_round1(request)
+  }
+
+  def dkgRound2(request: DkgRound2Request): Future[DkgRound2Response] = {
+    frostClient.dkg_round2(request)
+  }
+
+  def dkgRound3(request: DkgRound3Request): Future[DkgRound3Response] = {
+    frostClient.dkg_round3(request)
+  }
+
+  def frostNonce(request: FrostNonceRequest): Future[FrostNonceResponse] = {
+    frostClient.frost_nonce(request)
+  }
+
+  def signFrost(request: SignFrostRequest): Future[SignFrostResponse] = {
+    frostClient.sign_frost(request)
+  }
+
+  def aggregateFrost(
+      request: AggregateFrostRequest
+  ): Future[AggregateFrostResponse] = {
+    frostClient.aggregate_frost(request)
+  }
+
+  def validateSignatureShare(
+      request: ValidateSignatureShareRequest
+  ): Future[Empty] = {
+    frostClient.validate_signature_share(request)
+  }
+
+  def signFrostV2(request: SignFrostRequestV2): Future[SignFrostResponse] = {
+    frostClient.sign_frost_v2(request)
+  }
+
+  def aggregateFrostV2(
+      request: AggregateFrostRequestV2
+  ): Future[AggregateFrostResponse] = {
+    frostClient.aggregate_frost_v2(request)
+  }
+
+  def validateSignatureShareV2(
+      request: ValidateSignatureShareRequestV2
+  ): Future[Empty] = {
+    frostClient.validate_signature_share_v2(request)
   }
 }

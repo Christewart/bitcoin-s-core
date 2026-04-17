@@ -106,7 +106,8 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
                                                            signingKey)
       depositTreeCreation <- sparkClient.startDepositTreeCreation(
         depositTreeCreationReq)
-      _ = logger.info(s"Starting deposit tree creation: ${depositTreeCreation.treeId}")
+      _ = logger.info(
+        s"Starting deposit tree creation: ${depositTreeCreation.treeId}")
       balanceReq = QueryBalanceRequest(identityPublicKey =
                                          identityKey.publicKey.bytes,
                                        network = network)
