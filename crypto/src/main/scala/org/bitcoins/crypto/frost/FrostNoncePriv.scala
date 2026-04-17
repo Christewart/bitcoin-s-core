@@ -63,4 +63,10 @@ object FrostNoncePriv extends Factory[FrostNoncePriv] {
     FrostNoncePriv(ECPrivateKey.fromFieldElement(fe1),
                    ECPrivateKey.fromFieldElement(fe2))
   }
+
+  def fresh(): FrostNoncePriv = {
+    val k1 = ECPrivateKey.freshPrivateKey
+    val k2 = ECPrivateKey.freshPrivateKey
+    apply(k1, k2)
+  }
 }
