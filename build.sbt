@@ -256,7 +256,8 @@ lazy val `bitcoin-s` = project
     scripts,
     clightningRpc,
     clightningRpcTest,
-    sparkRpc
+    sparkRpc,
+    sparkRpcTest,
   )
   .dependsOn(
     secp256k1jni,

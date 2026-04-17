@@ -1,7 +1,7 @@
 package org.bitcoins.core.protocol.transaction
 
 import org.bitcoins.core.currency.{CurrencyUnit, CurrencyUnits}
-import org.bitcoins.core.protocol.script.ScriptPubKey
+import org.bitcoins.core.protocol.script.{NonStandardScriptPubKey, ScriptPubKey}
 import org.bitcoins.core.serializers.transaction.RawTransactionOutputParser
 import org.bitcoins.crypto.{Factory, NetworkElement}
 import scodec.bits.ByteVector
@@ -22,6 +22,11 @@ object TransactionOutput extends Factory[TransactionOutput] {
   def fromBytes(bytes: ByteVector): TransactionOutput =
     RawTransactionOutputParser.read(bytes)
 
+  val ephemeralAnchor: TransactionOutput = {
+    val spk =
+      NonStandardScriptPubKey.fromAsmBytes(ByteVector.fromValidHex("51024e73"))
+    TransactionOutput(CurrencyUnits.zero, spk)
+  }
 }
 
 case class OutputWithIndex(output: TransactionOutput, index: Int)
