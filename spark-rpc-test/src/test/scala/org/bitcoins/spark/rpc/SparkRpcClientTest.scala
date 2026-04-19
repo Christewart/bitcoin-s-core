@@ -22,10 +22,17 @@ import org.bitcoins.core.protocol.transaction.{
 import org.bitcoins.core.util.EnvUtil
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto.frost.FrostNoncePriv
-import org.bitcoins.crypto.ECPrivateKey
+import org.bitcoins.crypto.{ECPrivateKey, ECPublicKey}
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.rpc.config.BitcoindInstanceLocal
 import org.bitcoins.spark.rpc.proto.common.SigningCommitment
+import org.bitcoins.spark.rpc.proto.frost.{
+  FrostSigningJob,
+  KeyPackage,
+  SignFrostRequest,
+  SigningNonce
+}
+import org.bitcoins.spark.rpc.proto.frost.SigningRole.USER
 import org.bitcoins.spark.rpc.proto.spark.*
 import org.bitcoins.testkit.util.BitcoinSAsyncTest
 import scodec.bits.ByteVector
@@ -100,14 +107,23 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       _ = logger.info(s"Deposit txid=$depositTxId")
       _ <- bitcoind.generate(6)
       _ <- AsyncUtil.nonBlockingSleep(5.seconds)
-      depositTreeCreationReq = buildDepositTreeCreationReq(identityKey,
+      (depositTreeCreationReq, signingArtifacts) = buildDepositTreeCreationReq(identityKey,
                                                            depositTx,
                                                            amt,
                                                            signingKey)
       depositTreeCreation <- sparkClient.startDepositTreeCreation(
         depositTreeCreationReq)
       _ = logger.info(
-        s"Starting deposit tree creation: ${depositTreeCreation.treeId}")
+        s"Starting deposit tree creation: ${depositTreeCreation.treeId}, beginning signing flow...")
+      frostJobs = toFrostSigningJobs(
+        jobs = signingArtifacts.map(a => (a.job, a)),
+        verifyingKey = signingPubKey, //TODO NOT RIGHT
+        userKeyPackage = ???,
+        sparkEntityCommitmentsResp = ???
+      )
+      frostReq = SignFrostRequest(signingJobs = frostJobs, role = USER)
+      frostResponse <- sparkClient.signFrost(frostReq)
+
       balanceReq = QueryBalanceRequest(identityPublicKey =
                                          identityKey.publicKey.bytes,
                                        network = network)
@@ -124,7 +140,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       identityKey: ECPrivateKey,
       depositTx: Transaction,
       fundingAmt: CurrencyUnit,
-      signingKey: ECPrivateKey): StartDepositTreeCreationRequest = {
+      signingKey: ECPrivateKey): (StartDepositTreeCreationRequest, Vector[PreparedTxSigningArtifacts]) = {
     val vout = depositTx.outputs.zipWithIndex
       .find(_._1.value == fundingAmt)
       .get
@@ -180,7 +196,31 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       refundTxSigningJob = cpfpRefundTxSigningJobOpt,
       directFromCpfpRefundTxSigningJob = directFromCpfpRefundTxSigningJobOpt
     )
-    depositTreeCreationReq
+
+    val signingArtifacts = Vector(
+        PreparedTxSigningArtifacts(
+            rawTx = rootTx.bytes,
+            fundingTx = depositTx,
+            voutIdx = vout,
+            nonce = depositNonce,
+            job = rootTxSigningJobOpt.get
+        ),
+        PreparedTxSigningArtifacts(
+            rawTx = cpfpRefundTx.bytes,
+            fundingTx = rootTx,
+            voutIdx = 0,
+            nonce = cpfpRefundNonce,
+            job = cpfpRefundTxSigningJobOpt.get
+        ),
+        PreparedTxSigningArtifacts(
+            rawTx = directFromCpfpRefundTx.bytes,
+            fundingTx = rootTx,
+            voutIdx = 0,
+            nonce = cpfpRefundNonce,
+            job = directFromCpfpRefundTxSigningJobOpt.get
+        )
+    )
+    (depositTreeCreationReq,signingArtifacts)
   }
 
   private def buildRootTx(
@@ -245,5 +285,33 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       witness = TransactionWitness.fromWitOpt(Vector(None))
     )
     refund
+  }
+
+  private def toFrostSigningJobs(
+      jobs: Vector[(SigningJob, PreparedTxSigningArtifacts)],
+      verifyingKey: ECPublicKey,
+      userKeyPackage: KeyPackage,
+      sparkEntityCommitmentsResp: GetSigningCommitmentsResponse)
+      : Vector[FrostSigningJob] = {
+    jobs.zipWithIndex.map { case ((j, signingArtifact), idx) =>
+      val jobId = java.util.UUID.randomUUID().toString
+      logger.info(
+        s"Converting signing job ${j.getClass.getSimpleName} to frost signing job with id $jobId")
+      FrostSigningJob(
+        jobId = jobId,
+        message = signingArtifact.sighash,
+        keyPackage = Some(userKeyPackage),
+        verifyingKey = verifyingKey.bytes,
+        nonce = Some(
+          SigningNonce(
+            hiding = signingArtifact.nonce.k1.bytes,
+            binding = signingArtifact.nonce.k2.bytes
+          )),
+        userCommitments = j.signingNonceCommitment,
+        commitments = sparkEntityCommitmentsResp
+          .signingCommitments(idx)
+          .signingNonceCommitments
+      )
+    }
   }
 }
