@@ -4,35 +4,27 @@ import com.google.protobuf.ByteString
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.{Int32, UInt32}
-import org.bitcoins.core.protocol.BitcoinAddress
+import org.bitcoins.core.protocol.Bech32mAddress
 import org.bitcoins.core.protocol.script.{
   ScriptPubKey,
   ScriptSignature,
   TaprootScriptPubKey
 }
-import org.bitcoins.core.protocol.transaction.{
-  Transaction,
-  TransactionConstants,
-  TransactionInput,
-  TransactionOutPoint,
-  TransactionOutput,
-  TransactionWitness,
-  WitnessTransaction
-}
+import org.bitcoins.core.protocol.transaction.*
 import org.bitcoins.core.util.EnvUtil
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto.frost.FrostNoncePriv
-import org.bitcoins.crypto.{ECPrivateKey, ECPublicKey}
+import org.bitcoins.crypto.{ECPrivateKey, XOnlyPubKey}
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.rpc.config.BitcoindInstanceLocal
 import org.bitcoins.spark.rpc.proto.common.SigningCommitment
+import org.bitcoins.spark.rpc.proto.frost.SigningRole.USER
 import org.bitcoins.spark.rpc.proto.frost.{
   FrostSigningJob,
   KeyPackage,
   SignFrostRequest,
   SigningNonce
 }
-import org.bitcoins.spark.rpc.proto.frost.SigningRole.USER
 import org.bitcoins.spark.rpc.proto.spark.*
 import org.bitcoins.testkit.util.BitcoinSAsyncTest
 import scodec.bits.ByteVector
@@ -82,8 +74,16 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       QueryUnusedDepositAddressesRequest(identityPublicKey =
                                            identityKey.publicKey.bytes,
                                          network = network)
-
+    val userId = java.util.UUID.randomUUID().toString
+    val pubShares = Map(userId -> byteVecToByteString(signingPubKey.bytes))
+    val userKeyPackage = KeyPackage(identifier = userId,
+                                    secretShare = signingKey.bytes,
+                                    publicShares = pubShares,
+                                    minSigners = 1)
     val amt = Bitcoins.one
+    val getSigningCommitmentReq =
+      GetSigningCommitmentsRequest(count = 3, nodeIdCount = 1)
+
     for {
       _ <- sparkClient.login(identityKey)
       info <- sparkClient.generateDepositAddress(req)
@@ -97,33 +97,39 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       _ = assert(
         depositAddresses.depositAddresses.exists(
           _.depositAddress == address.address))
-
-      depositTxId <- bitcoind.sendToAddress(
-        BitcoinAddress.fromString(address.address),
-        amt,
-        walletName = "default")
+      depositAddress = Bech32mAddress.fromString(address.address)
+      depositTxId <- bitcoind.sendToAddress(address = depositAddress,
+                                            amt,
+                                            walletName = "default")
       depositTx <- bitcoind.getRawTransactionRaw(depositTxId)
 
       _ = logger.info(s"Deposit txid=$depositTxId")
       _ <- bitcoind.generate(6)
       _ <- AsyncUtil.nonBlockingSleep(5.seconds)
-      (depositTreeCreationReq, signingArtifacts) = buildDepositTreeCreationReq(identityKey,
-                                                           depositTx,
-                                                           amt,
-                                                           signingKey)
+      (depositTreeCreationReq, signingArtifacts) = buildDepositTreeCreationReq(
+        identityKey,
+        depositTx,
+        amt,
+        signingKey)
       depositTreeCreation <- sparkClient.startDepositTreeCreation(
         depositTreeCreationReq)
       _ = logger.info(
         s"Starting deposit tree creation: ${depositTreeCreation.treeId}, beginning signing flow...")
+      getSigningCommitmentResp <- sparkClient.getSigningCommitments(
+        getSigningCommitmentReq)
       frostJobs = toFrostSigningJobs(
-        jobs = signingArtifacts.map(a => (a.job, a)),
-        verifyingKey = signingPubKey, //TODO NOT RIGHT
-        userKeyPackage = ???,
-        sparkEntityCommitmentsResp = ???
+        jobs = signingArtifacts,
+        verifyingKey =
+          depositAddress.scriptPubKey.asInstanceOf[TaprootScriptPubKey].pubKey,
+        userKeyPackage = userKeyPackage,
+        sparkEntityCommitmentsResp = getSigningCommitmentResp
       )
       frostReq = SignFrostRequest(signingJobs = frostJobs, role = USER)
+      _ = logger.info(
+        s"Attempting to sign frost with ${frostJobs.size} signing jobs")
       frostResponse <- sparkClient.signFrost(frostReq)
-
+      _ = logger.info(
+        s"Done signing ${frostJobs.size} ${frostResponse.results.keys}")
       balanceReq = QueryBalanceRequest(identityPublicKey =
                                          identityKey.publicKey.bytes,
                                        network = network)
@@ -140,8 +146,9 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       identityKey: ECPrivateKey,
       depositTx: Transaction,
       fundingAmt: CurrencyUnit,
-      signingKey: ECPrivateKey): (StartDepositTreeCreationRequest, Vector[PreparedTxSigningArtifacts]) = {
-    val vout = depositTx.outputs.zipWithIndex
+      signingKey: ECPrivateKey): (StartDepositTreeCreationRequest,
+                                  Vector[PreparedTxSigningArtifacts]) = {
+    val depositOutputIdx = depositTx.outputs.zipWithIndex
       .find(_._1.value == fundingAmt)
       .get
       ._2
@@ -151,7 +158,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     val depositNonce = FrostNoncePriv.fresh()
     val cpfpRefundNonce = FrostNoncePriv.fresh()
     val utxoOpt = Some(
-      UTXO(rawTx = depositTx.bytes, vout = vout, network = network))
+      UTXO(rawTx = depositTx.bytes, vout = depositOutputIdx, network = network))
     val depositSigningCommitment = SigningCommitment(
       hiding = depositNonce.k1.publicKey.bytes,
       binding = depositNonce.k2.publicKey.bytes
@@ -160,7 +167,15 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       hiding = cpfpRefundNonce.k1.publicKey.bytes,
       binding = cpfpRefundNonce.k2.publicKey.bytes
     )
-    val rootTx = buildRootTx(depositTx, vout)
+    val rootTx = buildRootTx(depositTx, depositOutputIdx)
+    val rootTxOutputIdx = rootTx.outputs.zipWithIndex
+      .find(_._1.value == fundingAmt)
+      .get
+      ._2
+    logger.info(
+      s"Deposit tx outpoint: ${depositTx.txIdBE.hex}:${depositOutputIdx}")
+    logger.info(
+      s"Root tx outpoint: ${rootTx.txIdBE.hex}:${rootTxOutputIdx} output count=${rootTx.outputs.size}")
     val rootTxSigningJobOpt = Some(
       SigningJob(
         signingPublicKey = signingKey.publicKey.bytes,
@@ -170,7 +185,9 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     val refundSPK =
       TaprootScriptPubKey.fromInternalKey(signingKey.toXOnly)
     val cpfpRefundTx =
-      buildCpfpRefundTx(rootTx = rootTx, vout = vout, refundSPK = refundSPK)
+      buildCpfpRefundTx(rootTx = rootTx,
+                        vout = rootTxOutputIdx,
+                        refundSPK = refundSPK)
     val cpfpRefundTxSigningJobOpt = Some(
       SigningJob(
         signingPublicKey = signingKey.publicKey.bytes,
@@ -179,7 +196,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       ))
     val directFromCpfpRefundTx =
       buildDirectFromCpfpRefundTx(rootTx = rootTx,
-                                  vout = vout,
+                                  vout = rootTxOutputIdx,
                                   refundSPK = refundSPK,
                                   fee = fee)
     val directFromCpfpRefundTxSigningJobOpt = Some(
@@ -198,29 +215,29 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     )
 
     val signingArtifacts = Vector(
-        PreparedTxSigningArtifacts(
-            rawTx = rootTx.bytes,
-            fundingTx = depositTx,
-            voutIdx = vout,
-            nonce = depositNonce,
-            job = rootTxSigningJobOpt.get
-        ),
-        PreparedTxSigningArtifacts(
-            rawTx = cpfpRefundTx.bytes,
-            fundingTx = rootTx,
-            voutIdx = 0,
-            nonce = cpfpRefundNonce,
-            job = cpfpRefundTxSigningJobOpt.get
-        ),
-        PreparedTxSigningArtifacts(
-            rawTx = directFromCpfpRefundTx.bytes,
-            fundingTx = rootTx,
-            voutIdx = 0,
-            nonce = cpfpRefundNonce,
-            job = directFromCpfpRefundTxSigningJobOpt.get
-        )
+      PreparedTxSigningArtifacts(
+        rawTx = rootTx.bytes,
+        fundingTx = depositTx,
+        voutIdx = depositOutputIdx,
+        nonce = depositNonce,
+        job = rootTxSigningJobOpt.get
+      ),
+      PreparedTxSigningArtifacts(
+        rawTx = cpfpRefundTx.bytes,
+        fundingTx = rootTx,
+        voutIdx = rootTxOutputIdx,
+        nonce = cpfpRefundNonce,
+        job = cpfpRefundTxSigningJobOpt.get
+      ),
+      PreparedTxSigningArtifacts(
+        rawTx = directFromCpfpRefundTx.bytes,
+        fundingTx = rootTx,
+        voutIdx = rootTxOutputIdx,
+        nonce = cpfpRefundNonce,
+        job = directFromCpfpRefundTxSigningJobOpt.get
+      )
     )
-    (depositTreeCreationReq,signingArtifacts)
+    (depositTreeCreationReq, signingArtifacts)
   }
 
   private def buildRootTx(
@@ -237,11 +254,12 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       TransactionOutput.ephemeralAnchor
     )
     val witness = TransactionWitness.fromWitOpt(Vector(None))
-    WitnessTransaction(version = Int32(3),
-                       inputs = inputs,
-                       outputs = outputs,
-                       lockTime = TransactionConstants.lockTime,
-                       witness)
+    val wtx = WitnessTransaction(version = Int32(3),
+                                 inputs = inputs,
+                                 outputs = outputs,
+                                 lockTime = TransactionConstants.lockTime,
+                                 witness)
+    wtx
   }
   private def buildCpfpRefundTx(
       rootTx: Transaction,
@@ -249,6 +267,8 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       refundSPK: ScriptPubKey): WitnessTransaction = {
     val fundingOutput = rootTx.outputs(vout).value
     val outpoint = TransactionOutPoint(rootTx.txIdBE, vout)
+    logger.info(
+      s"Building cpfp refund tx with outpoint ${outpoint.txId.hex}:${outpoint.vout}")
     val refundSequence = UInt32(2000)
     val inputs = Vector(
       TransactionInput(outpoint, ScriptSignature.empty, refundSequence)
@@ -270,10 +290,11 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       fee: CurrencyUnit): WitnessTransaction = {
     val fundingOutput = rootTx.outputs(vout)
     val sequence = UInt32(2000) + UInt32(50)
+    val outpoint = TransactionOutPoint(rootTx.txIdBE, vout)
+    logger.info(
+      s"Building direct from cpfp refund tx with outpoint ${outpoint.txId.hex}:${outpoint.vout}")
     val inputs = Vector(
-      TransactionInput(TransactionOutPoint(rootTx.txIdBE, vout),
-                       ScriptSignature.empty,
-                       sequence))
+      TransactionInput(outpoint, ScriptSignature.empty, sequence))
     val outputs = Vector(
       TransactionOutput(value = fundingOutput.value - fee, refundSPK)
     )
@@ -288,13 +309,14 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
   }
 
   private def toFrostSigningJobs(
-      jobs: Vector[(SigningJob, PreparedTxSigningArtifacts)],
-      verifyingKey: ECPublicKey,
+      jobs: Vector[PreparedTxSigningArtifacts],
+      verifyingKey: XOnlyPubKey,
       userKeyPackage: KeyPackage,
       sparkEntityCommitmentsResp: GetSigningCommitmentsResponse)
       : Vector[FrostSigningJob] = {
-    jobs.zipWithIndex.map { case ((j, signingArtifact), idx) =>
+    jobs.zipWithIndex.map { case (signingArtifact, idx) =>
       val jobId = java.util.UUID.randomUUID().toString
+      val j = signingArtifact.job
       logger.info(
         s"Converting signing job ${j.getClass.getSimpleName} to frost signing job with id $jobId")
       FrostSigningJob(

@@ -2,15 +2,7 @@ package org.bitcoins.spark.rpc
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
-import io.grpc.{
-  CallOptions,
-  Channel,
-  ClientCall,
-  ClientInterceptor,
-  Metadata,
-  MethodDescriptor
-}
-import io.grpc.ForwardingClientCall.SimpleForwardingClientCall
+import io.grpc.{CallCredentials, Metadata}
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.grpc.GrpcClientSettings
@@ -24,9 +16,11 @@ import org.bitcoins.spark.rpc.proto.spark.token.*
 import scodec.bits.ByteVector
 
 import java.security.cert.X509Certificate
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.X509TrustManager
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 /** A client for the Spark RPC server
   */
@@ -50,35 +44,36 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
   private val useTls = instance.rpcUri.getScheme == "https"
 
   // Holds the session token obtained after a successful login().
-  // All gRPC calls automatically include it via authInterceptor once set.
+  // All gRPC calls automatically include it via callCredentials once set.
   private val tokenRef: AtomicReference[Option[String]] =
     new AtomicReference(None)
 
   private val AUTH_HEADER: Metadata.Key[String] =
     Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER)
 
-  /** gRPC interceptor that attaches `Authorization: bearer <token>` to every
+  /** gRPC CallCredentials that attaches the authorization token to every
     * outbound call whenever a session token is present.
     */
-  private val authInterceptor: ClientInterceptor = new ClientInterceptor {
+  private val callCredentials: CallCredentials = new CallCredentials {
 
-    override def interceptCall[ReqT, RespT](
-        method: MethodDescriptor[ReqT, RespT],
-        callOptions: CallOptions,
-        next: Channel): ClientCall[ReqT, RespT] = {
-      new SimpleForwardingClientCall[ReqT, RespT](
-        next.newCall(method, callOptions)) {
-
-        override def start(
-            responseListener: ClientCall.Listener[RespT],
-            headers: Metadata): Unit = {
+    override def applyRequestMetadata(
+        requestInfo: CallCredentials.RequestInfo,
+        appExecutor: Executor,
+        applier: CallCredentials.MetadataApplier
+    ): Unit = {
+      appExecutor.execute(() => {
+        Try {
+          val metadata = new Metadata()
           tokenRef.get().foreach { token =>
-            headers.put(AUTH_HEADER, token)
+            metadata.put(AUTH_HEADER, token)
           }
-          super.start(responseListener, headers)
+          applier(metadata)
         }
-      }
+        ()
+      })
     }
+
+    override def thisUsesUnstableApi(): Unit = ()
   }
 
   private val baseSettings = GrpcClientSettings
@@ -95,9 +90,7 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
       case _ =>
         baseSettings
     }
-    withTlsSettings.withChannelBuilderOverrides(
-      _.intercept(authInterceptor)
-    )
+    withTlsSettings.withCallCredentials(callCredentials)
   }
 
   // Assuming generated client name
