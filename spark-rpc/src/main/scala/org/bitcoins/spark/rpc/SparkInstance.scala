@@ -3,6 +3,7 @@ import java.net.URI
 
 sealed trait SparkInstance {
   def rpcUri: URI
+  def frostRpcUri: URI
 }
 
 /** A Spark operator instance for local / development use.
@@ -20,5 +21,5 @@ sealed trait SparkInstance {
 case class SparkInstanceLocal(
     rpcUri: URI,
     trustSelfSigned: Boolean = false,
-    frostSignerSocketPath: Option[String] = None
+    frostRpcUri: URI
 ) extends SparkInstance

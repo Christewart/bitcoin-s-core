@@ -47,7 +47,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       SparkInstanceLocal(
         new java.net.URI("https://localhost:8535"),
         trustSelfSigned = true,
-        frostSignerSocketPath = Some("/tmp/frost_0.sock")
+        new java.net.URI("http://localhost:9990")
       )
     val sparkClient = SparkRpcClient(sparkInstance)
 
