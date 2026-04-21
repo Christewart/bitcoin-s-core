@@ -14,7 +14,7 @@ import org.bitcoins.core.protocol.transaction.*
 import org.bitcoins.core.util.EnvUtil
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto.frost.FrostNoncePriv
-import org.bitcoins.crypto.{ECPrivateKey, XOnlyPubKey}
+import org.bitcoins.crypto.{ECPrivateKey, ECPublicKey}
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.rpc.config.BitcoindInstanceLocal
 import org.bitcoins.spark.rpc.proto.common.SigningCommitment
@@ -30,6 +30,7 @@ import org.bitcoins.testkit.util.BitcoinSAsyncTest
 import scodec.bits.ByteVector
 
 import java.nio.file.Paths
+import java.util.UUID
 import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
 
@@ -66,20 +67,26 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     }
     val bitcoindInstance = BitcoindInstanceLocal.fromConfigFile(path.toFile)
     val bitcoind = BitcoindRpcClient(bitcoindInstance)
+    val leafId = UUID.randomUUID().toString
     val req = GenerateDepositAddressRequest(
       identityPublicKey = identityKey.publicKey.bytes,
       signingPublicKey = signingPubKey.bytes,
-      network = network
+      network = network,
+      leafId = Some(leafId)
     )
     val unusedDepositReq =
       QueryUnusedDepositAddressesRequest(identityPublicKey =
                                            identityKey.publicKey.bytes,
                                          network = network)
-    val userId = java.util.UUID.randomUUID().toString
+    // +1 from the embedde spark userid
+    // https://github.com/buildonspark/spark/blob/main/spark/testing/wallet/signing.go#L24
+    val userId =
+      "0000000000000000000000000000000000000000000000000000000000000064"
     val pubShares = Map(userId -> byteVecToByteString(signingPubKey.bytes))
     val userKeyPackage = KeyPackage(identifier = userId,
                                     secretShare = signingKey.bytes,
                                     publicShares = pubShares,
+                                    publicKey = signingPubKey.bytes,
                                     minSigners = 1)
     val amt = Bitcoins.one
     val getSigningCommitmentReq =
@@ -99,6 +106,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
         depositAddresses.depositAddresses.exists(
           _.depositAddress == address.address))
       depositAddress = Bech32mAddress.fromString(address.address)
+      verifyKey = ECPublicKey.fromBytes(address.verifyingKey)
       depositTxId <- bitcoind.sendToAddress(address = depositAddress,
                                             amt,
                                             walletName = "default")
@@ -112,6 +120,9 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
         depositTx,
         amt,
         signingKey)
+      rootTx = signingArtifacts.head.tx
+      cpfpRefundTx = signingArtifacts(1).tx
+      directCpfpRefundTx = signingArtifacts(2).tx
       depositTreeCreation <- sparkClient.startDepositTreeCreation(
         depositTreeCreationReq)
       _ = logger.info(
@@ -120,8 +131,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
         getSigningCommitmentReq)
       frostJobs = toFrostSigningJobs(
         jobs = signingArtifacts,
-        verifyingKey =
-          depositAddress.scriptPubKey.asInstanceOf[TaprootScriptPubKey].pubKey,
+        verifyingKey = verifyKey,
         userKeyPackage = userKeyPackage,
         sparkEntityCommitmentsResp = getSigningCommitmentResp
       )
@@ -131,10 +141,35 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       frostResponse <- sparkClient.signFrost(frostReq)
       _ = logger.info(
         s"Done signing ${frostJobs.size} ${frostResponse.results.keys}")
+      signingResults = frostResponse.results.toVector
+      rootTxSigningJob = toUserSignedTxSigningJob(
+        leafId,
+        rootTx,
+        userSignature = signingResults(0)._2.signatureShare,
+        frostJobs(0))
+      cpfpRefundTxSigningJob = toUserSignedTxSigningJob(
+        leafId,
+        cpfpRefundTx,
+        userSignature = signingResults(1)._2.signatureShare,
+        frostJobs(1))
+      directFromCpfpRefundTxSigningJob = toUserSignedTxSigningJob(
+        leafId,
+        directCpfpRefundTx,
+        userSignature = signingResults(2)._2.signatureShare,
+        frostJobs(2))
+      finalizeDepTreeCreateReq = buildFinalizeDepositTreeCreationReq(
+        depositTreeCreationReq,
+        rootTxSigningJob = rootTxSigningJob,
+        cpfpRefundTxSigningJob = cpfpRefundTxSigningJob,
+        directFromCpfpRefundTxSigningJob = directFromCpfpRefundTxSigningJob
+      )
+      depositResponse <- sparkClient.finalizeDepositTreeCreation(
+        finalizeDepTreeCreateReq)
+      _ = assert(
+        depositResponse.rootNode.exists(_.value == amt.satoshis.toLong))
       balanceReq = QueryBalanceRequest(identityPublicKey =
                                          identityKey.publicKey.bytes,
                                        network = network)
-      _ <- AsyncUtil.nonBlockingSleep(5.second)
       balanceResp <- sparkClient.queryBalance(balanceReq)
     } yield {
       assert(balanceResp.balance == amt.satoshis.toLong)
@@ -311,7 +346,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
 
   private def toFrostSigningJobs(
       jobs: Vector[PreparedTxSigningArtifacts],
-      verifyingKey: XOnlyPubKey,
+      verifyingKey: ECPublicKey,
       userKeyPackage: KeyPackage,
       sparkEntityCommitmentsResp: GetSigningCommitmentsResponse)
       : Vector[FrostSigningJob] = {
@@ -337,4 +372,35 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       )
     }
   }
+
+  private def buildFinalizeDepositTreeCreationReq(
+      depositTreeCreationReq: StartDepositTreeCreationRequest,
+      rootTxSigningJob: UserSignedTxSigningJob,
+      cpfpRefundTxSigningJob: UserSignedTxSigningJob,
+      directFromCpfpRefundTxSigningJob: UserSignedTxSigningJob)
+      : FinalizeDepositTreeCreationRequest = {
+    FinalizeDepositTreeCreationRequest(
+      identityPublicKey = depositTreeCreationReq.identityPublicKey,
+      onChainUtxo = depositTreeCreationReq.onChainUtxo,
+      rootTxSigningJob = Some(rootTxSigningJob),
+      refundTxSigningJob = Some(cpfpRefundTxSigningJob),
+      directFromCpfpRefundTxSigningJob = Some(directFromCpfpRefundTxSigningJob)
+    )
+  }
+
+  private def toUserSignedTxSigningJob(
+      leafId: String,
+      transaction: Transaction,
+      userSignature: ByteVector,
+      frostSigningJob: FrostSigningJob): UserSignedTxSigningJob = {
+    UserSignedTxSigningJob(
+      leafId = leafId,
+      signingPublicKey = frostSigningJob.keyPackage.map(_.publicKey).get,
+      rawTx = transaction.bytes,
+      signingNonceCommitment = frostSigningJob.userCommitments,
+      userSignature = userSignature,
+      signingCommitments = Some(SigningCommitments(frostSigningJob.commitments))
+    )
+  }
+
 }
