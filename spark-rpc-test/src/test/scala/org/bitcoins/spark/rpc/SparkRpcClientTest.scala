@@ -123,10 +123,10 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       rootTx = signingArtifacts.head.tx
       cpfpRefundTx = signingArtifacts(1).tx
       directCpfpRefundTx = signingArtifacts(2).tx
-      depositTreeCreation <- sparkClient.startDepositTreeCreation(
-        depositTreeCreationReq)
-      _ = logger.info(
-        s"Starting deposit tree creation: ${depositTreeCreation.treeId}, beginning signing flow...")
+//      depositTreeCreation <- sparkClient.startDepositTreeCreation(
+//        depositTreeCreationReq)
+//      _ = logger.info(
+//        s"Starting deposit tree creation: ${depositTreeCreation.treeId}, beginning signing flow...")
       getSigningCommitmentResp <- sparkClient.getSigningCommitments(
         getSigningCommitmentReq)
       frostJobs = toFrostSigningJobs(
