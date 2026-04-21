@@ -3,10 +3,9 @@ package org.bitcoins.spark.rpc
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import io.grpc.{CallCredentials, Metadata}
-import io.grpc.netty.shaded.io.grpc.netty.NettyChannelBuilder
 import org.apache.pekko.NotUsed
 import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.grpc.{GrpcChannel, GrpcClientSettings}
+import org.apache.pekko.grpc.{GrpcClientSettings}
 import org.apache.pekko.stream.scaladsl.Source
 import org.bitcoins.core.util.StartStopAsync
 import org.bitcoins.crypto.{CryptoUtil, ECPrivateKey}
@@ -43,6 +42,7 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
   }
 
   private val useTls = instance.rpcUri.getScheme == "https"
+  private val useFrostTls = instance.frostRpcUri.getScheme == "https"
 
   // Holds the session token obtained after a successful login().
   // All gRPC calls automatically include it via callCredentials once set.
@@ -84,6 +84,13 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
     )
     .withTls(useTls)
 
+  private val baseFrostSettings = GrpcClientSettings
+    .connectToServiceAt(
+      instance.frostRpcUri.getHost,
+      instance.frostRpcUri.getPort
+    )
+    .withTls(useFrostTls)
+
   private val settings = {
     val withTlsSettings = instance match {
       case local: SparkInstanceLocal if local.trustSelfSigned && useTls =>
@@ -94,35 +101,19 @@ case class SparkRpcClient(instance: SparkInstance)(implicit
     withTlsSettings.withCallCredentials(callCredentials)
   }
 
+  private val frostSettings = {
+    val withTlsSettings = instance match {
+      case local: SparkInstanceLocal if local.trustSelfSigned && useFrostTls =>
+        baseFrostSettings.withTrustManager(trustAllCerts)
+      case _ =>
+        baseFrostSettings
+    }
+    withTlsSettings.withCallCredentials(callCredentials)
+  }
+
   // Create a separate gRPC client for FROST signing via Unix socket
-  private lazy val frostClient: FrostServiceClient = instance match {
-    case local: SparkInstanceLocal if local.frostSignerSocketPath.isDefined =>
-      // Build a direct gRPC channel for Unix domain socket connection
-      val socketPath = local.frostSignerSocketPath.get
-      val managedChannel = NettyChannelBuilder
-        .forAddress(
-          new io.grpc.netty.shaded.io.netty.channel.unix.DomainSocketAddress(
-            socketPath
-          )
-        )
-        // Explicitly set the channel type for Unix domain sockets
-        .channelType(
-          classOf[
-            io.grpc.netty.shaded.io.netty.channel.unix.DomainSocketChannel]
-        )
-        .usePlaintext()
-        // Use direct executor to avoid extra threads for local socket
-        .directExecutor()
-        .build()
-
-      // Cast the ManagedChannel to GrpcChannel
-      val grpcChannel = managedChannel.asInstanceOf[GrpcChannel]
-
-      // Create FrostServiceClient with the wrapped channel
-      FrostServiceClient(grpcChannel)
-    case _ =>
-      // Fallback to using the regular settings
-      FrostServiceClient(settings)
+  private lazy val frostClient: FrostServiceClient = {
+    FrostServiceClient(frostSettings)
   }
 
   // Assuming generated client name
