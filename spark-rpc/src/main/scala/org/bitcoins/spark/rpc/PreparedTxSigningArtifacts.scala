@@ -8,7 +8,7 @@ import org.bitcoins.core.number.UInt32
 import org.bitcoins.core.policy.Policy
 import org.bitcoins.core.protocol.transaction.*
 import org.bitcoins.core.script.util.PreviousOutputMap
-import org.bitcoins.crypto.HashType
+import org.bitcoins.crypto.{HashDigest, HashType}
 import org.bitcoins.crypto.frost.{FrostNoncePriv, FrostNoncePub}
 import org.bitcoins.spark.rpc.proto.spark.SigningJob
 import scodec.bits.ByteVector
@@ -38,7 +38,7 @@ case class PreparedTxSigningArtifacts(
     }
   }
 
-  def sighash: ByteVector = {
+  def sighash: HashDigest = {
     val outpoint = TransactionOutPoint(fundingTx.txId, UInt32(voutIdx))
     val previousOutputMap = PreviousOutputMap(
       Map(outpoint -> fundingTx.outputs(voutIdx)))
@@ -46,10 +46,10 @@ case class PreparedTxSigningArtifacts(
                                           UInt32.zero,
                                           previousOutputMap,
                                           Policy.standardScriptVerifyFlags)
-    TransactionSignatureSerializer.serializeForSignature(
-      txSigComp,
-      HashType.sigHashAll,
-      TaprootSerializationOptions.empty)
+    TransactionSignatureSerializer
+      .hashForSignature(txSigComp,
+                        HashType.sigHashDefault,
+                        TaprootSerializationOptions.empty)
   }
   def commitment: FrostNoncePub = nonce.toNoncePub
 }
