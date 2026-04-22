@@ -81,7 +81,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     // +1 from the embedde spark userid
     // https://github.com/buildonspark/spark/blob/main/spark/testing/wallet/signing.go#L24
     val userId =
-      "0000000000000000000000000000000000000000000000000000000000000064"
+      "0000000000000000000000000000000000000000000000000000000000000063"
     val pubShares = Map(userId -> byteVecToByteString(signingPubKey.bytes))
     val userKeyPackage = KeyPackage(identifier = userId,
                                     secretShare = signingKey.bytes,
@@ -141,22 +141,26 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       frostResponse <- sparkClient.signFrost(frostReq)
       _ = logger.info(
         s"Done signing ${frostJobs.size} ${frostResponse.results.keys}")
-      signingResults = frostResponse.results.toVector
-      rootTxSigningJob = toUserSignedTxSigningJob(
-        leafId,
-        rootTx,
-        userSignature = signingResults(0)._2.signatureShare,
-        frostJobs(0))
-      cpfpRefundTxSigningJob = toUserSignedTxSigningJob(
-        leafId,
-        cpfpRefundTx,
-        userSignature = signingResults(1)._2.signatureShare,
-        frostJobs(1))
-      directFromCpfpRefundTxSigningJob = toUserSignedTxSigningJob(
-        leafId,
-        directCpfpRefundTx,
-        userSignature = signingResults(2)._2.signatureShare,
-        frostJobs(2))
+      resultByJobId = frostResponse.results
+
+      rootSig = resultByJobId(frostJobs(0).jobId).signatureShare
+      refundSig = resultByJobId(frostJobs(1).jobId).signatureShare
+      directSig = resultByJobId(frostJobs(2).jobId).signatureShare
+
+      rootTxSigningJob = toUserSignedTxSigningJob(leafId,
+                                                  rootTx,
+                                                  rootSig,
+                                                  frostJobs(0))
+      cpfpRefundTxSigningJob = toUserSignedTxSigningJob(leafId,
+                                                        cpfpRefundTx,
+                                                        refundSig,
+                                                        frostJobs(1))
+      directFromCpfpRefundTxSigningJob =
+        toUserSignedTxSigningJob(leafId,
+                                 directCpfpRefundTx,
+                                 directSig,
+                                 frostJobs(2))
+
       finalizeDepTreeCreateReq = buildFinalizeDepositTreeCreationReq(
         depositTreeCreationReq,
         rootTxSigningJob = rootTxSigningJob,
@@ -193,6 +197,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     val fee = SatoshisPerVirtualByte(Satoshis(5)) * 191
     val depositNonce = FrostNoncePriv.fresh()
     val cpfpRefundNonce = FrostNoncePriv.fresh()
+    val directFromCpfpRefundNonce = FrostNoncePriv.fresh()
     val utxoOpt = Some(
       UTXO(rawTx = depositTx.bytes, vout = depositOutputIdx, network = network))
     val depositSigningCommitment = SigningCommitment(
@@ -202,6 +207,10 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     val cpfpRefundSigningCommitment = SigningCommitment(
       hiding = cpfpRefundNonce.k1.publicKey.bytes,
       binding = cpfpRefundNonce.k2.publicKey.bytes
+    )
+    val directFromCpfpRefundSigningCommitment = SigningCommitment(
+      hiding = directFromCpfpRefundNonce.k1.publicKey.bytes,
+      binding = directFromCpfpRefundNonce.k2.publicKey.bytes
     )
     val rootTx = buildRootTx(depositTx, depositOutputIdx)
     val rootTxOutputIdx = rootTx.outputs.zipWithIndex
@@ -239,7 +248,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       SigningJob(
         signingPublicKey = signingKey.publicKey.bytes,
         rawTx = directFromCpfpRefundTx.bytes,
-        signingNonceCommitment = Some(cpfpRefundSigningCommitment)
+        signingNonceCommitment = Some(directFromCpfpRefundSigningCommitment)
       )
     )
     val depositTreeCreationReq = StartDepositTreeCreationRequest(
@@ -269,7 +278,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
         rawTx = directFromCpfpRefundTx.bytes,
         fundingTx = rootTx,
         voutIdx = rootTxOutputIdx,
-        nonce = cpfpRefundNonce,
+        nonce = directFromCpfpRefundNonce,
         job = directFromCpfpRefundTxSigningJobOpt.get
       )
     )
@@ -357,7 +366,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
         s"Converting signing job ${j.getClass.getSimpleName} to frost signing job with id $jobId")
       FrostSigningJob(
         jobId = jobId,
-        message = signingArtifact.sighash,
+        message = signingArtifact.sighash.bytes,
         keyPackage = Some(userKeyPackage),
         verifyingKey = verifyingKey.bytes,
         nonce = Some(
