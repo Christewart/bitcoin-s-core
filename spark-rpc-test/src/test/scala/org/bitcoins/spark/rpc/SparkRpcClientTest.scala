@@ -5,6 +5,7 @@ import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.{Int32, UInt32}
 import org.bitcoins.core.protocol.Bech32mAddress
+import org.bitcoins.core.protocol.dlc.models.DLCStatus.getContractId
 import org.bitcoins.core.protocol.script.{
   ScriptPubKey,
   ScriptSignature,
