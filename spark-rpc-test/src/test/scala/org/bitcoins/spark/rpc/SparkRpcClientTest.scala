@@ -26,7 +26,12 @@ import org.bitcoins.spark.rpc.proto.frost.{
   SigningNonce
 }
 import org.bitcoins.spark.rpc.proto.spark.*
-import org.bitcoins.testkit.util.BitcoinSAsyncTest
+import org.bitcoins.testkit.wallet.DLCWalletUtil.InitializedDLCWallet
+import org.bitcoins.testkit.wallet.{
+  DLCWalletUtil,
+  DualDLCWalletTestCachedBitcoind
+}
+import org.scalatest.FutureOutcome
 import scodec.bits.ByteVector
 
 import java.nio.file.Paths
@@ -35,7 +40,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
 
-class SparkRpcClientTest extends BitcoinSAsyncTest {
+class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
   behavior of "SparkRpcClient"
   val path = if (EnvUtil.isMac) {
     Paths.get("/Users/chrisstewart/dev/spark/bitcoin_regtest.conf")
@@ -44,6 +49,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
   }
   val bitcoindInstance = BitcoindInstanceLocal.fromConfigFile(path.toFile)
   lazy val bitcoind = BitcoindRpcClient(bitcoindInstance)
+
   val sparkInstance =
     SparkInstanceLocal(
       new java.net.URI("https://localhost:8535"),
@@ -63,8 +69,14 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     ByteVector(byteString.toByteArray)
 
   private val network = Network.REGTEST
+  type FixtureParam =
+    (InitializedDLCWallet, InitializedDLCWallet, BitcoindRpcClient)
 
-  it must "deposit into a spark entity" in {
+  override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
+    withDualDLCWallets(test, DLCWalletUtil.sampleContractOraclePair, bitcoind)
+  }
+
+  it must "deposit into a spark entity" in { _ =>
     val (identityKey, leafId, userKeyPackage) = setupSparkTest()
     val amt = Bitcoins.one
     for {
@@ -100,6 +112,7 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
       GetSigningCommitmentsRequest(count = 3, nodeIdCount = 1)
     val signingKey = ECPrivateKey(userKeyPackage.secretShare)
     val signingPubKey = userKeyPackage.publicKey
+
     val req = GenerateDepositAddressRequest(
       identityPublicKey = identityKey.publicKey.bytes,
       signingPublicKey = signingPubKey,

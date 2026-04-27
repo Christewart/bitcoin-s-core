@@ -122,11 +122,13 @@ trait FundWalletUtil extends BitcoinSLogger {
       bitcoind: BitcoindRpcClient
   )(implicit
       ec: ExecutionContext): Future[(Transaction, DoubleSha256DigestBE)] = {
-
+    println("Funding addresses with bitcoind, this may take a moment...")
     val txAndHashF = for {
       txId <- bitcoind.sendMany(addressAmountMap)
       tx <- bitcoind.getRawTransactionRaw(txId)
       hashes <- bitcoind.generate(6)
+      _ = println(
+        s"Done funding addresses with bitcoind, got txId=${txId}, blockHash=${hashes.head}")
     } yield (tx, hashes.head)
 
     txAndHashF
