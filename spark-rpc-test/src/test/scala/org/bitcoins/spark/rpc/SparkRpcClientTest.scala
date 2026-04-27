@@ -5,6 +5,7 @@ import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.{Int32, UInt32}
 import org.bitcoins.core.protocol.Bech32mAddress
+import org.bitcoins.core.protocol.dlc.models.DLCStatus.getContractId
 import org.bitcoins.core.protocol.script.{
   ScriptPubKey,
   ScriptSignature,
@@ -26,7 +27,12 @@ import org.bitcoins.spark.rpc.proto.frost.{
   SigningNonce
 }
 import org.bitcoins.spark.rpc.proto.spark.*
-import org.bitcoins.testkit.util.BitcoinSAsyncTest
+import org.bitcoins.testkit.wallet.DLCWalletUtil.InitializedDLCWallet
+import org.bitcoins.testkit.wallet.{
+  DLCWalletUtil,
+  DualDLCWalletTestCachedBitcoind
+}
+import org.scalatest.FutureOutcome
 import scodec.bits.ByteVector
 
 import java.nio.file.Paths
@@ -34,16 +40,40 @@ import java.util.UUID
 import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
 
-class SparkRpcClientTest extends BitcoinSAsyncTest {
+class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
   behavior of "SparkRpcClient"
+  val path = if (EnvUtil.isMac) {
+    Paths.get("/Users/chrisstewart/dev/spark/bitcoin_regtest.conf")
+  } else {
+    Paths.get("/home/chris/dev/spark/bitcoin_regtest.conf")
+  }
+  val bitcoindInstance = BitcoindInstanceLocal.fromConfigFile(path.toFile)
+  lazy val bitcoind = BitcoindRpcClient(bitcoindInstance)
   implicit def byteVecToByteString(byteVector: ByteVector): ByteString =
     ByteString.copyFrom(byteVector.toArray)
 
   implicit def byteStringToByteVec(byteString: ByteString): ByteVector =
     ByteVector(byteString.toByteArray)
   private val network = Network.REGTEST
+  type FixtureParam =
+    (InitializedDLCWallet, InitializedDLCWallet, BitcoindRpcClient)
 
-  it must "deposit into a spark entity" in {
+  override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
+    withDualDLCWallets(test, DLCWalletUtil.sampleContractOraclePair, bitcoind)
+  }
+
+  it must "deposit into a spark entity" in { params =>
+    val walletA = params._1.wallet
+    val walletB = params._2.wallet
+    walletA
+      .listDLCs()
+      .foreach(dlcs =>
+        logger.info(s"Wallet A DLCs: ${dlcs.map(getContractId)}"))
+    walletB
+      .listDLCs()
+      .foreach(dlcs =>
+        logger.info(s"Wallet B DLCs: ${dlcs.map(getContractId)}"))
+
     val sparkInstance =
       SparkInstanceLocal(
         new java.net.URI("https://localhost:8535"),
@@ -60,13 +90,6 @@ class SparkRpcClientTest extends BitcoinSAsyncTest {
     logger.info(s"Identity pubkey: ${identityKey.publicKey.hex}")
     logger.info(s"Signing pubkey: ${signingPubKey.hex}")
 
-    val path = if (EnvUtil.isMac) {
-      Paths.get("/Users/chrisstewart/dev/spark/bitcoin_regtest.conf")
-    } else {
-      Paths.get("/home/chris/dev/spark/bitcoin_regtest.conf")
-    }
-    val bitcoindInstance = BitcoindInstanceLocal.fromConfigFile(path.toFile)
-    val bitcoind = BitcoindRpcClient(bitcoindInstance)
     val leafId = UUID.randomUUID().toString
     val req = GenerateDepositAddressRequest(
       identityPublicKey = identityKey.publicKey.bytes,

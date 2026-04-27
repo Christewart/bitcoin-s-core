@@ -9,11 +9,14 @@ import org.bitcoins.core.protocol.dlc.models.{
 }
 import org.bitcoins.crypto.CryptoUtil
 import org.bitcoins.dlc.wallet.DLCAppConfig
+import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.server.BitcoinSAppConfig
 import org.bitcoins.testkit.wallet.DLCWalletUtil.InitializedDLCWallet
 import org.bitcoins.testkit.wallet.FundWalletUtil.FundedDLCWallet
 import org.bitcoins.wallet.config.WalletAppConfig
 import org.scalatest.FutureOutcome
+
+import scala.concurrent.Future
 
 trait DualDLCWalletTestCachedBitcoind
     extends BitcoinSWalletTestCachedBitcoindNewest {
@@ -80,16 +83,25 @@ trait DualDLCWalletTestCachedBitcoind
       test: OneArgAsyncTest,
       contractOraclePair: ContractOraclePair
   ): FutureOutcome = {
+    val f: Future[FutureOutcome] = cachedBitcoindWithFundsF.map { bitcoind =>
+      withDualDLCWallets(test, contractOraclePair, bitcoind)
+    }
+    new FutureOutcome(f.flatMap(_.toFuture))
+
+  }
+
+  def withDualDLCWallets(
+      test: OneArgAsyncTest,
+      contractOraclePair: ContractOraclePair,
+      bitcoind: BitcoindRpcClient
+  ): FutureOutcome = {
     makeDependentFixture(
       build = () => {
-        val bitcoindF = cachedBitcoindWithFundsF
 
-        val walletAF = bitcoindF.flatMap { bitcoind =>
+        val walletAF =
           FundWalletUtil.createFundedDLCWalletWithBitcoind(bitcoind)
-        }
-        val walletBF = for {
-          bitcoind <- bitcoindF
 
+        val walletBF = for {
           // its important to map on this otherwise we generate blocks in parallel
           // causing a reorg inside of createFundedDLCWallet
           _ <- walletAF
@@ -105,7 +117,6 @@ trait DualDLCWalletTestCachedBitcoind
           contractInfo = SingleContractInfo(amt.satoshis, contractOraclePair)
           (dlcWalletA, dlcWalletB) <-
             DLCWalletUtil.initDLC(walletA, walletB, contractInfo)
-          bitcoind <- bitcoindF
         } yield (dlcWalletA, dlcWalletB, bitcoind)
       },
       destroy = {
