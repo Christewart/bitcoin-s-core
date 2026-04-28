@@ -59,10 +59,17 @@ trait DualDLCWalletTestCachedBitcoind
     * tied to an underlying blockchain
     */
   def withDualFundedDLCWallets(test: OneArgAsyncTest): FutureOutcome = {
+    val f = cachedBitcoindWithFundsF.map(bitcoind =>
+      withDualFundedDLCWallets(test, bitcoind))
+    new FutureOutcome(f.flatMap(_.toFuture))
+  }
+
+  def withDualFundedDLCWallets(
+      test: OneArgAsyncTest,
+      bitcoind: BitcoindRpcClient): FutureOutcome = {
     makeDependentFixture(
       build = () =>
         for {
-          bitcoind <- cachedBitcoindWithFundsF
           walletA <-
             FundWalletUtil.createFundedDLCWalletWithBitcoind(bitcoind)
           walletB <- FundWalletUtil.createFundedDLCWalletWithBitcoind(
@@ -87,7 +94,6 @@ trait DualDLCWalletTestCachedBitcoind
       withDualDLCWallets(test, contractOraclePair, bitcoind)
     }
     new FutureOutcome(f.flatMap(_.toFuture))
-
   }
 
   def withDualDLCWallets(

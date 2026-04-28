@@ -2,10 +2,15 @@ package org.bitcoins.spark.rpc
 
 import com.google.protobuf.ByteString
 import org.bitcoins.asyncutil.AsyncUtil
+import org.bitcoins.core.config.RegTest
 import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.{Int32, UInt32}
-import org.bitcoins.core.protocol.Bech32mAddress
-import org.bitcoins.core.protocol.dlc.models.DLCStatus.getContractId
+import org.bitcoins.core.protocol.BitcoinAddress
+import org.bitcoins.core.protocol.dlc.models.{
+  DLCStatus,
+  DisjointUnionContractInfo,
+  SingleContractInfo
+}
 import org.bitcoins.core.protocol.script.{
   ScriptPubKey,
   ScriptSignature,
@@ -16,6 +21,7 @@ import org.bitcoins.core.util.EnvUtil
 import org.bitcoins.core.wallet.fee.SatoshisPerVirtualByte
 import org.bitcoins.crypto.frost.FrostNoncePriv
 import org.bitcoins.crypto.{ECPrivateKey, ECPublicKey}
+import org.bitcoins.dlc.wallet.DLCWallet
 import org.bitcoins.rpc.client.common.BitcoindRpcClient
 import org.bitcoins.rpc.config.BitcoindInstanceLocal
 import org.bitcoins.spark.rpc.proto.common.SigningCommitment
@@ -27,7 +33,7 @@ import org.bitcoins.spark.rpc.proto.frost.{
   SigningNonce
 }
 import org.bitcoins.spark.rpc.proto.spark.*
-import org.bitcoins.testkit.wallet.DLCWalletUtil.InitializedDLCWallet
+import org.bitcoins.testkit.wallet.FundWalletUtil.FundedDLCWallet
 import org.bitcoins.testkit.wallet.{
   DLCWalletUtil,
   DualDLCWalletTestCachedBitcoind
@@ -37,10 +43,7 @@ import scodec.bits.ByteVector
 
 import java.nio.file.Paths
 import java.util.UUID
-<<<<<<< HEAD
 import scala.annotation.nowarn
-=======
->>>>>>> 5c7ce194cc (refactor: Add fundSparkAddress() helper method)
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
@@ -76,10 +79,10 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
 
   private val network = Network.REGTEST
   type FixtureParam =
-    (InitializedDLCWallet, InitializedDLCWallet, BitcoindRpcClient)
+    (FundedDLCWallet, FundedDLCWallet, BitcoindRpcClient)
 
   override def withFixture(test: OneArgAsyncTest): FutureOutcome = {
-    withDualDLCWallets(test, DLCWalletUtil.sampleContractOraclePair, bitcoind)
+    withDualFundedDLCWallets(test, bitcoind)
   }
 
   it must "deposit into a spark entity" in { _ =>
@@ -125,6 +128,161 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
       } yield {
         succeed
       }
+
+  }
+  it must "deposit into a spark entity with a settled DLC" in { params =>
+    val walletA = params._1.wallet
+    // val walletB = params._2.wallet
+
+    val sparkInstance =
+      SparkInstanceLocal(
+        new java.net.URI("https://localhost:8535"),
+        trustSelfSigned = true,
+        new java.net.URI("http://localhost:9990")
+      )
+    val sparkClient = SparkRpcClient(sparkInstance)
+
+    // Identity key is used for challenge-response auth with the operator.
+    // Signing key is the secp256k1 key associated with the deposit address.
+    val identityKey = ECPrivateKey.freshPrivateKey
+    val signingKey = ECPrivateKey.freshPrivateKey
+    val signingPubKey = signingKey.publicKey
+    logger.info(s"Identity pubkey: ${identityKey.publicKey.hex}")
+    logger.info(s"Signing pubkey: ${signingPubKey.hex}")
+
+    val leafId = UUID.randomUUID().toString
+    val req = GenerateDepositAddressRequest(
+      identityPublicKey = identityKey.publicKey.bytes,
+      signingPublicKey = signingPubKey.bytes,
+      network = network,
+      leafId = Some(leafId)
+    )
+    val unusedDepositReq =
+      QueryUnusedDepositAddressesRequest(identityPublicKey =
+                                           identityKey.publicKey.bytes,
+                                         network = network)
+    // +1 from the embedde spark userid
+    // https://github.com/buildonspark/spark/blob/main/spark/testing/wallet/signing.go#L24
+    val userId =
+      "0000000000000000000000000000000000000000000000000000000000000063"
+    val pubShares = Map(userId -> byteVecToByteString(signingPubKey.bytes))
+    val userKeyPackage = KeyPackage(identifier = userId,
+                                    secretShare = signingKey.bytes,
+                                    publicShares = pubShares,
+                                    publicKey = signingPubKey.bytes,
+                                    minSigners = 1)
+    val amt = DLCWalletUtil.total
+    val getSigningCommitmentReq =
+      GetSigningCommitmentsRequest(count = 3, nodeIdCount = 1)
+
+    for {
+      _ <- sparkClient.login(identityKey)
+      info <- sparkClient.generateDepositAddress(req)
+      address = info.getDepositAddress
+      sparkDepositAddress = BitcoinAddress.fromString(address.address)
+      _ <- DLCWalletUtil.initDLC(
+        params._1,
+        params._2,
+        SingleContractInfo(amt.satoshis,
+                           DLCWalletUtil.sampleContractOraclePair),
+        payoutAddressAOpt = Some(sparkDepositAddress)
+      )
+      dlc <- walletA.listDLCs().map(_.head)
+      fundingTxId = DLCStatus.getFundingTxId(dlc)
+      _ = logger.info(
+        s"Funded DLC with id ${dlc.dlcId}, txid=${fundingTxId} executing DLC...")
+      fundingTx <- walletA.getDLCFundingTx(DLCStatus.getContractId(dlc).get)
+      _ = fundingTx.outputs.foreach(o =>
+        logger.info(s"Funding tx output=$o address=${BitcoinAddress
+            .fromScriptPubKey(o.scriptPubKey, RegTest)}"))
+      settlementTx <- executeDLC(walletA, initiatorWins = true)
+      _ <- bitcoind.sendRawTransaction(settlementTx)
+      _ = settlementTx.inputs.map(_.previousOutput).foreach { o =>
+        logger.info(s"Settlement tx outpoint=${o.txId.hex}:${o.vout.toInt}")
+      }
+      _ = settlementTx.outputs.foreach { o =>
+        logger.info(
+          s"Settlement tx output=$o address=${BitcoinAddress.fromScriptPubKey(o.scriptPubKey, RegTest)}")
+      }
+      _ <- AsyncUtil.nonBlockingSleep(5.seconds)
+      depositAddresses <- sparkClient.queryUnusedDepositAddresses(
+        unusedDepositReq)
+      _ = logger.info(s"deposit address: ${address.address}")
+      _ = logger.info(
+        s"static deposit addresses: ${depositAddresses.depositAddresses.map(_.depositAddress)}")
+      _ = assert(
+        depositAddresses.depositAddresses.exists(
+          _.depositAddress == address.address))
+      verifyKey = ECPublicKey.fromBytes(address.verifyingKey)
+
+      _ <- bitcoind.generate(6)
+
+      _ <- AsyncUtil.nonBlockingSleep(5.seconds)
+      (depositTreeCreationReq, signingArtifacts) = buildDepositTreeCreationReq(
+        identityKey,
+        settlementTx,
+        amt,
+        signingKey)
+      rootTx = signingArtifacts.head.tx
+      cpfpRefundTx = signingArtifacts(1).tx
+      directCpfpRefundTx = signingArtifacts(2).tx
+      //      depositTreeCreation <- sparkClient.startDepositTreeCreation(
+      //        depositTreeCreationReq)
+      //      _ = logger.info(
+      //        s"Starting deposit tree creation: ${depositTreeCreation.treeId}, beginning signing flow...")
+      getSigningCommitmentResp <- sparkClient.getSigningCommitments(
+        getSigningCommitmentReq)
+      frostJobs = toFrostSigningJobs(
+        jobs = signingArtifacts,
+        verifyingKey = verifyKey,
+        userKeyPackage = userKeyPackage,
+        sparkEntityCommitmentsResp = getSigningCommitmentResp
+      )
+      frostReq = SignFrostRequest(signingJobs = frostJobs, role = USER)
+      _ = logger.info(
+        s"Attempting to sign frost with ${frostJobs.size} signing jobs")
+      frostResponse <- sparkClient.signFrost(frostReq)
+      _ = logger.info(
+        s"Done signing ${frostJobs.size} ${frostResponse.results.keys}")
+      resultByJobId = frostResponse.results
+
+      rootSig = resultByJobId(frostJobs(0).jobId).signatureShare
+      refundSig = resultByJobId(frostJobs(1).jobId).signatureShare
+      directSig = resultByJobId(frostJobs(2).jobId).signatureShare
+
+      rootTxSigningJob = toUserSignedTxSigningJob(leafId,
+                                                  rootTx,
+                                                  rootSig,
+                                                  frostJobs(0))
+      cpfpRefundTxSigningJob = toUserSignedTxSigningJob(leafId,
+                                                        cpfpRefundTx,
+                                                        refundSig,
+                                                        frostJobs(1))
+      directFromCpfpRefundTxSigningJob =
+        toUserSignedTxSigningJob(leafId,
+                                 directCpfpRefundTx,
+                                 directSig,
+                                 frostJobs(2))
+
+      finalizeDepTreeCreateReq = buildFinalizeDepositTreeCreationReq(
+        depositTreeCreationReq = depositTreeCreationReq,
+        rootTxSigningJob = rootTxSigningJob,
+        cpfpRefundTxSigningJob = cpfpRefundTxSigningJob,
+        directFromCpfpRefundTxSigningJob = directFromCpfpRefundTxSigningJob
+      )
+      depositResponse <- sparkClient.finalizeDepositTreeCreation(
+        finalizeDepTreeCreateReq)
+      _ = assert(
+        depositResponse.rootNode.exists(_.value == amt.satoshis.toLong))
+      balanceReq = QueryBalanceRequest(identityPublicKey =
+                                         identityKey.publicKey.bytes,
+                                       network = network)
+      balanceResp <- sparkClient.queryBalance(balanceReq)
+    } yield {
+      assert(balanceResp.balance == amt.satoshis.toLong)
+      println(s"Generated address: $info")
+      succeed
+    }
   }
 
   private def fundSparkAddress(
@@ -140,7 +298,7 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
       GetSigningCommitmentsRequest(count = 3, nodeIdCount = 1)
     val signingKey = ECPrivateKey(userKeyPackage.secretShare)
     val signingPubKey = userKeyPackage.publicKey
-    
+
     val req = GenerateDepositAddressRequest(
       identityPublicKey = identityKey.publicKey.bytes,
       signingPublicKey = signingPubKey,
@@ -151,18 +309,13 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
       _ <- sparkClient.login(identityKey)
       info <- sparkClient.generateDepositAddress(req)
       address = info.getDepositAddress
-      _ <- AsyncUtil.nonBlockingSleep(5.seconds)
-//      depositAddresses <- sparkClient.queryUnusedDepositAddresses(
-//        unusedDepositReq)
-
-      depositAddress = Bech32mAddress.fromString(address.address)
+      sparkDepositAddress = BitcoinAddress.fromString(address.address)
       verifyKey = ECPublicKey.fromBytes(address.verifyingKey)
-      depositTxId <- bitcoind.sendToAddress(address = depositAddress,
+      depositTxId <- bitcoind.sendToAddress(address = sparkDepositAddress,
                                             fundingAmount,
                                             walletName = "default")
       depositTx <- bitcoind.getRawTransactionRaw(depositTxId)
 
-      _ = logger.info(s"Deposit txid=$depositTxId")
       _ <- bitcoind.generate(6)
       _ <- AsyncUtil.nonBlockingSleep(5.seconds)
       (depositTreeCreationReq, signingArtifacts) = buildDepositTreeCreationReq(
@@ -470,6 +623,29 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
                                     publicKey = signingPubKey.bytes,
                                     minSigners = 1)
     (identityKey, leafId, userKeyPackage)
+  }
+  private def executeDLC(
+      wallet: DLCWallet,
+      initiatorWins: Boolean): Future[Transaction] = {
+    for {
+      contractId <- DLCWalletUtil.getContractId(wallet)
+      status <- DLCWalletUtil.getDLCStatus(wallet)
+      (initiatorSigs, receipientSigs) = status.contractInfo match {
+        case single: SingleContractInfo =>
+          DLCWalletUtil.getSigs(single)
+        case disjoint: DisjointUnionContractInfo =>
+          sys.error(
+            s"Cannot retrieve sigs for disjoint union contract, got=$disjoint"
+          )
+      }
+      settlementTx <- {
+        if (initiatorWins) {
+          wallet.executeDLC(contractId, initiatorSigs).map(_.get)
+        } else {
+          wallet.executeDLC(contractId, receipientSigs).map(_.get)
+        }
+      }
+    } yield settlementTx
   }
 
 }

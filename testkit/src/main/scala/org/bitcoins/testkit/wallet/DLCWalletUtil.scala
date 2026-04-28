@@ -384,7 +384,7 @@ object DLCWalletUtil extends BitcoinSLogger {
     for {
       offer <- walletA.createDLCOffer(
         contractInfo = contractInfo,
-        collateral = half,
+        collateral = (contractInfo.totalCollateral / Satoshis(2)).satoshis,
         feeRateOpt = Some(SatoshisPerVirtualByte.fromLong(10)),
         locktime = dummyTimeouts.contractMaturity.toUInt32,
         refundLocktime = dummyTimeouts.contractTimeout.toUInt32,
