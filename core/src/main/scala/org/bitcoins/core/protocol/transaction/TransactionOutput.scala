@@ -1,6 +1,6 @@
 package org.bitcoins.core.protocol.transaction
 
-import org.bitcoins.core.currency.{CurrencyUnit, CurrencyUnits}
+import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, CurrencyUnits}
 import org.bitcoins.core.protocol.script.{NonStandardScriptPubKey, ScriptPubKey}
 import org.bitcoins.core.serializers.transaction.RawTransactionOutputParser
 import org.bitcoins.crypto.{Factory, NetworkElement}
@@ -9,6 +9,10 @@ import scodec.bits.ByteVector
 case class TransactionOutput(value: CurrencyUnit, scriptPubKey: ScriptPubKey)
     extends NetworkElement {
   override val bytes: ByteVector = RawTransactionOutputParser.write(this)
+
+  override def toString: String = {
+    s"TransactionOutput(value=${Bitcoins(value.satoshis)}, scriptPubKey=$scriptPubKey)"
+  }
 }
 
 object EmptyTransactionOutput
