@@ -3,7 +3,7 @@ package org.bitcoins.spark.rpc
 import com.google.protobuf.ByteString
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.config.RegTest
-import org.bitcoins.core.currency.{CurrencyUnit, Satoshis}
+import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.{Int32, UInt32}
 import org.bitcoins.core.protocol.BitcoinAddress
 import org.bitcoins.core.protocol.dlc.models.{
