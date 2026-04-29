@@ -5,7 +5,6 @@ import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.core.currency.{Bitcoins, CurrencyUnit, Satoshis}
 import org.bitcoins.core.number.{Int32, UInt32}
 import org.bitcoins.core.protocol.Bech32mAddress
-import org.bitcoins.core.protocol.dlc.models.DLCStatus.getContractId
 import org.bitcoins.core.protocol.script.{
   ScriptPubKey,
   ScriptSignature,
@@ -37,6 +36,7 @@ import scodec.bits.ByteVector
 
 import java.nio.file.Paths
 import java.util.UUID
+import scala.annotation.nowarn
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
@@ -50,6 +50,17 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
   }
   val bitcoindInstance = BitcoindInstanceLocal.fromConfigFile(path.toFile)
   lazy val bitcoind = BitcoindRpcClient(bitcoindInstance)
+  val sparkInstance =
+    SparkInstanceLocal(
+      new java.net.URI("https://localhost:8535"),
+      trustSelfSigned = true,
+      new java.net.URI("http://localhost:9990")
+    )
+  lazy val sparkClient = SparkRpcClient(sparkInstance)
+  // +1 from the embedded spark userid
+  // https://github.com/buildonspark/spark/blob/main/spark/testing/wallet/signing.go#L24
+  val userId =
+    "0000000000000000000000000000000000000000000000000000000000000063"
 
   implicit def byteVecToByteString(byteVector: ByteVector): ByteString =
     ByteString.copyFrom(byteVector.toArray)
@@ -65,47 +76,9 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
     withDualDLCWallets(test, DLCWalletUtil.sampleContractOraclePair, bitcoind)
   }
 
-  it must "deposit into a spark entity" in { params =>
-    val walletA = params._1.wallet
-    val walletB = params._2.wallet
-    walletA
-      .listDLCs()
-      .foreach(dlcs =>
-        logger.info(s"Wallet A DLCs: ${dlcs.map(getContractId)}"))
-    walletB
-      .listDLCs()
-      .foreach(dlcs =>
-        logger.info(s"Wallet B DLCs: ${dlcs.map(getContractId)}"))
-
-    val sparkInstance =
-      SparkInstanceLocal(
-        new java.net.URI("https://localhost:8535"),
-        trustSelfSigned = true,
-        new java.net.URI("http://localhost:9990")
-      )
-    val sparkClient = SparkRpcClient(sparkInstance)
-
-    // Identity key is used for challenge-response auth with the operator.
-    // Signing key is the secp256k1 key associated with the deposit address.
-    val identityKey = ECPrivateKey.freshPrivateKey
-    val signingKey = ECPrivateKey.freshPrivateKey
-    val signingPubKey = signingKey.publicKey
-    logger.info(s"Identity pubkey: ${identityKey.publicKey.hex}")
-    logger.info(s"Signing pubkey: ${signingPubKey.hex}")
-
-    val leafId = UUID.randomUUID()
-    // +1 from the embedde spark userid
-    // https://github.com/buildonspark/spark/blob/main/spark/testing/wallet/signing.go#L24
-    val userId =
-      "0000000000000000000000000000000000000000000000000000000000000063"
-    val pubShares = Map(userId -> byteVecToByteString(signingPubKey.bytes))
-    val userKeyPackage = KeyPackage(identifier = userId,
-                                    secretShare = signingKey.bytes,
-                                    publicShares = pubShares,
-                                    publicKey = signingPubKey.bytes,
-                                    minSigners = 1)
+  it must "deposit into a spark entity" in { _ =>
+    val (identityKey, leafId, userKeyPackage) = setupSparkTest()
     val amt = Bitcoins.one
-
     for {
       depositResponse <- fundSparkAddress(
         sparkClient,
@@ -124,6 +97,28 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
       assert(balanceResp.balance == amt.satoshis.toLong)
       succeed
     }
+  }
+
+  it must "deposit into a spark entity and then transfer to another spark user" in {
+    _ =>
+      val (identityKey, leafId, userKeyPackage) = setupSparkTest()
+      val fundingAmt = Bitcoins.one
+      @nowarn val receiverPrivKey = ECPrivateKey.freshPrivateKey
+      @nowarn val newLeafPrivKey = ECPrivateKey.freshPrivateKey
+      for {
+        depositResponse0 <- fundSparkAddress(
+          sparkClient,
+          fundingAmt,
+          identityKey,
+          leafId.toString,
+          userKeyPackage
+        )
+        _ = assert(
+          depositResponse0.rootNode.exists(
+            _.value == fundingAmt.satoshis.toLong))
+      } yield {
+        succeed
+      }
   }
 
   private def fundSparkAddress(
@@ -448,6 +443,26 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
       userSignature = userSignature,
       signingCommitments = Some(SigningCommitments(frostSigningJob.commitments))
     )
+  }
+
+  private def setupSparkTest(): (ECPrivateKey, UUID, KeyPackage) = {
+    // Identity key is used for challenge-response auth with the operator.
+    // Signing key is the secp256k1 key associated with the deposit address.
+    val identityKey = ECPrivateKey.freshPrivateKey
+    val signingKey = ECPrivateKey.freshPrivateKey
+    val signingPubKey = signingKey.publicKey
+    logger.info(s"Identity pubkey: ${identityKey.publicKey.hex}")
+    logger.info(s"Signing pubkey: ${signingPubKey.hex}")
+
+    val leafId = UUID.randomUUID()
+
+    val pubShares = Map(userId -> byteVecToByteString(signingPubKey.bytes))
+    val userKeyPackage = KeyPackage(identifier = userId,
+                                    secretShare = signingKey.bytes,
+                                    publicShares = pubShares,
+                                    publicKey = signingPubKey.bytes,
+                                    minSigners = 1)
+    (identityKey, leafId, userKeyPackage)
   }
 
 }
