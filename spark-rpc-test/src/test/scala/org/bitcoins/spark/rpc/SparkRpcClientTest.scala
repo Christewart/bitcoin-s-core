@@ -50,13 +50,7 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
   }
   val bitcoindInstance = BitcoindInstanceLocal.fromConfigFile(path.toFile)
   lazy val bitcoind = BitcoindRpcClient(bitcoindInstance)
-  val sparkInstance =
-    SparkInstanceLocal(
-      new java.net.URI("https://localhost:8535"),
-      trustSelfSigned = true,
-      new java.net.URI("http://localhost:9990")
-    )
-  lazy val sparkClient = SparkRpcClient(sparkInstance)
+
   // +1 from the embedded spark userid
   // https://github.com/buildonspark/spark/blob/main/spark/testing/wallet/signing.go#L24
   val userId =
@@ -69,10 +63,6 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
       new java.net.URI("http://localhost:9990")
     )
   lazy val sparkClient = SparkRpcClient(sparkInstance)
-  // +1 from the embedded spark userid
-  // https://github.com/buildonspark/spark/blob/main/spark/testing/wallet/signing.go#L24
-  val userId =
-    "0000000000000000000000000000000000000000000000000000000000000063"
 
   implicit def byteVecToByteString(byteVector: ByteVector): ByteString =
     ByteString.copyFrom(byteVector.toArray)
