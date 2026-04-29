@@ -37,7 +37,10 @@ import scodec.bits.ByteVector
 
 import java.nio.file.Paths
 import java.util.UUID
+<<<<<<< HEAD
 import scala.annotation.nowarn
+=======
+>>>>>>> 5c7ce194cc (refactor: Add fundSparkAddress() helper method)
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
@@ -137,7 +140,7 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
       GetSigningCommitmentsRequest(count = 3, nodeIdCount = 1)
     val signingKey = ECPrivateKey(userKeyPackage.secretShare)
     val signingPubKey = userKeyPackage.publicKey
-
+    
     val req = GenerateDepositAddressRequest(
       identityPublicKey = identityKey.publicKey.bytes,
       signingPublicKey = signingPubKey,
