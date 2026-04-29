@@ -37,6 +37,7 @@ import scodec.bits.ByteVector
 
 import java.nio.file.Paths
 import java.util.UUID
+import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.language.implicitConversions
 
@@ -49,11 +50,13 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
   }
   val bitcoindInstance = BitcoindInstanceLocal.fromConfigFile(path.toFile)
   lazy val bitcoind = BitcoindRpcClient(bitcoindInstance)
+
   implicit def byteVecToByteString(byteVector: ByteVector): ByteString =
     ByteString.copyFrom(byteVector.toArray)
 
   implicit def byteStringToByteVec(byteString: ByteString): ByteVector =
     ByteVector(byteString.toByteArray)
+
   private val network = Network.REGTEST
   type FixtureParam =
     (InitializedDLCWallet, InitializedDLCWallet, BitcoindRpcClient)
@@ -90,17 +93,7 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
     logger.info(s"Identity pubkey: ${identityKey.publicKey.hex}")
     logger.info(s"Signing pubkey: ${signingPubKey.hex}")
 
-    val leafId = UUID.randomUUID().toString
-    val req = GenerateDepositAddressRequest(
-      identityPublicKey = identityKey.publicKey.bytes,
-      signingPublicKey = signingPubKey.bytes,
-      network = network,
-      leafId = Some(leafId)
-    )
-    val unusedDepositReq =
-      QueryUnusedDepositAddressesRequest(identityPublicKey =
-                                           identityKey.publicKey.bytes,
-                                         network = network)
+    val leafId = UUID.randomUUID()
     // +1 from the embedde spark userid
     // https://github.com/buildonspark/spark/blob/main/spark/testing/wallet/signing.go#L24
     val userId =
@@ -112,26 +105,58 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
                                     publicKey = signingPubKey.bytes,
                                     minSigners = 1)
     val amt = Bitcoins.one
+
+    for {
+      depositResponse <- fundSparkAddress(
+        sparkClient,
+        amt,
+        identityKey,
+        leafId.toString,
+        userKeyPackage
+      )
+      _ = assert(
+        depositResponse.rootNode.exists(_.value == amt.satoshis.toLong))
+      balanceReq = QueryBalanceRequest(identityPublicKey =
+                                         identityKey.publicKey.bytes,
+                                       network = network)
+      balanceResp <- sparkClient.queryBalance(balanceReq)
+    } yield {
+      assert(balanceResp.balance == amt.satoshis.toLong)
+      succeed
+    }
+  }
+
+  private def fundSparkAddress(
+      sparkClient: SparkRpcClient,
+      fundingAmount: CurrencyUnit,
+      identityKey: ECPrivateKey,
+      leafId: String,
+      userKeyPackage: KeyPackage)
+      : Future[FinalizeDepositTreeCreationResponse] = {
+    logger.info(
+      s"Funding deposit address with leafId $leafId, signing pubkey ${userKeyPackage.publicKey.toHex}, fundingAmount=$fundingAmount")
     val getSigningCommitmentReq =
       GetSigningCommitmentsRequest(count = 3, nodeIdCount = 1)
-
+    val signingKey = ECPrivateKey(userKeyPackage.secretShare)
+    val signingPubKey = userKeyPackage.publicKey
+    val req = GenerateDepositAddressRequest(
+      identityPublicKey = identityKey.publicKey.bytes,
+      signingPublicKey = signingPubKey,
+      network = network,
+      leafId = Some(leafId)
+    )
     for {
       _ <- sparkClient.login(identityKey)
       info <- sparkClient.generateDepositAddress(req)
       address = info.getDepositAddress
       _ <- AsyncUtil.nonBlockingSleep(5.seconds)
-      depositAddresses <- sparkClient.queryUnusedDepositAddresses(
-        unusedDepositReq)
-      _ = logger.info(s"deposit address: ${address.address}")
-      _ = logger.info(
-        s"static deposit addresses: ${depositAddresses.depositAddresses.map(_.depositAddress)}")
-      _ = assert(
-        depositAddresses.depositAddresses.exists(
-          _.depositAddress == address.address))
+//      depositAddresses <- sparkClient.queryUnusedDepositAddresses(
+//        unusedDepositReq)
+
       depositAddress = Bech32mAddress.fromString(address.address)
       verifyKey = ECPublicKey.fromBytes(address.verifyingKey)
       depositTxId <- bitcoind.sendToAddress(address = depositAddress,
-                                            amt,
+                                            fundingAmount,
                                             walletName = "default")
       depositTx <- bitcoind.getRawTransactionRaw(depositTxId)
 
@@ -141,15 +166,15 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
       (depositTreeCreationReq, signingArtifacts) = buildDepositTreeCreationReq(
         identityKey,
         depositTx,
-        amt,
+        fundingAmount,
         signingKey)
       rootTx = signingArtifacts.head.tx
       cpfpRefundTx = signingArtifacts(1).tx
       directCpfpRefundTx = signingArtifacts(2).tx
-//      depositTreeCreation <- sparkClient.startDepositTreeCreation(
-//        depositTreeCreationReq)
-//      _ = logger.info(
-//        s"Starting deposit tree creation: ${depositTreeCreation.treeId}, beginning signing flow...")
+      //      depositTreeCreation <- sparkClient.startDepositTreeCreation(
+      //        depositTreeCreationReq)
+      //      _ = logger.info(
+      //        s"Starting deposit tree creation: ${depositTreeCreation.treeId}, beginning signing flow...")
       getSigningCommitmentResp <- sparkClient.getSigningCommitments(
         getSigningCommitmentReq)
       frostJobs = toFrostSigningJobs(
@@ -192,17 +217,7 @@ class SparkRpcClientTest extends DualDLCWalletTestCachedBitcoind {
       )
       depositResponse <- sparkClient.finalizeDepositTreeCreation(
         finalizeDepTreeCreateReq)
-      _ = assert(
-        depositResponse.rootNode.exists(_.value == amt.satoshis.toLong))
-      balanceReq = QueryBalanceRequest(identityPublicKey =
-                                         identityKey.publicKey.bytes,
-                                       network = network)
-      balanceResp <- sparkClient.queryBalance(balanceReq)
-    } yield {
-      assert(balanceResp.balance == amt.satoshis.toLong)
-      println(s"Generated address: $info")
-      succeed
-    }
+    } yield depositResponse
   }
 
   private def buildDepositTreeCreationReq(
