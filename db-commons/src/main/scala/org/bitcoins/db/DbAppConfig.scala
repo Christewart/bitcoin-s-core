@@ -140,7 +140,7 @@ abstract class DbAppConfig extends AppConfig {
     case PostgreSQL =>
       Some(moduleName)
     case SQLite =>
-      None
+      Some("main")
   }
 
   private var slickDbConfigOpt: Option[DatabaseConfig[JdbcProfile]] = None

@@ -1,18 +1,19 @@
 package org.bitcoins.testkit.wallet
 
-import org.apache.pekko.actor.ActorSystem
 import com.typesafe.config.{Config, ConfigFactory}
+import org.apache.pekko.actor.ActorSystem
 import org.bitcoins.asyncutil.AsyncUtil
 import org.bitcoins.commons.config.AppConfig
 import org.bitcoins.core.api.chain.ChainQueryApi
 import org.bitcoins.core.api.node.NodeApi
 import org.bitcoins.core.api.wallet.WalletApi
 import org.bitcoins.core.currency.*
+import org.bitcoins.db.models.MasterXPubDAO
 import org.bitcoins.dlc.wallet.DLCWallet
 import org.bitcoins.node.NodeCallbacks
 import org.bitcoins.rpc.client.common.{BitcoindRpcClient, BitcoindVersion}
-import org.bitcoins.server.{BitcoinSAppConfig, BitcoindRpcBackendUtil}
 import org.bitcoins.server.util.CallbackUtil
+import org.bitcoins.server.{BitcoinSAppConfig, BitcoindRpcBackendUtil}
 import org.bitcoins.testkit.PostgresTestDatabase
 import org.bitcoins.testkit.fixtures.BitcoinSFixture
 import org.bitcoins.testkit.keymanager.KeyManagerTestUtil
@@ -37,7 +38,7 @@ trait BitcoinSWalletTest
     extends BitcoinSFixture
     with BaseWalletTest
     with PostgresTestDatabase {
-  import BitcoinSWalletTest._
+  import BitcoinSWalletTest.*
 
   override def beforeAll(): Unit = {
     super[PostgresTestDatabase].beforeAll()
@@ -510,7 +511,10 @@ object BitcoinSWalletTest extends WalletLogger {
       walletAppConfig: WalletAppConfig
   )(implicit ec: ExecutionContext): Future[Unit] = {
     walletAppConfig.clean()
+    val masterXpubDAO = MasterXPubDAO()(ec, walletAppConfig)
     for {
+      s <- masterXpubDAO.findAll().map(_.size)
+      _ = require(s == 0, s"Expected no xpubs in the database, found $s")
       _ <- walletAppConfig.stop()
     } yield ()
   }
